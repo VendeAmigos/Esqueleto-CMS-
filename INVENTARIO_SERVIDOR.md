@@ -7,8 +7,8 @@ Este documento mantiene el registro centralizado de la infraestructura, contened
 ## 🌐 1. Dominios y Red
 | Recurso | Destino / IP | Función | Estado |
 | :--- | :--- | :--- | :---: |
-| `shop.afotica.com` | IP Pública VPS | Tienda / Catálogo para clientes (Astro) | 🟡 Por apuntar DNS |
-| `admin.shop.afotica.com` | IP Pública VPS | Panel de control y catálogo (Next.js) | 🟡 Por apuntar DNS |
+| `shop.afotica.com` | IP Pública VPS | Tienda / Catálogo para clientes (Astro) | 🟢 Activo con Cloudflare |
+| `adminshop.afotica.com` | IP Pública VPS | Panel de control y catálogo (Next.js) | 🟢 Configurado en Nginx |
 | `Puerto 80 (HTTP)` | Nginx Container | Tráfico web estándar y validación Let's Encrypt | 🟢 Activo |
 | `Puerto 443 (HTTPS)`| Nginx Container | Tráfico cifrado SSL/TLS | 🟡 Requiere Certbot en VPS |
 | `Puerto 5432 (DB)` | Red interna Docker | PostgreSQL (bloqueado al exterior por seguridad) | 🟢 Activo |
