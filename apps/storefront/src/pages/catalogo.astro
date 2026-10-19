@@ -1,0 +1,100 @@
+---
+// apps/storefront/src/pages/catalogo.astro
+import Layout from '../layouts/Layout.astro';
+import ProductCard from '../components/ProductCard.astro';
+import { db, products, categories, productModifiers, modifierOptions, eq } from '@esqueleto/core';
+
+// Consultando productos con sus categorías y modificadores desde PostgreSQL
+const dbProducts = await db
+  .select({
+    id: products.id,
+    title: products.title,
+    description: products.description,
+    imageUrl: products.imageUrl,
+    basePrice: products.basePrice,
+    categoryName: categories.name,
+  })
+  .from(products)
+  .leftJoin(categories, eq(products.categoryId, categories.id))
+  .where(eq(products.isActive, true));
+
+// Obtener modificadores asociados
+const allModifiers = await db.select().from(productModifiers);
+const allOptions = await db.select().from(modifierOptions);
+
+// Organizar modificadores con sus opciones
+const fullProducts = dbProducts.map((prod) => {
+  const prodMods = allModifiers
+    .filter((m) => m.productId === prod.id)
+    .map((mod) => {
+      const opts = allOptions
+        .filter((o) => o.modifierId === mod.id)
+        .map((o) => ({
+          id: o.id,
+          name: o.name,
+          priceDelta: o.priceDelta,
+          isDefault: o.isDefault,
+        }));
+      return {
+        id: mod.id,
+        name: mod.name,
+        type: mod.type as 'single' | 'multiple',
+        required: mod.required,
+        options: opts,
+      };
+    });
+
+  return {
+    ...prod,
+    modifiers: prodMods,
+  };
+});
+---
+
+<Layout
+  title="Catálogo de Productos"
+  description="Explora nuestra selección de productos con personalización, opciones y precios en tiempo real."
+>
+  <div class="space-y-8">
+    <!-- Encabezado de la Sección -->
+    <div class="flex flex-col md:flex-row md:items-end justify-between border-b border-gray-200 pb-6 gap-4">
+      <div>
+        <p class="text-xs font-bold uppercase tracking-wider text-indigo-600 mb-1">
+          Colección Activa
+        </p>
+        <h1 class="text-3xl font-extrabold tracking-tight text-gray-900 sm:text-4xl">
+          Todos los Productos
+        </h1>
+        <p class="mt-2 text-sm text-gray-500 max-w-xl">
+          Selecciona tus productos favoritos, personaliza sus modificadores y tallas con cálculo de precios transparente.
+        </p>
+      </div>
+
+      <div class="flex items-center gap-2 text-sm text-gray-500">
+        <span>Mostrando <strong class="text-gray-900">{fullProducts.length}</strong> artículos</span>
+      </div>
+    </div>
+
+    <!-- Cuadrícula Responsiva de Productos -->
+    {fullProducts.length === 0 ? (
+      <div class="rounded-2xl border border-dashed border-gray-300 bg-white p-16 text-center">
+        <h3 class="text-lg font-bold text-gray-900">No hay productos disponibles</h3>
+        <p class="mt-1 text-sm text-gray-500">Ejecuta el seed para poblar el catálogo con imágenes y modificadores.</p>
+      </div>
+    ) : (
+      <div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        {fullProducts.map((product) => (
+          <ProductCard
+            id={product.id}
+            name={product.title}
+            description={product.description || ''}
+            price={product.basePrice}
+            image={product.imageUrl || 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=800&auto=format&fit=crop&q=80'}
+            category={product.categoryName || 'General'}
+            modifiers={product.modifiers}
+          />
+        ))}
+      </div>
+    )}
+  </div>
+</Layout>

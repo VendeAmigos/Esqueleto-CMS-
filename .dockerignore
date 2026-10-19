@@ -1,0 +1,28 @@
+# Ignorar dependencias locales
+**/node_modules
+**/.pnpm-store
+
+# Ignorar builds y caches
+**/.next
+**/dist
+**/.astro
+**/.turbo
+**/.cache
+
+# Ignorar logs y debug
+**/npm-debug.log*
+**/yarn-debug.log*
+**/yarn-error.log*
+**/pnpm-debug.log*
+
+# Ignorar archivos locales y variables secretas
+.git
+.gitignore
+.env
+.env.local
+.env.*.local
+*.pem
+
+# Archivos del sistema
+.DS_Store
+Thumbs.db

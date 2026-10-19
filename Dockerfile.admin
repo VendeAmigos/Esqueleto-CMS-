@@ -1,0 +1,32 @@
+# Dockerfile.admin
+FROM node:22-alpine AS base
+ENV PNPM_HOME="/pnpm"
+ENV PATH="$PNPM_HOME:$PATH"
+# Habilitar corepack para usar pnpm
+RUN corepack enable
+
+# 1. Fase de Dependencias y Build
+FROM base AS builder
+WORKDIR /app
+COPY . .
+RUN pnpm install --frozen-lockfile
+
+# Activar el output standalone de Next.js configurado en next.config.mjs
+ENV DOCKER_BUILD=1
+RUN pnpm --filter @esqueleto/admin build
+
+# 2. Fase de Producción
+FROM base AS runner
+WORKDIR /app
+ENV NODE_ENV=production
+ENV PORT=3001
+ENV HOSTNAME="0.0.0.0"
+
+# Copiar el build standalone y los estáticos de Next.js
+COPY --from=builder /app/apps/admin/.next/standalone ./
+COPY --from=builder /app/apps/admin/.next/static ./apps/admin/.next/static
+
+EXPOSE 3001
+
+# Ejecutar el servidor node optimizado generado por Next.js
+CMD ["node", "apps/admin/server.js"]

@@ -1,0 +1,35 @@
+# Dockerfile.storefront
+FROM node:22-alpine AS base
+ENV PNPM_HOME="/pnpm"
+ENV PATH="$PNPM_HOME:$PATH"
+# Habilitar corepack para usar pnpm nativo
+RUN corepack enable
+
+# 1. Fase de Dependencias y Build
+FROM base AS builder
+WORKDIR /app
+# Copiar manifiestos y código fuente
+COPY . .
+# Instalar dependencias respetando el lockfile y los workspaces
+RUN pnpm install --frozen-lockfile
+# Compilar únicamente el proyecto Storefront
+RUN pnpm --filter @esqueleto/storefront build
+
+# 2. Fase de Producción
+FROM base AS runner
+WORKDIR /app
+ENV NODE_ENV=production
+ENV HOST=0.0.0.0
+ENV PORT=4321
+
+# Copiar el output de Astro y los módulos de Node (Astro standalone necesita dependencias de runtime)
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/packages ./packages
+COPY --from=builder /app/apps/storefront/node_modules ./apps/storefront/node_modules
+COPY --from=builder /app/apps/storefront/dist ./apps/storefront/dist
+COPY --from=builder /app/apps/storefront/package.json ./apps/storefront/package.json
+
+EXPOSE 4321
+
+# Ejecutar el entrypoint de Astro (Node adapter en modo standalone)
+CMD ["node", "./apps/storefront/dist/server/entry.mjs"]

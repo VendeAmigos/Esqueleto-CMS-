@@ -1,0 +1,53 @@
+---
+// apps/storefront/src/layouts/Layout.astro
+import Navbar from '../components/Navbar.astro';
+
+interface Props {
+  title: string;
+  description?: string;
+}
+
+const { title, description = 'E-commerce Open Source Plug & Play de alto rendimiento' } = Astro.props;
+---
+
+<!doctype html>
+<html lang="es" class="scroll-smooth">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="generator" content={Astro.generator} />
+    <title>{title} | ESQUELETO</title>
+    <meta name="description" content={description} />
+    
+    <!-- Google Fonts Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body class="bg-gray-50 text-gray-900 min-h-screen flex flex-col font-sans antialiased">
+    <!-- Barra de Navegación Global -->
+    <Navbar />
+
+    <!-- Contenido Dinámico de la Página -->
+    <main class="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <slot />
+    </main>
+
+    <!-- Footer Mínimo y Elegante -->
+    <footer class="border-t border-gray-200 bg-white py-6 mt-auto">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center text-sm text-gray-500">
+        &copy; {new Date().getFullYear()} ESQUELETO CMS. Todos los derechos reservados.
+      </div>
+    </footer>
+  </body>
+</html>
+
+<style is:global>
+  body {
+    font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  }
+</style>

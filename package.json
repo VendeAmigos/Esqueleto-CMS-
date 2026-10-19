@@ -1,0 +1,10 @@
+{
+  "name": "proyectos-personales",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "pnpm --filter \"./apps/*\" --parallel run dev",
+    "db:seed": "pnpm --filter @esqueleto/core db:seed",
+    "db:push": "pnpm --filter @esqueleto/core db:push"
+  }
+}

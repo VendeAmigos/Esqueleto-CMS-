@@ -1,0 +1,97 @@
+---
+// apps/storefront/src/components/Navbar.astro
+---
+
+<header class="sticky top-0 z-50 w-full border-b border-gray-200/80 bg-white/80 backdrop-blur-md transition-all duration-200">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="flex items-center justify-between h-16">
+      
+      <!-- Logotipo / Nombre de la Tienda -->
+      <div class="flex items-center gap-3">
+        <a href="/" class="flex items-center gap-2 group">
+          <div class="w-8 h-8 rounded-lg bg-black text-white flex items-center justify-center font-bold text-sm tracking-wider transition-transform duration-200 group-hover:scale-105 shadow-sm">
+            E
+          </div>
+          <span class="text-xl font-bold tracking-tight text-gray-900 group-hover:text-black">
+            ESQUELETO<span class="text-indigo-600">.</span>
+          </span>
+        </a>
+      </div>
+
+      <!-- Enlaces de Navegación Centrales (Responsivo) -->
+      <nav class="hidden md:flex items-center space-x-8">
+        <a
+          href="/"
+          class="text-sm font-medium text-gray-600 hover:text-black transition-colors"
+        >
+          Inicio
+        </a>
+        <a
+          href="/catalogo"
+          class="text-sm font-medium text-gray-600 hover:text-black transition-colors"
+        >
+          Catálogo
+        </a>
+      </nav>
+
+      <!-- Área Derecha: Ícono de Carrito y Badges -->
+      <div class="flex items-center space-x-3">
+        <a
+          href="/carrito"
+          id="cart-button"
+          class="relative p-2 text-gray-700 hover:text-black rounded-full hover:bg-gray-100 transition-colors"
+          aria-label="Ver Carrito de Compras"
+        >
+          <!-- Ícono SVG de Bolsa de Compras -->
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            class="w-6 h-6"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            stroke-width="1.75"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              d="M15.75 10.5V6a3.75 3.75 0 10-7.5 0v4.5m11.356-1.993l1.263 12c.07.665-.45 1.243-1.119 1.243H4.25a1.125 1.125 0 01-1.12-1.243l1.264-12A1.125 1.125 0 015.513 7.5h12.974c.576 0 1.059.435 1.119.993z"
+            />
+          </svg>
+
+          <!-- Badge Reactivo del Carrito -->
+          <span
+            id="cart-badge"
+            class="absolute -top-0.5 -right-0.5 flex items-center justify-center min-w-[20px] h-5 px-1 text-[11px] font-bold text-white bg-black rounded-full transition-all duration-200 opacity-0 scale-75 shadow-sm"
+          >
+            0
+          </span>
+        </a>
+      </div>
+
+    </div>
+  </div>
+</header>
+
+<!-- Lógica reactiva Vanilla JS vinculada a Nano Stores -->
+<script>
+  import { $cart } from '../store/cart';
+
+  const cartBadge = document.getElementById('cart-badge');
+
+  if (cartBadge) {
+    // Suscripción al store reactivo y persistente
+    $cart.subscribe((cartItems) => {
+      const totalCount = cartItems.reduce((acc, item) => acc + item.quantity, 0);
+
+      cartBadge.textContent = totalCount > 99 ? '99+' : totalCount.toString();
+
+      if (totalCount > 0) {
+        cartBadge.classList.remove('opacity-0', 'scale-75');
+        cartBadge.classList.add('opacity-100', 'scale-100');
+      } else {
+        cartBadge.classList.remove('opacity-100', 'scale-100');
+        cartBadge.classList.add('opacity-0', 'scale-75');
+      }
+    });
+  }
+</script>

@@ -1,0 +1,35 @@
+# Dependencias
+node_modules/
+.pnpm-store/
+
+# Builds y compilaciones
+.next/
+dist/
+.astro/
+out/
+
+# Archivos de entorno y credenciales (Seguridad Crítica)
+.env
+.env.local
+.env.*.local
+*.env
+!*.env.example
+
+# Logs y depuración
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+*.log
+
+# Archivos temporales del sistema y paquetes
+.DS_Store
+Thumbs.db
+deploy.tar.gz
+scratch*.html
+
+# Certificados y secretos locales
+certbot/conf/
+certbot/www/
+uploads/*
+!uploads/.gitkeep
