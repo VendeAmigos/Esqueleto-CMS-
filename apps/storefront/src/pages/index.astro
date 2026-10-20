@@ -10,7 +10,15 @@ import {
   modifierOptions,
   siteSettings,
   eq,
+  ensureSchema,
 } from '@esqueleto/core';
+
+// 0. Auto-verificar esquema de base de datos
+try {
+  await ensureSchema();
+} catch (e) {
+  console.warn('Aviso al verificar esquema:', e);
+}
 
 // 1. Obtener configuración del sitio / Apariencia
 let settings = {
@@ -25,7 +33,7 @@ let settings = {
 
 try {
   const settingsList = await db.select().from(siteSettings).where(eq(siteSettings.id, 'default')).execute();
-  if (settingsList[0]) {
+  if (settingsList && settingsList[0]) {
     settings = {
       siteName: settingsList[0].siteName || settings.siteName,
       logoColor: settingsList[0].logoColor || settings.logoColor,
@@ -41,18 +49,32 @@ try {
 }
 
 // 2. Obtener Categorías ordenadas para el Bento Grid
-const allCategories = await db
-  .select()
-  .from(categories)
-  .orderBy(categories.displayOrder)
-  .execute();
+let allCategories: any[] = [];
+try {
+  allCategories = await db
+    .select()
+    .from(categories)
+    .orderBy(categories.displayOrder)
+    .execute();
+} catch (e) {
+  try {
+    allCategories = await db.select().from(categories).execute();
+  } catch (err) {
+    console.error('Error cargando categorías:', err);
+  }
+}
 
 // Contar productos activos por categoría
-const allActiveProducts = await db
-  .select({ id: products.id, categoryId: products.categoryId })
-  .from(products)
-  .where(eq(products.isActive, true))
-  .execute();
+let allActiveProducts: any[] = [];
+try {
+  allActiveProducts = await db
+    .select({ id: products.id, categoryId: products.categoryId })
+    .from(products)
+    .where(eq(products.isActive, true))
+    .execute();
+} catch (e) {
+  console.error('Error cargando conteo de productos:', e);
+}
 
 const categoriesWithCount = allCategories.map((cat) => {
   const count = allActiveProducts.filter((p) => p.categoryId === cat.id).length;
@@ -63,30 +85,58 @@ const categoriesWithCount = allCategories.map((cat) => {
 });
 
 // 3. Obtener Productos Destacados
-let featuredRaw = await db
-  .select({
-    id: products.id,
-    title: products.title,
-    description: products.description,
-    imageUrl: products.imageUrl,
-    basePrice: products.basePrice,
-    isFeatured: products.isFeatured,
-    categoryName: categories.name,
-  })
-  .from(products)
-  .leftJoin(categories, eq(products.categoryId, categories.id))
-  .where(eq(products.isActive, true))
-  .execute();
+let featuredProductsList: any[] = [];
+try {
+  let featuredRaw = await db
+    .select({
+      id: products.id,
+      title: products.title,
+      description: products.description,
+      imageUrl: products.imageUrl,
+      basePrice: products.basePrice,
+      isFeatured: products.isFeatured,
+      categoryName: categories.name,
+    })
+    .from(products)
+    .leftJoin(categories, eq(products.categoryId, categories.id))
+    .where(eq(products.isActive, true))
+    .execute();
 
-// Filtrar destacados o usar los primeros 4 si no hay ninguno marcado aún
-let featuredProductsList = featuredRaw.filter((p) => p.isFeatured);
-if (featuredProductsList.length === 0) {
-  featuredProductsList = featuredRaw.slice(0, 4);
+  featuredProductsList = featuredRaw.filter((p) => p.isFeatured);
+  if (featuredProductsList.length === 0) {
+    featuredProductsList = featuredRaw.slice(0, 4);
+  }
+} catch (e) {
+  try {
+    const fallbackRaw = await db
+      .select({
+        id: products.id,
+        title: products.title,
+        description: products.description,
+        imageUrl: products.imageUrl,
+        basePrice: products.basePrice,
+        categoryName: categories.name,
+      })
+      .from(products)
+      .leftJoin(categories, eq(products.categoryId, categories.id))
+      .where(eq(products.isActive, true))
+      .limit(4)
+      .execute();
+    featuredProductsList = fallbackRaw.map((p) => ({ ...p, isFeatured: false }));
+  } catch (err) {
+    console.error('Error cargando productos destacados:', err);
+  }
 }
 
 // Asociar modificadores a los productos destacados
-const allModifiers = await db.select().from(productModifiers).execute();
-const allOptions = await db.select().from(modifierOptions).execute();
+let allModifiers: any[] = [];
+let allOptions: any[] = [];
+try {
+  allModifiers = await db.select().from(productModifiers).execute();
+  allOptions = await db.select().from(modifierOptions).execute();
+} catch (e) {
+  console.error('Error cargando modificadores:', e);
+}
 
 const featuredProducts = featuredProductsList.map((prod) => {
   const prodMods = allModifiers

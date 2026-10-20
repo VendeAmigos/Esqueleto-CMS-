@@ -1,21 +1,37 @@
 ---
 // apps/storefront/src/pages/categorias/index.astro
 import Layout from '../../layouts/Layout.astro';
-import { db, categories, products, eq } from '@esqueleto/core';
+import { db, categories, products, eq, ensureSchema } from '@esqueleto/core';
+
+try {
+  await ensureSchema();
+} catch (e) {}
 
 // Consultar todas las categorías ordenadas
-const allCategories = await db
-  .select()
-  .from(categories)
-  .orderBy(categories.displayOrder)
-  .execute();
+let allCategories: any[] = [];
+try {
+  allCategories = await db
+    .select()
+    .from(categories)
+    .orderBy(categories.displayOrder)
+    .execute();
+} catch (e) {
+  try {
+    allCategories = await db.select().from(categories).execute();
+  } catch (err) {
+    console.error('Error cargando categorías:', err);
+  }
+}
 
 // Contar productos activos en cada categoría
-const allActiveProducts = await db
-  .select({ id: products.id, categoryId: products.categoryId })
-  .from(products)
-  .where(eq(products.isActive, true))
-  .execute();
+let allActiveProducts: any[] = [];
+try {
+  allActiveProducts = await db
+    .select({ id: products.id, categoryId: products.categoryId })
+    .from(products)
+    .where(eq(products.isActive, true))
+    .execute();
+} catch (e) {}
 
 const categoriesWithCount = allCategories.map((cat) => {
   const count = allActiveProducts.filter((p) => p.categoryId === cat.id).length;

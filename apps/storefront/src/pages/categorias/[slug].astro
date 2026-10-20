@@ -10,7 +10,12 @@ import {
   modifierOptions,
   eq,
   and,
+  ensureSchema,
 } from '@esqueleto/core';
+
+try {
+  await ensureSchema();
+} catch (e) {}
 
 const { slug } = Astro.params;
 
@@ -19,35 +24,67 @@ if (!slug) {
 }
 
 // 1. Obtener la categoría
-const [category] = await db
-  .select()
-  .from(categories)
-  .where(eq(categories.slug, slug))
-  .limit(1);
+let category: any = null;
+try {
+  const [cat] = await db
+    .select()
+    .from(categories)
+    .where(eq(categories.slug, slug))
+    .limit(1);
+  category = cat;
+} catch (e) {
+  console.error('Error buscando categoría:', e);
+}
 
 if (!category) {
   return Astro.redirect('/categorias');
 }
 
 // 2. Obtener productos de esta categoría
-const dbProducts = await db
-  .select({
-    id: products.id,
-    title: products.title,
-    description: products.description,
-    imageUrl: products.imageUrl,
-    basePrice: products.basePrice,
-    isFeatured: products.isFeatured,
-    categoryName: categories.name,
-  })
-  .from(products)
-  .leftJoin(categories, eq(products.categoryId, categories.id))
-  .where(and(eq(products.isActive, true), eq(products.categoryId, category.id)))
-  .execute();
+let dbProducts: any[] = [];
+try {
+  dbProducts = await db
+    .select({
+      id: products.id,
+      title: products.title,
+      description: products.description,
+      imageUrl: products.imageUrl,
+      basePrice: products.basePrice,
+      isFeatured: products.isFeatured,
+      categoryName: categories.name,
+    })
+    .from(products)
+    .leftJoin(categories, eq(products.categoryId, categories.id))
+    .where(and(eq(products.isActive, true), eq(products.categoryId, category.id)))
+    .execute();
+} catch (e) {
+  try {
+    const raw = await db
+      .select({
+        id: products.id,
+        title: products.title,
+        description: products.description,
+        imageUrl: products.imageUrl,
+        basePrice: products.basePrice,
+        categoryName: categories.name,
+      })
+      .from(products)
+      .leftJoin(categories, eq(products.categoryId, categories.id))
+      .where(and(eq(products.isActive, true), eq(products.categoryId, category.id)))
+      .execute();
+    dbProducts = raw.map((p) => ({ ...p, isFeatured: false }));
+  } catch (err) {
+    console.error('Error cargando productos por categoría:', err);
+  }
+}
 
 // 3. Obtener modificadores asociados
-const allModifiers = await db.select().from(productModifiers).execute();
-const allOptions = await db.select().from(modifierOptions).execute();
+let allModifiers: any[] = [];
+let allOptions: any[] = [];
+try {
+  allModifiers = await db.select().from(productModifiers).execute();
+  allOptions = await db.select().from(modifierOptions).execute();
+} catch (e) {}
 
 const fullProducts = dbProducts.map((prod) => {
   const prodMods = allModifiers

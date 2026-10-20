@@ -2,25 +2,38 @@
 // apps/storefront/src/pages/catalogo.astro
 import Layout from '../layouts/Layout.astro';
 import ProductCard from '../components/ProductCard.astro';
-import { db, products, categories, productModifiers, modifierOptions, eq } from '@esqueleto/core';
+import { db, products, categories, productModifiers, modifierOptions, eq, ensureSchema } from '@esqueleto/core';
+
+try {
+  await ensureSchema();
+} catch (e) {}
 
 // Consultando productos con sus categorías y modificadores desde PostgreSQL
-const dbProducts = await db
-  .select({
-    id: products.id,
-    title: products.title,
-    description: products.description,
-    imageUrl: products.imageUrl,
-    basePrice: products.basePrice,
-    categoryName: categories.name,
-  })
-  .from(products)
-  .leftJoin(categories, eq(products.categoryId, categories.id))
-  .where(eq(products.isActive, true));
+let dbProducts: any[] = [];
+try {
+  dbProducts = await db
+    .select({
+      id: products.id,
+      title: products.title,
+      description: products.description,
+      imageUrl: products.imageUrl,
+      basePrice: products.basePrice,
+      categoryName: categories.name,
+    })
+    .from(products)
+    .leftJoin(categories, eq(products.categoryId, categories.id))
+    .where(eq(products.isActive, true));
+} catch (err) {
+  console.error('Error consultando catálogo:', err);
+}
 
 // Obtener modificadores asociados
-const allModifiers = await db.select().from(productModifiers);
-const allOptions = await db.select().from(modifierOptions);
+let allModifiers: any[] = [];
+let allOptions: any[] = [];
+try {
+  allModifiers = await db.select().from(productModifiers);
+  allOptions = await db.select().from(modifierOptions);
+} catch (e) {}
 
 // Organizar modificadores con sus opciones
 const fullProducts = dbProducts.map((prod) => {

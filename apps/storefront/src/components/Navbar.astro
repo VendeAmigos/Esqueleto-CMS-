@@ -1,6 +1,10 @@
 ---
 // apps/storefront/src/components/Navbar.astro
-import { db, siteSettings, eq } from '@esqueleto/core';
+import { db, siteSettings, eq, ensureSchema } from '@esqueleto/core';
+
+try {
+  await ensureSchema();
+} catch (e) {}
 
 let settings = {
   siteName: 'ESQUELETO',
