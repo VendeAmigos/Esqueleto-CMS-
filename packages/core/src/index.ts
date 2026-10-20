@@ -67,6 +67,16 @@ export async function ensureSchema(): Promise<void> {
         `UPDATE categories SET image_url = 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=900&auto=format&fit=crop&q=80', grid_span = 'col-1', display_order = 2 WHERE slug = 'tecnologia' AND (image_url IS NULL OR image_url = '');`,
         `UPDATE categories SET image_url = 'https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?w=900&auto=format&fit=crop&q=80', grid_span = 'col-1', display_order = 3 WHERE slug = 'gourmet' AND (image_url IS NULL OR image_url = '');`,
         `UPDATE categories SET image_url = 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=900&auto=format&fit=crop&q=80', grid_span = 'col-2', display_order = 4 WHERE slug = 'accesorios' AND (image_url IS NULL OR image_url = '');`,
+        `CREATE TABLE IF NOT EXISTS orders (
+          id TEXT PRIMARY KEY,
+          user_id TEXT,
+          status TEXT NOT NULL DEFAULT 'pending',
+          total INTEGER NOT NULL,
+          customer_email TEXT,
+          items_summary TEXT,
+          items_json TEXT,
+          created_at TIMESTAMP NOT NULL DEFAULT NOW()
+        );`,
         `UPDATE products SET is_featured = true WHERE id IN ('prod-playera-01', 'prod-audifonos-02', 'prod-smartwatch-03', 'prod-cafe-04');`,
       ];
 

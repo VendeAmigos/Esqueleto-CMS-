@@ -1,8 +1,17 @@
-import { db, orders } from '@esqueleto/core';
+import { db, orders, ensureSchema } from '@esqueleto/core';
 import Link from 'next/link';
 
 export default async function OrdenesPage() {
-  const allOrders = await db.select().from(orders);
+  try {
+    await ensureSchema();
+  } catch (e) {}
+
+  let allOrders: any[] = [];
+  try {
+    allOrders = await db.select().from(orders);
+  } catch (e) {
+    console.error('Error cargando órdenes:', e);
+  }
 
   // Formateador de moneda nativo (MXN)
   const currencyFormatter = new Intl.NumberFormat('es-MX', {

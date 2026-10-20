@@ -32,6 +32,8 @@ services:
       - DATABASE_URL=postgres://${POSTGRES_USER:-admin}:${POSTGRES_PASSWORD:-admin123}@postgres:5432/${POSTGRES_DB:-esqueleto}
       - HOST=0.0.0.0
       - PORT=4321
+      - MP_ACCESS_TOKEN=${MP_ACCESS_TOKEN:-}
+      - PUBLIC_STOREFRONT_URL=${PUBLIC_STOREFRONT_URL:-https://shop.afotica.com}
     env_file:
       - path: .env
         required: false
