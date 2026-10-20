@@ -2,14 +2,21 @@ import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 import * as schema from './schema';
 
-const connectionString =
+let connectionString =
   process.env.DATABASE_URL ||
-  'postgres://admin:admin123@localhost:5432/esqueleto';
+  'postgres://admin:admin123@postgres:5432/esqueleto';
+
+// Si estamos dentro del contenedor Docker (HOST o HOSTNAME = 0.0.0.0) y DATABASE_URL vino con localhost, corregir a 'postgres'
+if (process.env.HOST === '0.0.0.0' || process.env.HOSTNAME === '0.0.0.0') {
+  connectionString = connectionString
+    .replace('@localhost:', '@postgres:')
+    .replace('@127.0.0.1:', '@postgres:');
+}
 
 export const client = postgres(connectionString, {
   max: 10,
   idle_timeout: 20,
-  connect_timeout: 10,
+  connect_timeout: 5,
 });
 
 export const db = drizzle(client, { schema });
