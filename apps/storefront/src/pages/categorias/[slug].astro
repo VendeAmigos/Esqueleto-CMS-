@@ -1,0 +1,151 @@
+---
+// apps/storefront/src/pages/categorias/[slug].astro
+import Layout from '../../layouts/Layout.astro';
+import ProductCard from '../../components/ProductCard.astro';
+import {
+  db,
+  categories,
+  products,
+  productModifiers,
+  modifierOptions,
+  eq,
+  and,
+} from '@esqueleto/core';
+
+const { slug } = Astro.params;
+
+if (!slug) {
+  return Astro.redirect('/categorias');
+}
+
+// 1. Obtener la categoría
+const [category] = await db
+  .select()
+  .from(categories)
+  .where(eq(categories.slug, slug))
+  .limit(1);
+
+if (!category) {
+  return Astro.redirect('/categorias');
+}
+
+// 2. Obtener productos de esta categoría
+const dbProducts = await db
+  .select({
+    id: products.id,
+    title: products.title,
+    description: products.description,
+    imageUrl: products.imageUrl,
+    basePrice: products.basePrice,
+    isFeatured: products.isFeatured,
+    categoryName: categories.name,
+  })
+  .from(products)
+  .leftJoin(categories, eq(products.categoryId, categories.id))
+  .where(and(eq(products.isActive, true), eq(products.categoryId, category.id)))
+  .execute();
+
+// 3. Obtener modificadores asociados
+const allModifiers = await db.select().from(productModifiers).execute();
+const allOptions = await db.select().from(modifierOptions).execute();
+
+const fullProducts = dbProducts.map((prod) => {
+  const prodMods = allModifiers
+    .filter((m) => m.productId === prod.id)
+    .map((mod) => {
+      const opts = allOptions
+        .filter((o) => o.modifierId === mod.id)
+        .map((o) => ({
+          id: o.id,
+          name: o.name,
+          priceDelta: o.priceDelta,
+          isDefault: o.isDefault,
+        }));
+      return {
+        id: mod.id,
+        name: mod.name,
+        type: mod.type as 'single' | 'multiple',
+        required: mod.required,
+        options: opts,
+      };
+    });
+
+  return {
+    ...prod,
+    modifiers: prodMods,
+  };
+});
+---
+
+<Layout
+  title={category.name}
+  description={`Explora los productos de la categoría ${category.name}.`}
+>
+  <div class="space-y-10">
+    <!-- Breadcrumb -->
+    <nav class="flex items-center gap-2 text-xs text-gray-500">
+      <a href="/" class="hover:text-black transition-colors">Inicio</a>
+      <span>/</span>
+      <a href="/categorias" class="hover:text-black transition-colors">Categorías</a>
+      <span>/</span>
+      <span class="text-black font-semibold">{category.name}</span>
+    </nav>
+
+    <!-- Header Banner de la Categoría -->
+    <div class="relative overflow-hidden rounded-3xl bg-gray-900 py-12 px-8 sm:px-12 text-white shadow-lg">
+      {category.imageUrl && (
+        <img
+          src={category.imageUrl}
+          alt={category.name}
+          class="absolute inset-0 h-full w-full object-cover object-center brightness-50"
+        />
+      )}
+      <div class="absolute inset-0 bg-gradient-to-r from-black/80 via-black/50 to-transparent" />
+
+      <div class="relative z-10 max-w-2xl space-y-2">
+        <span class="inline-block px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-white/20 backdrop-blur-md text-white border border-white/20">
+          Colección
+        </span>
+        <h1 class="text-3xl sm:text-5xl font-extrabold tracking-tight drop-shadow-md">
+          {category.name}
+        </h1>
+        <p class="text-sm text-gray-200 drop-shadow">
+          {fullProducts.length} {fullProducts.length === 1 ? 'producto disponible' : 'productos disponibles'} en esta categoría.
+        </p>
+      </div>
+    </div>
+
+    <!-- Lista de Productos -->
+    {fullProducts.length === 0 ? (
+      <div class="text-center py-16 px-4 bg-white rounded-3xl border border-dashed border-gray-300 space-y-4">
+        <span class="text-4xl">🛍️</span>
+        <h3 class="text-lg font-bold text-gray-900">Aún no hay productos en esta categoría</h3>
+        <p class="text-sm text-gray-500 max-w-md mx-auto">
+          Estamos preparando nuevos artículos para esta sección. Mientras tanto, puedes explorar las demás categorías.
+        </p>
+        <div class="pt-2">
+          <a
+            href="/categorias"
+            class="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-black text-white text-xs font-bold hover:bg-gray-800 transition-colors"
+          >
+            &larr; Ver otras categorías
+          </a>
+        </div>
+      </div>
+    ) : (
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        {fullProducts.map((product) => (
+          <ProductCard
+            id={product.id}
+            name={product.title}
+            price={product.basePrice}
+            image={product.imageUrl || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=800&auto=format&fit=crop&q=80'}
+            category={product.categoryName || category.name}
+            description={product.description || ''}
+            modifiers={product.modifiers}
+          />
+        ))}
+      </div>
+    )}
+  </div>
+</Layout>

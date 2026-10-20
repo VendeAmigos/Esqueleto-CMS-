@@ -12,8 +12,15 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE TABLE IF NOT EXISTS categories (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
-  slug TEXT NOT NULL UNIQUE
+  slug TEXT NOT NULL UNIQUE,
+  image_url TEXT,
+  grid_span TEXT NOT NULL DEFAULT 'col-1',
+  display_order INTEGER NOT NULL DEFAULT 0
 );
+
+ALTER TABLE categories ADD COLUMN IF NOT EXISTS image_url TEXT;
+ALTER TABLE categories ADD COLUMN IF NOT EXISTS grid_span TEXT NOT NULL DEFAULT 'col-1';
+ALTER TABLE categories ADD COLUMN IF NOT EXISTS display_order INTEGER NOT NULL DEFAULT 0;
 
 CREATE TABLE IF NOT EXISTS products (
   id TEXT PRIMARY KEY,
@@ -22,9 +29,35 @@ CREATE TABLE IF NOT EXISTS products (
   image_url TEXT,
   base_price INTEGER NOT NULL,
   is_active BOOLEAN NOT NULL DEFAULT true,
+  is_featured BOOLEAN NOT NULL DEFAULT false,
   category_id TEXT REFERENCES categories(id) ON DELETE SET NULL,
   created_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
+
+ALTER TABLE products ADD COLUMN IF NOT EXISTS is_featured BOOLEAN NOT NULL DEFAULT false;
+
+CREATE TABLE IF NOT EXISTS site_settings (
+  id TEXT PRIMARY KEY,
+  site_name TEXT NOT NULL DEFAULT 'ESQUELETO',
+  logo_svg TEXT,
+  logo_color TEXT NOT NULL DEFAULT '#4f46e5',
+  hero_title TEXT NOT NULL DEFAULT 'Velocidad extrema. Control total en Docker.',
+  hero_subtitle TEXT NOT NULL DEFAULT 'E-commerce Open Source Plug & Play de alto rendimiento con catálogo interactivo y checkout seguro.',
+  hero_image_url TEXT DEFAULT 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?auto=format&fit=crop&w=1600&q=80',
+  hero_cta_text TEXT NOT NULL DEFAULT 'Explorar Catálogo',
+  hero_cta_link TEXT NOT NULL DEFAULT '/catalogo',
+  updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+INSERT INTO site_settings (id, site_name, logo_color, hero_title, hero_subtitle, hero_image_url)
+VALUES (
+  'default',
+  'ESQUELETO',
+  '#4f46e5',
+  'Velocidad extrema. Control total en Docker.',
+  'E-commerce Open Source Plug & Play de alto rendimiento con catálogo interactivo y checkout seguro.',
+  'https://images.unsplash.com/photo-1441986300917-64674bd600d8?auto=format&fit=crop&w=1600&q=80'
+) ON CONFLICT (id) DO NOTHING;
 
 CREATE TABLE IF NOT EXISTS product_modifiers (
   id TEXT PRIMARY KEY,
@@ -64,22 +97,27 @@ CREATE TABLE IF NOT EXISTS orders (
 );
 
 -- ============================================================
--- Categorías
+-- Categorías con Imágenes de Alta Calidad y Tamaños de Grid
 -- ============================================================
-INSERT INTO categories (id, name, slug)
+INSERT INTO categories (id, name, slug, image_url, grid_span, display_order)
 VALUES 
-  ('cat-ropa-01', 'Ropa y Estilo', 'ropa'),
-  ('cat-tec-02', 'Tecnología', 'tecnologia'),
-  ('cat-gourmet-03', 'Café & Gourmet', 'gourmet'),
-  ('cat-acc-04', 'Accesorios', 'accesorios')
-ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, slug = EXCLUDED.slug;
+  ('cat-ropa-01', 'Ropa y Estilo', 'ropa', 'https://images.unsplash.com/photo-1489987707025-afc232f7ea0f?w=900&auto=format&fit=crop&q=80', 'col-2', 1),
+  ('cat-tec-02', 'Tecnología', 'tecnologia', 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=900&auto=format&fit=crop&q=80', 'col-1', 2),
+  ('cat-gourmet-03', 'Café & Gourmet', 'gourmet', 'https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?w=900&auto=format&fit=crop&q=80', 'col-1', 3),
+  ('cat-acc-04', 'Accesorios', 'accesorios', 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=900&auto=format&fit=crop&q=80', 'col-2', 4)
+ON CONFLICT (id) DO UPDATE SET 
+  name = EXCLUDED.name, 
+  slug = EXCLUDED.slug,
+  image_url = EXCLUDED.image_url,
+  grid_span = EXCLUDED.grid_span,
+  display_order = EXCLUDED.display_order;
 
 -- ============================================================
 -- Productos con Imágenes Reales y Modificadores de Precio
 -- ============================================================
 
 -- 1. Playera
-INSERT INTO products (id, title, description, image_url, base_price, is_active, category_id)
+INSERT INTO products (id, title, description, image_url, base_price, is_active, is_featured, category_id)
 VALUES (
   'prod-playera-01',
   'Playera Heavyweight Streetwear',
@@ -87,8 +125,9 @@ VALUES (
   'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=800&auto=format&fit=crop&q=80',
   34900,
   true,
+  true,
   'cat-ropa-01'
-) ON CONFLICT (id) DO NOTHING;
+) ON CONFLICT (id) DO UPDATE SET is_featured = EXCLUDED.is_featured;
 
 INSERT INTO product_modifiers (id, product_id, name, type, required)
 VALUES 
@@ -110,7 +149,7 @@ VALUES
 ON CONFLICT (id) DO NOTHING;
 
 -- 2. Audífonos
-INSERT INTO products (id, title, description, image_url, base_price, is_active, category_id)
+INSERT INTO products (id, title, description, image_url, base_price, is_active, is_featured, category_id)
 VALUES (
   'prod-audifonos-02',
   'Audífonos Over-Ear Pro ANC',
@@ -118,8 +157,9 @@ VALUES (
   'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800&auto=format&fit=crop&q=80',
   159900,
   true,
+  true,
   'cat-tec-02'
-) ON CONFLICT (id) DO NOTHING;
+) ON CONFLICT (id) DO UPDATE SET is_featured = EXCLUDED.is_featured;
 
 INSERT INTO product_modifiers (id, product_id, name, type, required)
 VALUES 
@@ -140,7 +180,7 @@ VALUES
 ON CONFLICT (id) DO NOTHING;
 
 -- 3. Smartwatch
-INSERT INTO products (id, title, description, image_url, base_price, is_active, category_id)
+INSERT INTO products (id, title, description, image_url, base_price, is_active, is_featured, category_id)
 VALUES (
   'prod-smartwatch-03',
   'Smartwatch Cronógrafo Titanium V3',
@@ -148,8 +188,9 @@ VALUES (
   'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=800&auto=format&fit=crop&q=80',
   249900,
   true,
+  true,
   'cat-tec-02'
-) ON CONFLICT (id) DO NOTHING;
+) ON CONFLICT (id) DO UPDATE SET is_featured = EXCLUDED.is_featured;
 
 INSERT INTO product_modifiers (id, product_id, name, type, required)
 VALUES 
@@ -166,7 +207,7 @@ VALUES
 ON CONFLICT (id) DO NOTHING;
 
 -- 4. Café
-INSERT INTO products (id, title, description, image_url, base_price, is_active, category_id)
+INSERT INTO products (id, title, description, image_url, base_price, is_active, is_featured, category_id)
 VALUES (
   'prod-cafe-04',
   'Café de Especialidad Chiapas Finca 500g',
@@ -174,8 +215,9 @@ VALUES (
   'https://images.unsplash.com/photo-1559056199-641a0ac8b55e?w=800&auto=format&fit=crop&q=80',
   22000,
   true,
+  true,
   'cat-gourmet-03'
-) ON CONFLICT (id) DO NOTHING;
+) ON CONFLICT (id) DO UPDATE SET is_featured = EXCLUDED.is_featured;
 
 INSERT INTO product_modifiers (id, product_id, name, type, required)
 VALUES 
@@ -196,7 +238,7 @@ VALUES
 ON CONFLICT (id) DO NOTHING;
 
 -- 5. Mochila
-INSERT INTO products (id, title, description, image_url, base_price, is_active, category_id)
+INSERT INTO products (id, title, description, image_url, base_price, is_active, is_featured, category_id)
 VALUES (
   'prod-mochila-05',
   'Mochila Técnica Urbana Impermeable 25L',
@@ -204,8 +246,9 @@ VALUES (
   'https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=800&auto=format&fit=crop&q=80',
   89900,
   true,
+  true,
   'cat-acc-04'
-) ON CONFLICT (id) DO NOTHING;
+) ON CONFLICT (id) DO UPDATE SET is_featured = EXCLUDED.is_featured;
 
 INSERT INTO product_modifiers (id, product_id, name, type, required)
 VALUES 

@@ -26,6 +26,7 @@ export async function createProduct(formData: FormData) {
   const price = formData.get("price")?.toString();
   const category = formData.get("category")?.toString() || null;
   const image = formData.get("image")?.toString() || "";
+  const isFeatured = formData.get("isFeatured") === "true";
   const modifiersRaw = formData.get("modifiers")?.toString();
 
   if (!name || !price) {
@@ -42,6 +43,7 @@ export async function createProduct(formData: FormData) {
     imageUrl: image,
     basePrice: priceInCents,
     categoryId: category || null,
+    isFeatured,
   });
 
   if (modifiersRaw) {
@@ -85,6 +87,7 @@ export async function updateProduct(id: string, formData: FormData) {
   const price = formData.get("price")?.toString();
   const category = formData.get("category")?.toString() || null;
   const image = formData.get("image")?.toString() || "";
+  const isFeatured = formData.get("isFeatured") === "true";
   const modifiersRaw = formData.get("modifiers")?.toString();
 
   if (!name || !price) {
@@ -101,6 +104,7 @@ export async function updateProduct(id: string, formData: FormData) {
       imageUrl: image,
       basePrice: priceInCents,
       categoryId: category || null,
+      isFeatured,
     })
     .where(eq(products.id, id));
 

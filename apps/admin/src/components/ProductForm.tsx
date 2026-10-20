@@ -28,6 +28,7 @@ interface ProductFormProps {
     imageUrl: string | null;
     basePrice: number; // En centavos
     categoryId: string | null;
+    isFeatured?: boolean;
     modifiers: ModifierGroup[];
   };
   isEdit?: boolean;
@@ -39,6 +40,7 @@ export default function ProductForm({ categories, initialData, isEdit = false }:
   const [price, setPrice] = useState(initialData ? (initialData.basePrice / 100).toFixed(2) : '');
   const [categoryId, setCategoryId] = useState(initialData?.categoryId || '');
   const [imageUrl, setImageUrl] = useState(initialData?.imageUrl || '');
+  const [isFeatured, setIsFeatured] = useState(initialData?.isFeatured || false);
   const [modifiers, setModifiers] = useState<ModifierGroup[]>(initialData?.modifiers || []);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -242,6 +244,7 @@ export default function ProductForm({ categories, initialData, isEdit = false }:
     formData.append('price', price);
     formData.append('category', categoryId);
     formData.append('image', imageUrl);
+    formData.append('isFeatured', isFeatured ? 'true' : 'false');
     formData.append('modifiers', JSON.stringify(modifiers));
 
     try {
@@ -338,6 +341,33 @@ export default function ProductForm({ categories, initialData, isEdit = false }:
                 </option>
               ))}
             </select>
+          </div>
+
+          {/* Toggle de Producto Destacado en Inicio */}
+          <div className="md:col-span-2 bg-gradient-to-r from-amber-50 to-orange-50/50 border border-amber-200/80 rounded-2xl p-4 flex items-center justify-between">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-lg">⭐</span>
+                <span className="text-sm font-bold text-gray-900">Destacar en la Página de Inicio</span>
+                {isFeatured && (
+                  <span className="bg-amber-100 text-amber-800 text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+                    Destacado Activo
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-gray-500 mt-1">
+                Los productos destacados se exhibirán en la sección principal de la portada de la tienda para impulsar las ventas.
+              </p>
+            </div>
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                checked={isFeatured}
+                onChange={(e) => setIsFeatured(e.target.checked)}
+                className="sr-only peer"
+              />
+              <div className="w-12 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-500 shadow-inner"></div>
+            </label>
           </div>
         </div>
 

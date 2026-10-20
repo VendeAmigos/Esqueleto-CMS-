@@ -1,34 +1,80 @@
 ---
 // apps/storefront/src/components/Navbar.astro
+import { db, siteSettings, eq } from '@esqueleto/core';
+
+let settings = {
+  siteName: 'ESQUELETO',
+  logoSvg: '',
+  logoColor: '#4f46e5',
+};
+
+try {
+  const res = await db.select().from(siteSettings).where(eq(siteSettings.id, 'default')).execute();
+  if (res[0]) {
+    settings = {
+      siteName: res[0].siteName || 'ESQUELETO',
+      logoSvg: res[0].logoSvg || '',
+      logoColor: res[0].logoColor || '#4f46e5',
+    };
+  }
+} catch (e) {
+  // En caso de que la tabla aún se esté migrando
+}
+
+const pathname = Astro.url.pathname;
 ---
 
-<header class="sticky top-0 z-50 w-full border-b border-gray-200/80 bg-white/80 backdrop-blur-md transition-all duration-200">
+<!-- BARRA DE NAVEGACIÓN SUPERIOR (DESKTOP & HEADER MÓVIL) -->
+<header class="sticky top-0 z-50 w-full border-b border-gray-200/80 bg-white/85 backdrop-blur-md transition-all duration-200">
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
     <div class="flex items-center justify-between h-16">
       
-      <!-- Logotipo / Nombre de la Tienda -->
+      <!-- Logotipo y Nombre de la Tienda -->
       <div class="flex items-center gap-3">
-        <a href="/" class="flex items-center gap-2 group">
-          <div class="w-8 h-8 rounded-lg bg-black text-white flex items-center justify-center font-bold text-sm tracking-wider transition-transform duration-200 group-hover:scale-105 shadow-sm">
-            E
-          </div>
-          <span class="text-xl font-bold tracking-tight text-gray-900 group-hover:text-black">
-            ESQUELETO<span class="text-indigo-600">.</span>
+        <a href="/" class="flex items-center gap-2.5 group">
+          {settings.logoSvg ? (
+            <div
+              class="w-8 h-8 flex items-center justify-center shrink-0 transition-transform duration-200 group-hover:scale-105 [&>svg]:w-full [&>svg]:h-full"
+              style={`color: ${settings.logoColor};`}
+              set:html={settings.logoSvg}
+            />
+          ) : (
+            <div
+              class="w-8 h-8 rounded-lg text-white flex items-center justify-center font-bold text-sm tracking-wider transition-transform duration-200 group-hover:scale-105 shadow-sm"
+              style={`background-color: ${settings.logoColor};`}
+            >
+              {settings.siteName.charAt(0) || 'E'}
+            </div>
+          )}
+          <span class="text-xl font-extrabold tracking-tight text-gray-900 group-hover:text-black">
+            {settings.siteName}<span style={`color: ${settings.logoColor};`}>.</span>
           </span>
         </a>
       </div>
 
-      <!-- Enlaces de Navegación Centrales (Responsivo) -->
+      <!-- Enlaces de Navegación Centrales (Desktop) -->
       <nav class="hidden md:flex items-center space-x-8">
         <a
           href="/"
-          class="text-sm font-medium text-gray-600 hover:text-black transition-colors"
+          class={`text-sm font-semibold transition-colors ${
+            pathname === '/' ? 'text-black' : 'text-gray-600 hover:text-black'
+          }`}
         >
           Inicio
         </a>
         <a
+          href="/categorias"
+          class={`text-sm font-semibold transition-colors ${
+            pathname.startsWith('/categorias') ? 'text-black' : 'text-gray-600 hover:text-black'
+          }`}
+        >
+          Categorías
+        </a>
+        <a
           href="/catalogo"
-          class="text-sm font-medium text-gray-600 hover:text-black transition-colors"
+          class={`text-sm font-semibold transition-colors ${
+            pathname === '/catalogo' ? 'text-black' : 'text-gray-600 hover:text-black'
+          }`}
         >
           Catálogo
         </a>
@@ -39,7 +85,7 @@
         <a
           href="/carrito"
           id="cart-button"
-          class="relative p-2 text-gray-700 hover:text-black rounded-full hover:bg-gray-100 transition-colors"
+          class="relative p-2.5 text-gray-700 hover:text-black rounded-full hover:bg-gray-100 transition-colors"
           aria-label="Ver Carrito de Compras"
         >
           <!-- Ícono SVG de Bolsa de Compras -->
@@ -58,10 +104,11 @@
             />
           </svg>
 
-          <!-- Badge Reactivo del Carrito -->
+          <!-- Badge Reactivo del Carrito (Desktop) -->
           <span
             id="cart-badge"
-            class="absolute -top-0.5 -right-0.5 flex items-center justify-center min-w-[20px] h-5 px-1 text-[11px] font-bold text-white bg-black rounded-full transition-all duration-200 opacity-0 scale-75 shadow-sm"
+            class="absolute -top-0.5 -right-0.5 flex items-center justify-center min-w-[20px] h-5 px-1 text-[11px] font-bold text-white rounded-full transition-all duration-200 opacity-0 scale-75 shadow-sm"
+            style={`background-color: ${settings.logoColor};`}
           >
             0
           </span>
@@ -72,19 +119,88 @@
   </div>
 </header>
 
+<!-- BARRA DE NAVEGACIÓN MÓVIL (BOTTOM NAVIGATION BAR FIJA) -->
+<nav
+  class="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-lg border-t border-gray-200 px-4 py-2 flex items-center justify-around shadow-2xl safe-area-bottom"
+  aria-label="Navegación Móvil"
+>
+  <!-- 1. Inicio -->
+  <a
+    href="/"
+    class={`flex flex-col items-center justify-center py-1 px-3 rounded-xl transition-all ${
+      pathname === '/' ? 'text-black font-bold' : 'text-gray-500 hover:text-gray-900'
+    }`}
+  >
+    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 mb-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width={pathname === '/' ? 2.25 : 1.75}>
+      <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12l8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25" />
+    </svg>
+    <span class="text-[11px]">Inicio</span>
+  </a>
+
+  <!-- 2. Categorías -->
+  <a
+    href="/categorias"
+    class={`flex flex-col items-center justify-center py-1 px-3 rounded-xl transition-all ${
+      pathname.startsWith('/categorias') ? 'text-black font-bold' : 'text-gray-500 hover:text-gray-900'
+    }`}
+  >
+    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 mb-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width={pathname.startsWith('/categorias') ? 2.25 : 1.75}>
+      <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z" />
+    </svg>
+    <span class="text-[11px]">Categorías</span>
+  </a>
+
+  <!-- 3. Catálogo -->
+  <a
+    href="/catalogo"
+    class={`flex flex-col items-center justify-center py-1 px-3 rounded-xl transition-all ${
+      pathname === '/catalogo' ? 'text-black font-bold' : 'text-gray-500 hover:text-gray-900'
+    }`}
+  >
+    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 mb-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width={pathname === '/catalogo' ? 2.25 : 1.75}>
+      <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 10.5V6a3.75 3.75 0 10-7.5 0v4.5m11.356-1.993l1.263 12c.07.665-.45 1.243-1.119 1.243H4.25a1.125 1.125 0 01-1.12-1.243l1.264-12A1.125 1.125 0 015.513 7.5h12.974c.576 0 1.059.435 1.119.993z" />
+    </svg>
+    <span class="text-[11px]">Catálogo</span>
+  </a>
+
+  <!-- 4. Carrito con Badge Móvil -->
+  <a
+    href="/carrito"
+    class={`relative flex flex-col items-center justify-center py-1 px-3 rounded-xl transition-all ${
+      pathname === '/carrito' ? 'text-black font-bold' : 'text-gray-500 hover:text-gray-900'
+    }`}
+  >
+    <div class="relative">
+      <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 mb-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width={pathname === '/carrito' ? 2.25 : 1.75}>
+        <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 00-3 3h15.75m-12.75-3h11.218c1.121-2.3 2.1-4.684 2.924-7.138a60.114 60.114 0 00-16.536-1.84M7.5 14.25L5.106 5.272M6 20.25a.75.75 0 11-1.5 0 .75.75 0 011.5 0zm12.75 0a.75.75 0 11-1.5 0 .75.75 0 011.5 0z" />
+      </svg>
+      <span
+        id="cart-badge-mobile"
+        class="absolute -top-1.5 -right-2.5 flex items-center justify-center min-w-[18px] h-4 px-1 text-[10px] font-bold text-white rounded-full transition-all duration-200 opacity-0 scale-75 shadow-sm"
+        style={`background-color: ${settings.logoColor};`}
+      >
+        0
+      </span>
+    </div>
+    <span class="text-[11px]">Carrito</span>
+  </a>
+</nav>
+
 <!-- Lógica reactiva Vanilla JS vinculada a Nano Stores -->
 <script>
   import { $cart } from '../store/cart';
 
   const cartBadge = document.getElementById('cart-badge');
+  const cartBadgeMobile = document.getElementById('cart-badge-mobile');
 
-  if (cartBadge) {
-    // Suscripción al store reactivo y persistente
-    $cart.subscribe((cartItems) => {
-      const totalCount = cartItems.reduce((acc, item) => acc + item.quantity, 0);
+  // Suscripción al store reactivo y persistente
+  $cart.subscribe((cartItems) => {
+    const totalCount = cartItems.reduce((acc, item) => acc + item.quantity, 0);
+    const countText = totalCount > 99 ? '99+' : totalCount.toString();
 
-      cartBadge.textContent = totalCount > 99 ? '99+' : totalCount.toString();
-
+    // Actualizar badge Desktop
+    if (cartBadge) {
+      cartBadge.textContent = countText;
       if (totalCount > 0) {
         cartBadge.classList.remove('opacity-0', 'scale-75');
         cartBadge.classList.add('opacity-100', 'scale-100');
@@ -92,6 +208,18 @@
         cartBadge.classList.remove('opacity-100', 'scale-100');
         cartBadge.classList.add('opacity-0', 'scale-75');
       }
-    });
-  }
+    }
+
+    // Actualizar badge Móvil
+    if (cartBadgeMobile) {
+      cartBadgeMobile.textContent = countText;
+      if (totalCount > 0) {
+        cartBadgeMobile.classList.remove('opacity-0', 'scale-75');
+        cartBadgeMobile.classList.add('opacity-100', 'scale-100');
+      } else {
+        cartBadgeMobile.classList.remove('opacity-100', 'scale-100');
+        cartBadgeMobile.classList.add('opacity-0', 'scale-75');
+      }
+    }
+  });
 </script>

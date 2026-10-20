@@ -36,13 +36,14 @@ Este documento mantiene el registro centralizado de la infraestructura, contened
 - **Script de auto-inicialización:** `docker/init.sql` (montado en `/docker-entrypoint-initdb.d/`)
 
 ### Tablas Creadas:
-1. `categories`: Categorías del catálogo (Ropa, Tecnología, Gourmet, Accesorios).
-2. `products`: Catálogo con `title`, `description`, `image_url`, `base_price` (en centavos), `is_active`.
-3. `product_modifiers`: Grupos de opciones (`Talla`, `Color`, `Molienda`, etc.) con tipo `single` o `multiple`.
-4. `modifier_options`: Opciones específicas con ajuste de precio en centavos (`price_delta`).
-5. `product_variants`: Variantes y control de SKU/stock.
-6. `orders`: Órdenes de compra con `total`, `status`, `customer_email`, `items_summary` e `items_json`.
-7. `users`: Cuentas de usuario y administradores.
+1. `site_settings`: Personalización de marca (nombre, logotipo SVG dinámico, color de marca HEX, banner principal Hero con imagen, títulos y botón de acción).
+2. `categories`: Categorías con `image_url`, `grid_span` (1x1, 2x1, 1x2, 2x2 para Bento Grid) y `display_order`.
+3. `products`: Catálogo con `title`, `description`, `image_url`, `base_price` (en centavos), `is_active`, `is_featured` (para destacar en portada).
+4. `product_modifiers`: Grupos de opciones (`Talla`, `Color`, `Molienda`, etc.) con tipo `single` o `multiple`.
+5. `modifier_options`: Opciones específicas con ajuste de precio en centavos (`price_delta`).
+6. `product_variants`: Variantes y control de SKU/stock.
+7. `orders`: Órdenes de compra con `total`, `status`, `customer_email`, `items_summary` e `items_json`.
+8. `users`: Cuentas de usuario y administradores.
 
 ---
 

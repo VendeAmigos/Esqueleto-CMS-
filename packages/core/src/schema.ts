@@ -23,6 +23,9 @@ export const categories = pgTable('categories', {
     .$defaultFn(() => crypto.randomUUID()),
   name: text('name').notNull(),
   slug: text('slug').notNull().unique(),
+  imageUrl: text('image_url'),
+  gridSpan: text('grid_span').notNull().default('col-1'), // 'col-1' | 'col-2' | 'tall' | 'large'
+  displayOrder: integer('display_order').notNull().default(0),
 });
 
 // ==========================================
@@ -37,8 +40,27 @@ export const products = pgTable('products', {
   imageUrl: text('image_url'),
   basePrice: integer('base_price').notNull(), // Almacenado en centavos (ej: 29900 = $299.00 MXN)
   isActive: boolean('is_active').notNull().default(true),
+  isFeatured: boolean('is_featured').notNull().default(false), // Producto destacado en portada
   categoryId: text('category_id').references(() => categories.id, { onDelete: 'set null' }),
   createdAt: timestamp('created_at').notNull().$defaultFn(() => new Date()),
+});
+
+// ==========================================
+// 3b. Tabla: site_settings (Configuración visual y de marca de la tienda)
+// ==========================================
+export const siteSettings = pgTable('site_settings', {
+  id: text('id')
+    .primaryKey()
+    .$defaultFn(() => 'default'),
+  siteName: text('site_name').notNull().default('ESQUELETO'),
+  logoSvg: text('logo_svg'), // Código SVG personalizado para el logo
+  logoColor: text('logo_color').notNull().default('#4f46e5'), // Color HEX del logo / marca
+  heroTitle: text('hero_title').notNull().default('Velocidad extrema. Control total en Docker.'),
+  heroSubtitle: text('hero_subtitle').notNull().default('E-commerce Open Source Plug & Play de alto rendimiento con catálogo interactivo y checkout seguro.'),
+  heroImageUrl: text('hero_image_url').default('https://images.unsplash.com/photo-1441986300917-64674bd600d8?auto=format&fit=crop&w=1600&q=80'),
+  heroCtaText: text('hero_cta_text').notNull().default('Explorar Catálogo'),
+  heroCtaLink: text('hero_cta_link').notNull().default('/catalogo'),
+  updatedAt: timestamp('updated_at').notNull().$defaultFn(() => new Date()),
 });
 
 // ==========================================
@@ -176,3 +198,6 @@ export type NewProductVariant = InferInsertModel<typeof productVariants>;
 
 export type Order = InferSelectModel<typeof orders>;
 export type NewOrder = InferInsertModel<typeof orders>;
+
+export type SiteSettings = InferSelectModel<typeof siteSettings>;
+export type NewSiteSettings = InferInsertModel<typeof siteSettings>;

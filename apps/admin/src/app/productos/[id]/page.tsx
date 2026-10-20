@@ -56,6 +56,7 @@ export default async function EditarProductoPage({
     imageUrl: product.imageUrl,
     basePrice: product.basePrice,
     categoryId: product.categoryId,
+    isFeatured: Boolean(product.isFeatured),
     modifiers: modifiersWithOpts,
   };
 

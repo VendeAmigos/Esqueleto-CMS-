@@ -1,0 +1,115 @@
+---
+// apps/storefront/src/pages/categorias/index.astro
+import Layout from '../../layouts/Layout.astro';
+import { db, categories, products, eq } from '@esqueleto/core';
+
+// Consultar todas las categorías ordenadas
+const allCategories = await db
+  .select()
+  .from(categories)
+  .orderBy(categories.displayOrder)
+  .execute();
+
+// Contar productos activos en cada categoría
+const allActiveProducts = await db
+  .select({ id: products.id, categoryId: products.categoryId })
+  .from(products)
+  .where(eq(products.isActive, true))
+  .execute();
+
+const categoriesWithCount = allCategories.map((cat) => {
+  const count = allActiveProducts.filter((p) => p.categoryId === cat.id).length;
+  return {
+    ...cat,
+    productCount: count,
+  };
+});
+
+const getGridSpanClass = (span: string) => {
+  switch (span) {
+    case 'col-2':
+      return 'col-span-1 md:col-span-2 row-span-1 min-h-[260px]';
+    case 'tall':
+      return 'col-span-1 row-span-2 min-h-[520px]';
+    case 'large':
+      return 'col-span-1 md:col-span-2 row-span-2 min-h-[520px]';
+    case 'col-1':
+    default:
+      return 'col-span-1 row-span-1 min-h-[260px]';
+  }
+};
+---
+
+<Layout
+  title="Categorías"
+  description="Explora todas las colecciones y departamentos de nuestra tienda."
+>
+  <div class="space-y-10">
+    <!-- Encabezado de la página -->
+    <div class="border-b border-gray-200 pb-6 flex flex-col md:flex-row md:items-end justify-between gap-4">
+      <div>
+        <!-- Breadcrumbs -->
+        <nav class="flex items-center gap-2 text-xs text-gray-500 mb-2">
+          <a href="/" class="hover:text-black transition-colors">Inicio</a>
+          <span>/</span>
+          <span class="text-black font-semibold">Categorías</span>
+        </nav>
+        <h1 class="text-3xl sm:text-4xl font-extrabold tracking-tight text-gray-900">
+          Todas las Categorías
+        </h1>
+        <p class="mt-2 text-sm text-gray-500">
+          Encuentra productos organizados por departamento con opciones y modificadores personalizados.
+        </p>
+      </div>
+
+      <a
+        href="/catalogo"
+        class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-800 text-sm font-semibold transition-colors"
+      >
+        <span>🛍️</span> Ver Catálogo Completo
+      </a>
+    </div>
+
+    <!-- Bento Grid de Categorías -->
+    <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6 auto-rows-[260px]">
+      {categoriesWithCount.map((cat) => (
+        <a
+          href={`/categorias/${cat.slug}`}
+          class={`group relative rounded-3xl overflow-hidden shadow-sm hover:shadow-2xl transition-all duration-500 flex flex-col justify-end p-6 border border-gray-200 ${getGridSpanClass(
+            cat.gridSpan
+          )}`}
+        >
+          {cat.imageUrl ? (
+            <img
+              src={cat.imageUrl}
+              alt={cat.name}
+              class="absolute inset-0 h-full w-full object-cover object-center transition-transform duration-700 ease-out group-hover:scale-110"
+            />
+          ) : (
+            <div class="absolute inset-0 bg-gradient-to-br from-gray-800 to-gray-950" />
+          )}
+
+          <div class="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent transition-opacity group-hover:via-black/55" />
+
+          <!-- Badge Superior -->
+          <div class="relative z-10 self-start mb-auto">
+            <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-black/60 text-white/90 backdrop-blur-md border border-white/20 shadow-sm">
+              <span>🏷️</span>
+              {cat.productCount} {cat.productCount === 1 ? 'producto' : 'productos'}
+            </span>
+          </div>
+
+          <!-- Contenido Inferior -->
+          <div class="relative z-10 space-y-1">
+            <h2 class="text-2xl sm:text-3xl font-extrabold text-white tracking-tight drop-shadow-md">
+              {cat.name}
+            </h2>
+            <p class="text-xs text-white/80 font-medium inline-flex items-center gap-1 transition-transform group-hover:translate-x-1">
+              Ver colección completa &rarr;
+            </p>
+          </div>
+        </a>
+      ))}
+    </div>
+  </div>
+</Layout>

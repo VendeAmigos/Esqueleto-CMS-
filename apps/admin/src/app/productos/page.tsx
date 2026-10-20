@@ -10,6 +10,7 @@ export default async function ProductosPage() {
       description: products.description,
       imageUrl: products.imageUrl,
       price: products.basePrice,
+      isFeatured: products.isFeatured,
       categoryName: categories.name,
     })
     .from(products)
@@ -105,9 +106,16 @@ export default async function ProductosPage() {
                         )}
                       </div>
                       <div>
-                        <div className="text-sm font-bold text-gray-900">{product.title}</div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-bold text-gray-900">{product.title}</span>
+                          {product.isFeatured && (
+                            <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
+                              ⭐ Destacado
+                            </span>
+                          )}
+                        </div>
                         {product.description && (
-                          <div className="text-xs text-gray-400 max-w-xs truncate">
+                          <div className="text-xs text-gray-400 max-w-xs truncate mt-0.5">
                             {product.description}
                           </div>
                         )}
