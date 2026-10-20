@@ -1,0 +1,634 @@
+---
+// apps/storefront/src/pages/producto/[id].astro
+import Layout from '../../layouts/Layout.astro';
+import ProductCard from '../../components/ProductCard.astro';
+import {
+  db,
+  products,
+  categories,
+  productModifiers,
+  modifierOptions,
+  eq,
+  and,
+  ensureSchema,
+} from '@esqueleto/core';
+
+try {
+  await ensureSchema();
+} catch (e) {}
+
+const { id } = Astro.params;
+
+if (!id) {
+  return Astro.redirect('/catalogo');
+}
+
+// 1. Obtener datos del producto
+let product: any = null;
+try {
+  const [prod] = await db
+    .select()
+    .from(products)
+    .where(and(eq(products.id, id), eq(products.isActive, true)))
+    .limit(1);
+  product = prod;
+} catch (e) {
+  console.error('Error buscando producto:', e);
+}
+
+if (!product) {
+  return Astro.redirect('/catalogo');
+}
+
+// 2. Obtener categoría del producto
+let category: any = null;
+if (product.categoryId) {
+  try {
+    const [cat] = await db
+      .select()
+      .from(categories)
+      .where(eq(categories.id, product.categoryId))
+      .limit(1);
+    category = cat;
+  } catch (e) {}
+}
+
+// 3. Obtener modificadores asociados al producto
+let modifiersWithOpts: any[] = [];
+try {
+  const modifiers = await db
+    .select()
+    .from(productModifiers)
+    .where(eq(productModifiers.productId, product.id));
+
+  const allOpts = await db.select().from(modifierOptions);
+
+  modifiersWithOpts = modifiers.map((mod) => {
+    const opts = allOpts
+      .filter((o) => o.modifierId === mod.id)
+      .map((o) => ({
+        id: o.id,
+        name: o.name,
+        priceDelta: o.priceDelta,
+        isDefault: o.isDefault,
+      }));
+
+    return {
+      id: mod.id,
+      name: mod.name,
+      type: mod.type as 'single' | 'multiple',
+      required: mod.required,
+      options: opts,
+    };
+  });
+} catch (e) {
+  console.error('Error cargando modificadores del producto:', e);
+}
+
+// 4. Obtener productos relacionados (de la misma categoría o activos)
+let relatedProducts: any[] = [];
+try {
+  const rawRelated = await db
+    .select({
+      id: products.id,
+      title: products.title,
+      description: products.description,
+      imageUrl: products.imageUrl,
+      basePrice: products.basePrice,
+      categoryId: products.categoryId,
+      categoryName: categories.name,
+    })
+    .from(products)
+    .leftJoin(categories, eq(products.categoryId, categories.id))
+    .where(eq(products.isActive, true))
+    .limit(8)
+    .execute();
+
+  relatedProducts = rawRelated
+    .filter((p) => p.id !== product.id)
+    .slice(0, 4)
+    .map((p) => ({
+      ...p,
+      modifiers: [],
+    }));
+} catch (e) {}
+
+const formattedBasePrice = new Intl.NumberFormat('es-MX', {
+  style: 'currency',
+  currency: 'MXN',
+}).format(product.basePrice / 100);
+
+const hasModifiers = modifiersWithOpts.length > 0;
+---
+
+<Layout
+  title={`${product.title} | Tienda`}
+  description={product.description || `Compra ${product.title} con opciones personalizadas y envío seguro.`}
+>
+  <div class="space-y-12 py-4">
+    <!-- Migas de Pan (Breadcrumbs) -->
+    <nav class="flex items-center gap-2 text-xs text-gray-500 font-medium">
+      <a href="/" class="hover:text-black transition-colors">Inicio</a>
+      <span>/</span>
+      <a href="/catalogo" class="hover:text-black transition-colors">Catálogo</a>
+      {category && (
+        <>
+          <span>/</span>
+          <a href={`/categorias/${category.slug}`} class="hover:text-black transition-colors">
+            {category.name}
+          </a>
+        </>
+      )}
+      <span>/</span>
+      <span class="text-black font-semibold truncate max-w-xs">{product.title}</span>
+    </nav>
+
+    <!-- Sección Principal de Producto: 2 Columnas -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-10 items-start">
+      
+      <!-- Columna Izquierda: Galería y Foto Principal -->
+      <div class="lg:col-span-6 space-y-4">
+        <div class="relative aspect-square w-full rounded-3xl overflow-hidden bg-gray-100 border border-gray-200/80 shadow-sm group">
+          <img
+            id="main-product-image"
+            src={product.imageUrl || 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=900&auto=format&fit=crop&q=80'}
+            alt={product.title}
+            class="h-full w-full object-cover object-center transition-transform duration-500 ease-out group-hover:scale-105"
+          />
+
+          <!-- Badges flotantes -->
+          <div class="absolute top-4 left-4 flex flex-wrap gap-2">
+            {category && (
+              <span class="rounded-full bg-white/95 backdrop-blur-md px-3.5 py-1 text-xs font-bold text-gray-900 shadow-sm border border-gray-100">
+                {category.name}
+              </span>
+            )}
+            {hasModifiers && (
+              <span class="rounded-full bg-indigo-600/95 text-white backdrop-blur-md px-3 py-1 text-xs font-bold shadow-sm flex items-center gap-1.5">
+                <span class="h-2 w-2 rounded-full bg-indigo-200 animate-pulse"></span>
+                Personalizable
+              </span>
+            )}
+          </div>
+        </div>
+
+        <!-- Badges de Confianza / Garantía -->
+        <div class="grid grid-cols-3 gap-3 pt-2">
+          <div class="flex flex-col items-center text-center p-3 rounded-2xl bg-gray-50 border border-gray-100">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-indigo-600 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+            </svg>
+            <span class="text-[11px] font-bold text-gray-800">100% Original</span>
+            <span class="text-[10px] text-gray-500">Calidad garantizada</span>
+          </div>
+
+          <div class="flex flex-col items-center text-center p-3 rounded-2xl bg-gray-50 border border-gray-100">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-indigo-600 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+            </svg>
+            <span class="text-[11px] font-bold text-gray-800">Pago Seguro</span>
+            <span class="text-[10px] text-gray-500">Vía Mercado Pago</span>
+          </div>
+
+          <div class="flex flex-col items-center text-center p-3 rounded-2xl bg-gray-50 border border-gray-100">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-indigo-600 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+            </svg>
+            <span class="text-[11px] font-bold text-gray-800">Envío Rápido</span>
+            <span class="text-[10px] text-gray-500">A todo el país</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Columna Derecha: Información del Producto y Personalizador -->
+      <div
+        id="product-customizer-app"
+        class="lg:col-span-6 space-y-6"
+        data-product={JSON.stringify({
+          id: product.id,
+          title: product.title,
+          image: product.imageUrl,
+          category: category?.name || 'General',
+          basePrice: product.basePrice,
+          modifiers: modifiersWithOpts,
+        })}
+      >
+        <!-- Encabezado del Producto -->
+        <div class="border-b border-gray-200/80 pb-6">
+          {category && (
+            <a
+              href={`/categorias/${category.slug}`}
+              class="text-xs font-bold uppercase tracking-wider text-indigo-600 hover:text-indigo-800 transition-colors inline-block mb-1"
+            >
+              {category.name}
+            </a>
+          )}
+          <h1 class="text-3xl sm:text-4xl font-extrabold tracking-tight text-gray-900 leading-tight">
+            {product.title}
+          </h1>
+
+          <!-- Precio Dinámico -->
+          <div class="mt-4 flex items-baseline gap-3">
+            <span
+              id="dynamic-price-display"
+              class="text-3xl font-black text-gray-900 tracking-tight"
+            >
+              {formattedBasePrice}
+            </span>
+            <span class="text-xs font-medium text-gray-500">
+              MXN con IVA incluido
+            </span>
+          </div>
+
+          {product.description && (
+            <p class="mt-4 text-sm sm:text-base text-gray-600 leading-relaxed">
+              {product.description}
+            </p>
+          )}
+        </div>
+
+        <!-- Formulario Interactivo de Personalización (Modificadores) -->
+        {hasModifiers ? (
+          <div class="space-y-6">
+            <div class="flex items-center justify-between">
+              <h2 class="text-sm font-bold uppercase tracking-wider text-gray-900 flex items-center gap-2">
+                <span>Personaliza tu selección</span>
+                <span class="text-[11px] font-normal text-gray-400">
+                  ({modifiersWithOpts.length} opciones configurables)
+                </span>
+              </h2>
+            </div>
+
+            <div class="space-y-6">
+              {modifiersWithOpts.map((group) => (
+                <div
+                  class="rounded-2xl border border-gray-200 bg-white p-5 shadow-xs space-y-3"
+                  data-modifier-group-id={group.id}
+                  data-group-name={group.name}
+                  data-group-type={group.type}
+                  data-group-required={group.required ? 'true' : 'false'}
+                >
+                  <div class="flex items-center justify-between">
+                    <label class="text-sm font-bold text-gray-900">
+                      {group.name}
+                      {group.required ? (
+                        <span class="ml-1 text-xs font-bold text-red-500">* Requerido</span>
+                      ) : (
+                        <span class="ml-1 text-xs font-normal text-gray-400">(Opcional)</span>
+                      )}
+                    </label>
+                    <span class="text-[11px] text-gray-400">
+                      {group.type === 'single' ? 'Elige 1' : 'Puedes elegir varios'}
+                    </span>
+                  </div>
+
+                  <!-- Opciones del Modificador -->
+                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+                    {group.options.map((opt: any) => {
+                      const optDeltaFormatted = opt.priceDelta > 0
+                        ? `+${new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(opt.priceDelta / 100)}`
+                        : 'Incluido';
+
+                      return (
+                        <label
+                          class={`option-card relative flex items-center justify-between p-3.5 rounded-xl border border-gray-200 cursor-pointer transition-all hover:border-black/50 ${
+                            opt.isDefault ? 'border-black bg-gray-50/50' : 'bg-white'
+                          }`}
+                        >
+                          <div class="flex items-center gap-3">
+                            <input
+                              type={group.type === 'single' ? 'radio' : 'checkbox'}
+                              name={`modifier_${group.id}`}
+                              value={opt.id}
+                              data-option-id={opt.id}
+                              data-option-name={opt.name}
+                              data-price-delta={opt.priceDelta}
+                              checked={opt.isDefault}
+                              class="h-4 w-4 text-black focus:ring-black border-gray-300"
+                            />
+                            <span class="text-sm font-semibold text-gray-800">
+                              {opt.name}
+                            </span>
+                          </div>
+                          <span
+                            class={`text-xs font-bold ${
+                              opt.priceDelta > 0 ? 'text-indigo-600' : 'text-gray-400'
+                            }`}
+                          >
+                            {optDeltaFormatted}
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div class="p-4 rounded-2xl bg-gray-50 border border-gray-100 text-xs text-gray-500">
+            Este producto cuenta con especificaciones estándar listas para envío inmediato.
+          </div>
+        )}
+
+        <!-- Selector de Cantidad y Botón de Compra -->
+        <div class="pt-4 space-y-4 border-t border-gray-200/80">
+          <div class="flex items-center gap-4">
+            <div class="flex items-center rounded-xl border border-gray-300 bg-white p-1 shadow-xs">
+              <button
+                type="button"
+                id="btn-qty-minus"
+                class="h-9 w-9 rounded-lg flex items-center justify-center text-gray-600 hover:bg-gray-100 hover:text-black font-bold transition-colors"
+                aria-label="Disminuir cantidad"
+              >
+                &minus;
+              </button>
+              <input
+                type="number"
+                id="input-product-qty"
+                value="1"
+                min="1"
+                max="99"
+                class="w-12 text-center text-sm font-bold text-gray-900 border-none focus:ring-0 p-0"
+              />
+              <button
+                type="button"
+                id="btn-qty-plus"
+                class="h-9 w-9 rounded-lg flex items-center justify-center text-gray-600 hover:bg-gray-100 hover:text-black font-bold transition-colors"
+                aria-label="Aumentar cantidad"
+              >
+                &#43;
+              </button>
+            </div>
+
+            <!-- Botón de Agregar al Carrito -->
+            <button
+              type="button"
+              id="btn-add-to-cart"
+              class="flex-1 inline-flex items-center justify-center gap-2.5 rounded-2xl bg-gray-900 px-6 py-3.5 text-base font-bold text-white shadow-md transition-all duration-200 hover:bg-black hover:shadow-lg active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-black focus:ring-offset-2"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+              </svg>
+              <span>Agregar al Carrito</span>
+            </button>
+          </div>
+
+          <!-- Mensaje de Validación de Opciones Requeridas -->
+          <p id="validation-error-msg" class="hidden text-xs font-semibold text-red-600 flex items-center gap-1.5">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+            <span>Por favor selecciona las opciones requeridas antes de continuar.</span>
+          </p>
+        </div>
+
+        <!-- Notificación Toast de Éxito al Agregar -->
+        <div
+          id="cart-success-toast"
+          class="hidden fixed bottom-6 right-6 z-50 max-w-sm w-full bg-gray-900 text-white rounded-2xl p-4 shadow-2xl border border-gray-800 transition-all duration-300"
+        >
+          <div class="flex items-start gap-3">
+            <div class="h-8 w-8 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
+            <div class="flex-1">
+              <h4 class="text-sm font-bold text-white">¡Producto agregado!</h4>
+              <p class="text-xs text-gray-300 mt-0.5">Se añadió correctamente a tu carrito de compras.</p>
+              <div class="mt-3 flex items-center gap-2">
+                <a
+                  href="/carrito"
+                  class="rounded-lg bg-white px-3 py-1.5 text-xs font-bold text-gray-900 hover:bg-gray-100 transition-colors"
+                >
+                  Ver Carrito &rarr;
+                </a>
+                <button
+                  type="button"
+                  id="toast-continue-shopping"
+                  class="rounded-lg bg-gray-800 px-3 py-1.5 text-xs font-semibold text-gray-300 hover:text-white transition-colors"
+                >
+                  Seguir viendo
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Productos Relacionados -->
+    {relatedProducts.length > 0 && (
+      <div class="pt-16 border-t border-gray-200">
+        <div class="flex items-center justify-between mb-8">
+          <div>
+            <h2 class="text-2xl font-extrabold tracking-tight text-gray-900">
+              También te podría interesar
+            </h2>
+            <p class="text-sm text-gray-500 mt-1">
+              Otros artículos populares de nuestra colección.
+            </p>
+          </div>
+          <a
+            href="/catalogo"
+            class="text-sm font-semibold text-indigo-600 hover:text-indigo-800 transition-colors"
+          >
+            Ver catálogo completo &rarr;
+          </a>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          {relatedProducts.map((p) => (
+            <ProductCard
+              id={p.id}
+              name={p.title}
+              description={p.description || ''}
+              price={p.basePrice}
+              image={p.imageUrl || 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=800&auto=format&fit=crop&q=80'}
+              category={p.categoryName || 'General'}
+              modifiers={[]}
+            />
+          ))}
+        </div>
+      </div>
+    )}
+  </div>
+</Layout>
+
+<script>
+  import { addItem } from '../../store/cart';
+
+  function initProductCustomizer() {
+    const container = document.getElementById('product-customizer-app');
+    if (!container) return;
+
+    let productData: any = {};
+    try {
+      productData = JSON.parse(container.dataset.product || '{}');
+    } catch (e) {
+      return;
+    }
+
+    const priceDisplay = document.getElementById('dynamic-price-display');
+    const qtyInput = document.getElementById('input-product-qty') as HTMLInputElement | null;
+    const btnMinus = document.getElementById('btn-qty-minus');
+    const btnPlus = document.getElementById('btn-qty-plus');
+    const btnAddToCart = document.getElementById('btn-add-to-cart');
+    const errorMsg = document.getElementById('validation-error-msg');
+    const toast = document.getElementById('cart-success-toast');
+    const toastContinue = document.getElementById('toast-continue-shopping');
+
+    // Manejo de cantidad
+    if (btnMinus && qtyInput) {
+      btnMinus.addEventListener('click', () => {
+        const val = parseInt(qtyInput.value) || 1;
+        if (val > 1) {
+          qtyInput.value = (val - 1).toString();
+          updateDynamicPrice();
+        }
+      });
+    }
+
+    if (btnPlus && qtyInput) {
+      btnPlus.addEventListener('click', () => {
+        const val = parseInt(qtyInput.value) || 1;
+        if (val < 99) {
+          qtyInput.value = (val + 1).toString();
+          updateDynamicPrice();
+        }
+      });
+    }
+
+    if (qtyInput) {
+      qtyInput.addEventListener('change', () => {
+        let val = parseInt(qtyInput.value) || 1;
+        if (val < 1) val = 1;
+        if (val > 99) val = 99;
+        qtyInput.value = val.toString();
+        updateDynamicPrice();
+      });
+    }
+
+    // Manejo de selección de modificadores y cálculo de precio en tiempo real
+    const optionInputs = container.querySelectorAll<HTMLInputElement>('input[data-option-id]');
+
+    function getSelectedModifiers() {
+      const selected: any[] = [];
+      const groups = container?.querySelectorAll('[data-modifier-group-id]');
+
+      groups?.forEach((group) => {
+        const groupId = group.getAttribute('data-modifier-group-id') || '';
+        const groupName = group.getAttribute('data-group-name') || '';
+        const checkedInputs = group.querySelectorAll<HTMLInputElement>('input[data-option-id]:checked');
+
+        checkedInputs.forEach((input) => {
+          selected.push({
+            modifierId: groupId,
+            modifierName: groupName,
+            optionId: input.dataset.optionId || '',
+            optionName: input.dataset.optionName || '',
+            priceDelta: parseInt(input.dataset.priceDelta || '0', 10),
+          });
+        });
+      });
+
+      return selected;
+    }
+
+    function updateOptionCardStyles() {
+      container?.querySelectorAll('.option-card').forEach((card) => {
+        const input = card.querySelector<HTMLInputElement>('input[data-option-id]');
+        if (input?.checked) {
+          card.classList.add('border-black', 'bg-gray-50/70', 'ring-1', 'ring-black');
+          card.classList.remove('border-gray-200', 'bg-white');
+        } else {
+          card.classList.remove('border-black', 'bg-gray-50/70', 'ring-1', 'ring-black');
+          card.classList.add('border-gray-200', 'bg-white');
+        }
+      });
+    }
+
+    function updateDynamicPrice() {
+      const selected = getSelectedModifiers();
+      const deltaTotal = selected.reduce((acc, m) => acc + (m.priceDelta || 0), 0);
+      const unitPrice = (productData.basePrice || 0) + deltaTotal;
+      const qty = parseInt(qtyInput?.value || '1', 10) || 1;
+      const totalAmount = unitPrice * qty;
+
+      if (priceDisplay) {
+        priceDisplay.textContent = new Intl.NumberFormat('es-MX', {
+          style: 'currency',
+          currency: 'MXN',
+        }).format(totalAmount / 100);
+      }
+
+      updateOptionCardStyles();
+    }
+
+    optionInputs.forEach((input) => {
+      input.addEventListener('change', () => {
+        if (errorMsg) errorMsg.classList.add('hidden');
+        updateDynamicPrice();
+      });
+    });
+
+    // Validar y agregar al carrito
+    btnAddToCart?.addEventListener('click', () => {
+      // Validar grupos requeridos
+      const groups = container.querySelectorAll('[data-modifier-group-id]');
+      let isValid = true;
+
+      groups.forEach((group) => {
+        const isRequired = group.getAttribute('data-group-required') === 'true';
+        if (isRequired) {
+          const checked = group.querySelector<HTMLInputElement>('input[data-option-id]:checked');
+          if (!checked) {
+            isValid = false;
+            group.classList.add('border-red-400', 'bg-red-50/30');
+          } else {
+            group.classList.remove('border-red-400', 'bg-red-50/30');
+          }
+        }
+      });
+
+      if (!isValid) {
+        if (errorMsg) errorMsg.classList.remove('hidden');
+        return;
+      }
+
+      const selectedModifiers = getSelectedModifiers();
+      const quantity = parseInt(qtyInput?.value || '1', 10) || 1;
+
+      // Invocar función global de carrito
+      addItem({
+        id: productData.id,
+        title: productData.title,
+        image: productData.image,
+        category: productData.category,
+        basePrice: productData.basePrice,
+        quantity,
+        selectedModifiers,
+      });
+
+      // Feedback visual
+      if (toast) {
+        toast.classList.remove('hidden');
+        setTimeout(() => {
+          toast.classList.add('hidden');
+        }, 5000);
+      }
+    });
+
+    toastContinue?.addEventListener('click', () => {
+      if (toast) toast.classList.add('hidden');
+    });
+
+    // Inicializar estilos
+    updateDynamicPrice();
+  }
+
+  // Ejecución en carga inicial y transiciones Astro
+  initProductCustomizer();
+  document.addEventListener('astro:page-load', initProductCustomizer);
+</script>

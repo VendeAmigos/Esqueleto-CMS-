@@ -2,13 +2,37 @@
 // apps/storefront/src/pages/catalogo.astro
 import Layout from '../layouts/Layout.astro';
 import ProductCard from '../components/ProductCard.astro';
-import { db, products, categories, productModifiers, modifierOptions, eq, ensureSchema } from '@esqueleto/core';
+import {
+  db,
+  products,
+  categories,
+  productModifiers,
+  modifierOptions,
+  eq,
+  ensureSchema,
+} from '@esqueleto/core';
 
 try {
   await ensureSchema();
 } catch (e) {}
 
-// Consultando productos con sus categorías y modificadores desde PostgreSQL
+// 1. Obtener todas las categorías ordenadas
+let allCategories: any[] = [];
+try {
+  allCategories = await db
+    .select()
+    .from(categories)
+    .orderBy(categories.displayOrder)
+    .execute();
+} catch (e) {
+  try {
+    allCategories = await db.select().from(categories).execute();
+  } catch (err) {
+    console.error('Error consultando categorías en catálogo:', err);
+  }
+}
+
+// 2. Consultar productos activos
 let dbProducts: any[] = [];
 try {
   dbProducts = await db
@@ -18,7 +42,9 @@ try {
       description: products.description,
       imageUrl: products.imageUrl,
       basePrice: products.basePrice,
+      categoryId: products.categoryId,
       categoryName: categories.name,
+      categorySlug: categories.slug,
     })
     .from(products)
     .leftJoin(categories, eq(products.categoryId, categories.id))
@@ -27,7 +53,7 @@ try {
   console.error('Error consultando catálogo:', err);
 }
 
-// Obtener modificadores asociados
+// 3. Obtener modificadores asociados
 let allModifiers: any[] = [];
 let allOptions: any[] = [];
 try {
@@ -35,7 +61,7 @@ try {
   allOptions = await db.select().from(modifierOptions);
 } catch (e) {}
 
-// Organizar modificadores con sus opciones
+// 4. Organizar modificadores con sus opciones en cada producto
 const fullProducts = dbProducts.map((prod) => {
   const prodMods = allModifiers
     .filter((m) => m.productId === prod.id)
@@ -62,52 +88,208 @@ const fullProducts = dbProducts.map((prod) => {
     modifiers: prodMods,
   };
 });
+
+// 5. Agrupar productos por categoría
+const categoriesWithProducts = allCategories
+  .map((cat) => {
+    const prods = fullProducts.filter((p) => p.categoryId === cat.id);
+    return {
+      ...cat,
+      products: prods,
+      count: prods.length,
+    };
+  })
+  .filter((c) => c.count > 0);
+
+// Productos sin categoría asignada
+const uncategorizedProducts = fullProducts.filter((p) => !p.categoryId);
 ---
 
 <Layout
-  title="Catálogo de Productos"
-  description="Explora nuestra selección de productos con personalización, opciones y precios en tiempo real."
+  title="Catálogo por Categorías"
+  description="Explora todos nuestros productos organizados por departamento con opciones y personalizaciones exclusivas."
 >
-  <div class="space-y-8">
-    <!-- Encabezado de la Sección -->
-    <div class="flex flex-col md:flex-row md:items-end justify-between border-b border-gray-200 pb-6 gap-4">
+  <div class="space-y-12 py-4">
+    <!-- Encabezado Principal del Catálogo -->
+    <div class="border-b border-gray-200 pb-8 flex flex-col md:flex-row md:items-end justify-between gap-6">
       <div>
-        <p class="text-xs font-bold uppercase tracking-wider text-indigo-600 mb-1">
-          Colección Activa
-        </p>
-        <h1 class="text-3xl font-extrabold tracking-tight text-gray-900 sm:text-4xl">
-          Todos los Productos
+        <nav class="flex items-center gap-2 text-xs text-gray-500 mb-2">
+          <a href="/" class="hover:text-black transition-colors">Inicio</a>
+          <span>/</span>
+          <span class="text-black font-semibold">Catálogo</span>
+        </nav>
+        <h1 class="text-3xl sm:text-4xl font-extrabold tracking-tight text-gray-900">
+          Catálogo de Productos
         </h1>
-        <p class="mt-2 text-sm text-gray-500 max-w-xl">
-          Selecciona tus productos favoritos, personaliza sus modificadores y tallas con cálculo de precios transparente.
+        <p class="mt-2 text-sm sm:text-base text-gray-500 max-w-2xl">
+          Explora nuestra selección dividida por colecciones y categorías. Cada producto cuenta con personalizaciones y tallas a tu medida.
         </p>
       </div>
 
-      <div class="flex items-center gap-2 text-sm text-gray-500">
-        <span>Mostrando <strong class="text-gray-900">{fullProducts.length}</strong> artículos</span>
+      <div class="flex items-center gap-2 bg-gray-100 px-4 py-2 rounded-xl text-xs font-semibold text-gray-700 self-start md:self-auto shrink-0">
+        <span class="h-2 w-2 rounded-full bg-emerald-500"></span>
+        <span>{fullProducts.length} productos en {categoriesWithProducts.length} categorías</span>
       </div>
     </div>
 
-    <!-- Cuadrícula Responsiva de Productos -->
+    <!-- Barra de Navegación Rápida por Categorías (Filtros / Anclas) -->
+    {categoriesWithProducts.length > 1 && (
+      <nav
+        id="category-nav-bar"
+        class="sticky top-20 z-40 bg-white/95 backdrop-blur-md py-3 border-y border-gray-100 flex items-center gap-2 overflow-x-auto no-scrollbar scroll-smooth"
+        aria-label="Filtro rápido de categorías"
+      >
+        <span class="text-xs font-bold uppercase tracking-wider text-gray-400 shrink-0 mr-1 hidden sm:inline">
+          Saltar a:
+        </span>
+        <button
+          type="button"
+          data-filter="all"
+          class="cat-filter-btn px-4 py-2 rounded-xl text-xs font-bold transition-all bg-black text-white shrink-0 shadow-xs"
+        >
+          Todas las Categorías
+        </button>
+        {categoriesWithProducts.map((cat) => (
+          <button
+            type="button"
+            data-filter={cat.slug}
+            class="cat-filter-btn px-4 py-2 rounded-xl text-xs font-bold transition-all bg-gray-100 text-gray-700 hover:bg-gray-200 shrink-0"
+          >
+            {cat.name}
+            <span class="ml-1.5 opacity-60 font-normal">({cat.count})</span>
+          </button>
+        ))}
+      </nav>
+    )}
+
+    <!-- Secciones Divididas por Categoría -->
     {fullProducts.length === 0 ? (
-      <div class="rounded-2xl border border-dashed border-gray-300 bg-white p-16 text-center">
+      <div class="rounded-3xl border border-dashed border-gray-300 bg-white p-16 text-center">
+        <svg xmlns="http://www.w3.org/2000/svg" class="mx-auto h-12 w-12 text-gray-400 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+        </svg>
         <h3 class="text-lg font-bold text-gray-900">No hay productos disponibles</h3>
-        <p class="mt-1 text-sm text-gray-500">Ejecuta el seed para poblar el catálogo con imágenes y modificadores.</p>
+        <p class="mt-1 text-sm text-gray-500">Agrega productos y categorías desde el panel de administración.</p>
       </div>
     ) : (
-      <div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-        {fullProducts.map((product) => (
-          <ProductCard
-            id={product.id}
-            name={product.title}
-            description={product.description || ''}
-            price={product.basePrice}
-            image={product.imageUrl || 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=800&auto=format&fit=crop&q=80'}
-            category={product.categoryName || 'General'}
-            modifiers={product.modifiers}
-          />
+      <div class="space-y-16">
+        {categoriesWithProducts.map((cat) => (
+          <section
+            id={`seccion-${cat.slug}`}
+            class="category-section scroll-mt-36 space-y-6"
+            data-category-slug={cat.slug}
+          >
+            <!-- Cabecera de Categoría con Enlace a su Página Dedicada -->
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-gray-200/80 gap-3">
+              <div class="flex items-center gap-3">
+                <span class="h-8 w-1.5 rounded-full bg-black"></span>
+                <div>
+                  <div class="flex items-center gap-2.5">
+                    <h2 class="text-2xl font-black tracking-tight text-gray-900">
+                      {cat.name}
+                    </h2>
+                    <span class="rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-bold text-gray-600">
+                      {cat.count} {cat.count === 1 ? 'artículo' : 'artículos'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <a
+                href={`/categorias/${cat.slug}`}
+                class="inline-flex items-center gap-1.5 text-xs font-bold text-indigo-600 hover:text-indigo-800 transition-colors self-start sm:self-auto group"
+              >
+                <span>Ver colección {cat.name}</span>
+                <span class="transition-transform group-hover:translate-x-1">&rarr;</span>
+              </a>
+            </div>
+
+            <!-- Grilla de Productos de la Categoría -->
+            <div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {cat.products.map((product: any) => (
+                <ProductCard
+                  id={product.id}
+                  name={product.title}
+                  description={product.description || ''}
+                  price={product.basePrice}
+                  image={product.imageUrl || 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=800&auto=format&fit=crop&q=80'}
+                  category={cat.name}
+                  modifiers={product.modifiers}
+                />
+              ))}
+            </div>
+          </section>
         ))}
+
+        <!-- Productos Sin Categoría Asignada -->
+        {uncategorizedProducts.length > 0 && (
+          <section
+            id="seccion-otros"
+            class="category-section scroll-mt-36 space-y-6 pt-4"
+            data-category-slug="otros"
+          >
+            <div class="flex items-center gap-3 pb-4 border-b border-gray-200">
+              <span class="h-8 w-1.5 rounded-full bg-gray-400"></span>
+              <div>
+                <h2 class="text-2xl font-black tracking-tight text-gray-900">
+                  Otros Productos
+                </h2>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {uncategorizedProducts.map((product: any) => (
+                <ProductCard
+                  id={product.id}
+                  name={product.title}
+                  description={product.description || ''}
+                  price={product.basePrice}
+                  image={product.imageUrl || 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=800&auto=format&fit=crop&q=80'}
+                  category="General"
+                  modifiers={product.modifiers}
+                />
+              ))}
+            </div>
+          </section>
+        )}
       </div>
     )}
   </div>
 </Layout>
+
+<script>
+  function initCategoryFilters() {
+    const buttons = document.querySelectorAll<HTMLButtonElement>('.cat-filter-btn');
+    const sections = document.querySelectorAll<HTMLElement>('.category-section');
+
+    buttons.forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const filter = btn.dataset.filter;
+
+        // Actualizar estado activo de los botones
+        buttons.forEach((b) => {
+          b.classList.remove('bg-black', 'text-white', 'shadow-xs');
+          b.classList.add('bg-gray-100', 'text-gray-700');
+        });
+        btn.classList.add('bg-black', 'text-white', 'shadow-xs');
+        btn.classList.remove('bg-gray-100', 'text-gray-700');
+
+        if (filter === 'all') {
+          sections.forEach((sec) => sec.classList.remove('hidden'));
+        } else {
+          sections.forEach((sec) => {
+            if (sec.dataset.categorySlug === filter) {
+              sec.classList.remove('hidden');
+              sec.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            } else {
+              sec.classList.add('hidden');
+            }
+          });
+        }
+      });
+    });
+  }
+
+  initCategoryFilters();
+  document.addEventListener('astro:page-load', initCategoryFilters);
+</script>

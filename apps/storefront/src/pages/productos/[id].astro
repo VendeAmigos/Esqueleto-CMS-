@@ -1,0 +1,5 @@
+---
+// apps/storefront/src/pages/productos/[id].astro
+const { id } = Astro.params;
+return Astro.redirect(`/producto/${id}`);
+---

@@ -193,6 +193,70 @@ export default function ProductForm({ categories, initialData, isEdit = false }:
     ]);
   };
 
+  const addPresetSizes = () => {
+    setModifiers([
+      ...modifiers,
+      {
+        name: 'Talla',
+        type: 'single',
+        required: true,
+        options: [
+          { name: 'Chica (CH)', priceDelta: 0, isDefault: true },
+          { name: 'Mediana (M)', priceDelta: 0, isDefault: false },
+          { name: 'Grande (G)', priceDelta: 0, isDefault: false },
+          { name: 'Extra Grande (XG)', priceDelta: 3000, isDefault: false },
+        ],
+      },
+    ]);
+  };
+
+  const addPresetColors = () => {
+    setModifiers([
+      ...modifiers,
+      {
+        name: 'Color',
+        type: 'single',
+        required: true,
+        options: [
+          { name: 'Negro', priceDelta: 0, isDefault: true },
+          { name: 'Blanco', priceDelta: 0, isDefault: false },
+          { name: 'Azul Marino', priceDelta: 0, isDefault: false },
+        ],
+      },
+    ]);
+  };
+
+  const addPresetCustomization = () => {
+    setModifiers([
+      ...modifiers,
+      {
+        name: 'Personalización / Grabado',
+        type: 'single',
+        required: false,
+        options: [
+          { name: 'Estándar (Sin personalización)', priceDelta: 0, isDefault: true },
+          { name: 'Iniciales grabadas', priceDelta: 5000, isDefault: false },
+          { name: 'Nombre completo grabado', priceDelta: 9000, isDefault: false },
+        ],
+      },
+    ]);
+  };
+
+  const addPresetExtras = () => {
+    setModifiers([
+      ...modifiers,
+      {
+        name: 'Complementos y Extras',
+        type: 'multiple',
+        required: false,
+        options: [
+          { name: 'Envoltura de Regalo con Moño', priceDelta: 3500, isDefault: false },
+          { name: 'Garantía Extendida (1 año)', priceDelta: 12000, isDefault: false },
+        ],
+      },
+    ]);
+  };
+
   const removeModifierGroup = (index: number) => {
     setModifiers(modifiers.filter((_, i) => i !== index));
   };
@@ -511,31 +575,71 @@ export default function ProductForm({ categories, initialData, isEdit = false }:
         <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-gray-100 pb-4 gap-3">
           <div>
             <h2 className="text-lg font-bold text-gray-900">
-              Modificadores y Personalizaciones
+              Modificadores y Personalizaciones del Producto
             </h2>
             <p className="text-xs text-gray-500 mt-0.5">
-              Configura tallas, colores, complementos o ingredientes con ajustes de precio personalizables.
+              Aquí decides exactamente qué puede personalizar el cliente (tallas, colores, grabado, extras) y cuánto suma al precio.
             </p>
           </div>
           <button
             type="button"
             onClick={addModifierGroup}
-            className="inline-flex items-center gap-2 rounded-xl bg-gray-100 px-4 py-2 text-xs font-semibold text-gray-800 hover:bg-gray-200 transition-colors"
+            className="inline-flex items-center gap-2 rounded-xl bg-gray-900 px-4 py-2 text-xs font-semibold text-white hover:bg-black transition-colors shrink-0 shadow-xs"
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
             </svg>
-            Añadir Grupo de Modificador
+            + Grupo en Blanco
           </button>
+        </div>
+
+        {/* Barra de Plantillas Rápidas */}
+        <div className="p-3.5 rounded-xl bg-indigo-50/60 border border-indigo-100/80 space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-indigo-900 flex items-center gap-1.5">
+              <span>⚡ Plantillas Rápidas con 1 Clic:</span>
+            </span>
+            <span className="text-[11px] text-indigo-600">Se añadirán automáticamente al formulario</span>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={addPresetSizes}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-indigo-200 text-xs font-semibold text-indigo-800 hover:bg-indigo-100/60 transition-colors shadow-2xs"
+            >
+              <span>👕 + Tallas (CH, M, G, XG)</span>
+            </button>
+            <button
+              type="button"
+              onClick={addPresetColors}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-indigo-200 text-xs font-semibold text-indigo-800 hover:bg-indigo-100/60 transition-colors shadow-2xs"
+            >
+              <span>🎨 + Colores (Negro, Blanco, Azul)</span>
+            </button>
+            <button
+              type="button"
+              onClick={addPresetCustomization}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-indigo-200 text-xs font-semibold text-indigo-800 hover:bg-indigo-100/60 transition-colors shadow-2xs"
+            >
+              <span>✨ + Grabado Personalizado (+ $50 / $90)</span>
+            </button>
+            <button
+              type="button"
+              onClick={addPresetExtras}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-indigo-200 text-xs font-semibold text-indigo-800 hover:bg-indigo-100/60 transition-colors shadow-2xs"
+            >
+              <span>🎁 + Extras / Regalo (+ $35 / $120)</span>
+            </button>
+          </div>
         </div>
 
         {modifiers.length === 0 ? (
           <div className="p-8 text-center border border-dashed border-gray-200 rounded-xl bg-gray-50/50">
-            <p className="text-sm text-gray-500">
-              Este producto no tiene modificadores aún.
+            <p className="text-sm font-semibold text-gray-700">
+              Este producto aún no tiene opciones personalizables.
             </p>
             <p className="text-xs text-gray-400 mt-1">
-              Haz clic en "Añadir Grupo de Modificador" para crear opciones como Talla, Color, Extras, etc.
+              Usa las plantillas rápidas de arriba o haz clic en "+ Grupo en Blanco" para definir qué puede modificar el cliente.
             </p>
           </div>
         ) : (
