@@ -1,5 +1,4 @@
-import { db, products, orders, categories, discountCodes } from '@esqueleto/core';
-import { sql } from 'drizzle-orm';
+import { db, products, orders, categories, discountCodes, sql } from '@esqueleto/core';
 import Link from 'next/link';
 
 export default async function AdminDashboardPage() {

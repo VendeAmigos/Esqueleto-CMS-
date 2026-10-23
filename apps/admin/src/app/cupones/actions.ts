@@ -1,7 +1,6 @@
 'use server';
 
-import { db, discountCodes, ensureSchema } from '@esqueleto/core';
-import { eq } from 'drizzle-orm';
+import { db, discountCodes, ensureSchema, eq } from '@esqueleto/core';
 import { revalidatePath } from 'next/cache';
 
 export async function createDiscountCode(formData: FormData) {

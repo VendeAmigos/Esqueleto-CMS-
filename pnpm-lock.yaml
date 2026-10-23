@@ -13,9 +13,6 @@ importers:
       '@esqueleto/core':
         specifier: workspace:*
         version: link:../../packages/core
-      drizzle-orm:
-        specifier: ^0.45.3
-        version: 0.45.3(@libsql/client@0.18.0)(gel@2.2.1)
       next:
         specifier: ^14.2.24
         version: 14.2.35(@babel/core@7.29.7)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
@@ -4548,11 +4545,6 @@ snapshots:
       gel: 2.2.1
     transitivePeerDependencies:
       - supports-color
-
-  drizzle-orm@0.45.3(@libsql/client@0.18.0)(gel@2.2.1):
-    optionalDependencies:
-      '@libsql/client': 0.18.0
-      gel: 2.2.1
 
   drizzle-orm@0.45.3(@libsql/client@0.18.0)(gel@2.2.1)(postgres@3.4.9):
     optionalDependencies:

@@ -1,7 +1,6 @@
 'use server';
 
-import { db, categories, ensureSchema } from '@esqueleto/core';
-import { eq } from 'drizzle-orm';
+import { db, categories, ensureSchema, eq } from '@esqueleto/core';
 import { revalidatePath } from 'next/cache';
 
 export async function createCategory(formData: FormData) {

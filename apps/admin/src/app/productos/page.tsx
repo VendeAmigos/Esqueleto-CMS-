@@ -1,5 +1,4 @@
-import { db, products, categories, productModifiers, ensureSchema } from '@esqueleto/core';
-import { eq } from 'drizzle-orm';
+import { db, products, categories, productModifiers, ensureSchema, eq } from '@esqueleto/core';
 import { deleteProduct } from '../../actions/products';
 import Link from 'next/link';
 

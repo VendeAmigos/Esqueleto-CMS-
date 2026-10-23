@@ -1,7 +1,6 @@
 "use server";
 
-import { db, products, productModifiers, modifierOptions, ensureSchema } from "@esqueleto/core";
-import { eq } from "drizzle-orm";
+import { db, products, productModifiers, modifierOptions, ensureSchema, eq } from "@esqueleto/core";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import crypto from "crypto";

@@ -1,5 +1,4 @@
-import { db, siteSettings, ensureSchema } from '@esqueleto/core';
-import { eq } from 'drizzle-orm';
+import { db, siteSettings, ensureSchema, eq } from '@esqueleto/core';
 import AppearanceForm from './AppearanceForm';
 
 export default async function AparienciaPage() {

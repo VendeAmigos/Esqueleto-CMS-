@@ -1,7 +1,6 @@
 'use server';
 
-import { db, siteSettings, ensureSchema } from '@esqueleto/core';
-import { eq } from 'drizzle-orm';
+import { db, siteSettings, ensureSchema, eq } from '@esqueleto/core';
 import { revalidatePath } from 'next/cache';
 
 export async function updateSiteSettings(formData: FormData) {

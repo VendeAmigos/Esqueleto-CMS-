@@ -1,5 +1,4 @@
-import { db, discountCodes, ensureSchema } from '@esqueleto/core';
-import { desc } from 'drizzle-orm';
+import { db, discountCodes, ensureSchema, desc } from '@esqueleto/core';
 import CouponManager from './CouponManager';
 import Link from 'next/link';
 
