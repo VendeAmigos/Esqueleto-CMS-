@@ -1,0 +1,80 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: esqueleto-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-admin123}
+      POSTGRES_DB: ${POSTGRES_DB:-esqueleto}
+    ports:
+      - "5434:5432"
+    volumes:
+      - esqueleto_pgdata:/var/lib/postgresql/data
+      - ./docker/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-admin} -d ${POSTGRES_DB:-esqueleto}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - esqueleto-internal
+    restart: unless-stopped
+
+  storefront:
+    build:
+      context: .
+      dockerfile: Dockerfile.storefront
+    container_name: esqueleto-storefront
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      - DATABASE_URL=postgres://${POSTGRES_USER:-admin}:${POSTGRES_PASSWORD:-admin123}@postgres:5432/${POSTGRES_DB:-esqueleto}
+      - HOST=0.0.0.0
+      - PORT=4321
+      - MP_ACCESS_TOKEN=${MP_ACCESS_TOKEN:-}
+      - PUBLIC_STOREFRONT_URL=${PUBLIC_STOREFRONT_URL:-https://shop.afotica.com}
+    env_file:
+      - path: .env
+        required: false
+    volumes:
+      - ./uploads:/app/uploads
+    networks:
+      - esqueleto-internal
+      - shared_caddy_net
+    restart: unless-stopped
+
+  admin:
+    build:
+      context: .
+      dockerfile: Dockerfile.admin
+    container_name: esqueleto-admin
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      - DATABASE_URL=postgres://${POSTGRES_USER:-admin}:${POSTGRES_PASSWORD:-admin123}@postgres:5432/${POSTGRES_DB:-esqueleto}
+      - UPLOADS_DIR=/app/uploads
+      - HOSTNAME=0.0.0.0
+      - PORT=3001
+      - DOCKER_BUILD=1
+    env_file:
+      - path: .env
+        required: false
+    volumes:
+      - ./uploads:/app/uploads
+    networks:
+      - esqueleto-internal
+      - shared_caddy_net
+    restart: unless-stopped
+
+volumes:
+  esqueleto_pgdata:
+    driver: local
+
+networks:
+  esqueleto-internal:
+    driver: bridge
+  shared_caddy_net:
+    external: true
+    name: kws-mx-docker_kws_network
