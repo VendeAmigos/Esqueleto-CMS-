@@ -11,11 +11,77 @@ import {
   eq,
   and,
   ensureSchema,
+  isDatabaseAvailable,
 } from '@esqueleto/core';
 
-try {
-  await ensureSchema();
-} catch (e) {}
+const fallbackCategories = [
+  {
+    id: 'cat-prints-01',
+    name: 'Prints & Láminas de Arte',
+    slug: 'prints-arte',
+    imageUrl: 'https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?w=900&auto=format&fit=crop&q=80',
+  },
+  {
+    id: 'cat-stickers-02',
+    name: 'Stickers & Papelería',
+    slug: 'stickers-papeleria',
+    imageUrl: 'https://images.unsplash.com/photo-1589998059171-988d887df646?w=900&auto=format&fit=crop&q=80',
+  },
+  {
+    id: 'cat-acc-03',
+    name: 'Pines & Llaveros Acrílicos',
+    slug: 'pines-llaveros',
+    imageUrl: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=900&auto=format&fit=crop&q=80',
+  },
+  {
+    id: 'cat-textil-04',
+    name: 'Merch Textil & Totebags',
+    slug: 'merch-textil',
+    imageUrl: 'https://images.unsplash.com/photo-1544816155-12df9643f363?w=900&auto=format&fit=crop&q=80',
+  },
+  {
+    id: 'cat-orig-05',
+    name: 'Obras Originales & Libretas',
+    slug: 'obras-originales',
+    imageUrl: 'https://images.unsplash.com/photo-1513364776144-60967b0f800f?w=900&auto=format&fit=crop&q=80',
+  },
+];
+
+const fallbackProductsMap: Record<string, any[]> = {
+  'prints-arte': [
+    {
+      id: 'prod-print-jardin',
+      title: 'Print Fine Art "El Jardín de los Recuerdos"',
+      description: 'Lámina de ilustración impresa en papel algodón de 310g con tintas pigmentadas de archivo.',
+      imageUrl: 'https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?w=800&auto=format&fit=crop&q=80',
+      basePrice: 18000,
+      categoryName: 'Prints & Láminas de Arte',
+      modifiers: [
+        {
+          id: 'mod-size-01',
+          name: 'Tamaño de Lámina',
+          type: 'single',
+          required: true,
+          options: [
+            { id: 'opt-a5', name: 'A5 (14.8 x 21 cm)', priceDelta: 0, isDefault: true },
+            { id: 'opt-a4', name: 'A4 (21 x 29.7 cm)', priceDelta: 6000, isDefault: false },
+          ],
+        },
+      ],
+    },
+  ],
+  'stickers-papeleria': [
+    {
+      id: 'prod-pack-stickers-brujitas',
+      title: 'Pack de Stickers Holográficos "Pequeñas Brujas"',
+      description: 'Set de 5 stickers resistentes al agua con acabado holográfico brillante arcoíris.',
+      imageUrl: 'https://images.unsplash.com/photo-1589998059171-988d887df646?w=800&auto=format&fit=crop&q=80',
+      basePrice: 12000,
+      categoryName: 'Stickers & Papelería',
+      modifiers: [],
+    },
+  ],
+};
 
 const { slug } = Astro.params;
 
@@ -23,17 +89,25 @@ if (!slug) {
   return Astro.redirect('/categorias');
 }
 
-// 1. Obtener la categoría
+const isDbOnline = await isDatabaseAvailable();
 let category: any = null;
-try {
-  const [cat] = await db
-    .select()
-    .from(categories)
-    .where(eq(categories.slug, slug))
-    .limit(1);
-  category = cat;
-} catch (e) {
-  console.error('Error buscando categoría:', e);
+
+if (isDbOnline) {
+  try {
+    await ensureSchema();
+    const [cat] = await db
+      .select()
+      .from(categories)
+      .where(eq(categories.slug, slug))
+      .limit(1);
+    category = cat;
+  } catch (e) {
+    console.error('Error buscando categoría:', e);
+  }
+}
+
+if (!category) {
+  category = fallbackCategories.find((c) => c.slug === slug);
 }
 
 if (!category) {
@@ -42,51 +116,39 @@ if (!category) {
 
 // 2. Obtener productos de esta categoría
 let dbProducts: any[] = [];
-try {
-  dbProducts = await db
-    .select({
-      id: products.id,
-      title: products.title,
-      description: products.description,
-      imageUrl: products.imageUrl,
-      basePrice: products.basePrice,
-      isFeatured: products.isFeatured,
-      categoryName: categories.name,
-    })
-    .from(products)
-    .leftJoin(categories, eq(products.categoryId, categories.id))
-    .where(and(eq(products.isActive, true), eq(products.categoryId, category.id)))
-    .execute();
-} catch (e) {
+let allModifiers: any[] = [];
+let allOptions: any[] = [];
+
+if (isDbOnline) {
   try {
-    const raw = await db
+    dbProducts = await db
       .select({
         id: products.id,
         title: products.title,
         description: products.description,
         imageUrl: products.imageUrl,
         basePrice: products.basePrice,
+        isFeatured: products.isFeatured,
         categoryName: categories.name,
       })
       .from(products)
       .leftJoin(categories, eq(products.categoryId, categories.id))
       .where(and(eq(products.isActive, true), eq(products.categoryId, category.id)))
       .execute();
-    dbProducts = raw.map((p) => ({ ...p, isFeatured: false }));
+
+    allModifiers = await db.select().from(productModifiers).execute();
+    allOptions = await db.select().from(modifierOptions).execute();
   } catch (err) {
     console.error('Error cargando productos por categoría:', err);
   }
 }
 
-// 3. Obtener modificadores asociados
-let allModifiers: any[] = [];
-let allOptions: any[] = [];
-try {
-  allModifiers = await db.select().from(productModifiers).execute();
-  allOptions = await db.select().from(modifierOptions).execute();
-} catch (e) {}
+if (dbProducts.length === 0 && fallbackProductsMap[slug]) {
+  dbProducts = fallbackProductsMap[slug];
+}
 
 const fullProducts = dbProducts.map((prod) => {
+  if (prod.modifiers) return prod;
   const prodMods = allModifiers
     .filter((m) => m.productId === prod.id)
     .map((mod) => {
@@ -155,7 +217,9 @@ const fullProducts = dbProducts.map((prod) => {
     <!-- Lista de Productos -->
     {fullProducts.length === 0 ? (
       <div class="text-center py-16 px-4 bg-white rounded-3xl border border-dashed border-gray-300 space-y-4">
-        <span class="text-4xl">🛍️</span>
+        <div class="w-12 h-12 mx-auto rounded-full bg-gray-100 flex items-center justify-center text-gray-400">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" /></svg>
+        </div>
         <h3 class="text-lg font-bold text-gray-900">Aún no hay productos en esta categoría</h3>
         <p class="text-sm text-gray-500 max-w-md mx-auto">
           Estamos preparando nuevos artículos para esta sección. Mientras tanto, puedes explorar las demás categorías.

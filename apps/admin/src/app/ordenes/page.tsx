@@ -68,6 +68,9 @@ export default async function OrdenesPage() {
                     Total
                   </th>
                   <th scope="col" className="px-6 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                    Cupón Aplicado
+                  </th>
+                  <th scope="col" className="px-6 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
                     Estado
                   </th>
                 </tr>
@@ -94,6 +97,21 @@ export default async function OrdenesPage() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
                       {currencyFormatter.format(order.total / 100)}
+                      {order.subtotal && order.subtotal > order.total && (
+                        <span className="block text-[11px] font-normal text-gray-400 line-through">
+                          {currencyFormatter.format(order.subtotal / 100)}
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-xs">
+                      {order.discountCode ? (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 font-mono font-bold">
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z" /></svg>
+                          {order.discountCode} (-{currencyFormatter.format((order.discountAmount || 0) / 100)})
+                        </span>
+                      ) : (
+                        <span className="text-gray-400">Sin cupón</span>
+                      )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       {order.status === 'paid' ? (

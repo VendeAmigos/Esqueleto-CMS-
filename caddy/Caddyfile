@@ -1,0 +1,55 @@
+{
+    # Desactivar API interna de Caddy para máxima seguridad
+    admin off
+    # Correo para emisión de certificados SSL gratuitos automáticos con Let's Encrypt / ZeroSSL
+    email {$CADDY_EMAIL:admin@afotica.com}
+}
+
+# ==============================================================================
+# 1. Astro Storefront (Tienda Pública)
+# ==============================================================================
+{$STOREFRONT_DOMAIN:localhost}, {$PUBLIC_STOREFRONT_URL:shop.afotica.com}, tienda.local {
+    # Compresión automática de alto rendimiento con Gzip y Zstandard
+    encode gzip zstd
+
+    # Servir archivos subidos directamente desde disco con caché inmutable
+    handle /uploads/* {
+        root * /var/www
+        file_server
+        header Cache-Control "public, max-age=2592000, immutable"
+    }
+
+    # Tráfico dinámico hacia Astro Storefront
+    handle {
+        reverse_proxy storefront:4321 {
+            header_up Host {host}
+            header_up X-Real-IP {remote_host}
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Forwarded-Proto {scheme}
+        }
+    }
+}
+
+# ==============================================================================
+# 2. Next.js CMS Admin (Panel de Administración)
+# ==============================================================================
+{$ADMIN_DOMAIN:admin.localhost}, adminshop.afotica.com, admshop.afotica.com, admin.shop.afotica.com, admin.tienda.local {
+    encode gzip zstd
+
+    # Servir imágenes subidas
+    handle /uploads/* {
+        root * /var/www
+        file_server
+        header Cache-Control "public, max-age=2592000, immutable"
+    }
+
+    # Tráfico hacia Next.js Admin con soporte nativo de WebSockets y Server Actions
+    handle {
+        reverse_proxy admin:3001 {
+            header_up Host {host}
+            header_up X-Real-IP {remote_host}
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Forwarded-Proto {scheme}
+        }
+    }
+}

@@ -1,16 +1,19 @@
 import { db, categories, ensureSchema } from '@esqueleto/core';
 import CategoryGridManager from './CategoryGridManager';
 
-export const dynamic = 'force-dynamic';
-
 export default async function CategoriasPage() {
-  await ensureSchema();
+  await ensureSchema().catch(() => {});
 
-  const allCategories = await db
-    .select()
-    .from(categories)
-    .orderBy(categories.displayOrder)
-    .execute();
+  let allCategories: any[] = [];
+  try {
+    allCategories = await db
+      .select()
+      .from(categories)
+      .orderBy(categories.displayOrder)
+      .execute();
+  } catch (err) {
+    console.error('Error al cargar categorías desde la base de datos:', err);
+  }
 
   return (
     <main className="min-h-screen p-8 max-w-7xl mx-auto space-y-8">

@@ -411,7 +411,7 @@ export default function ProductForm({ categories, initialData, isEdit = false }:
           <div className="md:col-span-2 bg-gradient-to-r from-amber-50 to-orange-50/50 border border-amber-200/80 rounded-2xl p-4 flex items-center justify-between">
             <div>
               <div className="flex items-center gap-2">
-                <span className="text-lg">⭐</span>
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-amber-600" fill="currentColor" viewBox="0 0 24 24"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>
                 <span className="text-sm font-bold text-gray-900">Destacar en la Página de Inicio</span>
                 {isFeatured && (
                   <span className="bg-amber-100 text-amber-800 text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider">
@@ -597,7 +597,8 @@ export default function ProductForm({ categories, initialData, isEdit = false }:
         <div className="p-3.5 rounded-xl bg-indigo-50/60 border border-indigo-100/80 space-y-2">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold text-indigo-900 flex items-center gap-1.5">
-              <span>⚡ Plantillas Rápidas con 1 Clic:</span>
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+              <span>Plantillas Rápidas con 1 Clic:</span>
             </span>
             <span className="text-[11px] text-indigo-600">Se añadirán automáticamente al formulario</span>
           </div>
@@ -607,28 +608,28 @@ export default function ProductForm({ categories, initialData, isEdit = false }:
               onClick={addPresetSizes}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-indigo-200 text-xs font-semibold text-indigo-800 hover:bg-indigo-100/60 transition-colors shadow-2xs"
             >
-              <span>👕 + Tallas (CH, M, G, XG)</span>
+              <span>+ Tallas (CH, M, G, XG)</span>
             </button>
             <button
               type="button"
               onClick={addPresetColors}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-indigo-200 text-xs font-semibold text-indigo-800 hover:bg-indigo-100/60 transition-colors shadow-2xs"
             >
-              <span>🎨 + Colores (Negro, Blanco, Azul)</span>
+              <span>+ Colores (Negro, Blanco, Azul)</span>
             </button>
             <button
               type="button"
               onClick={addPresetCustomization}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-indigo-200 text-xs font-semibold text-indigo-800 hover:bg-indigo-100/60 transition-colors shadow-2xs"
             >
-              <span>✨ + Grabado Personalizado (+ $50 / $90)</span>
+              <span>+ Grabado Personalizado (+ $50 / $90)</span>
             </button>
             <button
               type="button"
               onClick={addPresetExtras}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-indigo-200 text-xs font-semibold text-indigo-800 hover:bg-indigo-100/60 transition-colors shadow-2xs"
             >
-              <span>🎁 + Extras / Regalo (+ $35 / $120)</span>
+              <span>+ Extras / Regalo (+ $35 / $120)</span>
             </button>
           </div>
         </div>

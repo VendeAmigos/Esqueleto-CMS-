@@ -1,8 +1,9 @@
-import { db, categories } from "@esqueleto/core";
+import { db, categories, ensureSchema } from "@esqueleto/core";
 import ProductForm from "@/components/ProductForm";
 import Link from "next/link";
 
 export default async function NuevoProductoPage() {
+  await ensureSchema();
   const allCategories = await db.select().from(categories).execute();
 
   return (

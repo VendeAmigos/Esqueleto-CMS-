@@ -11,174 +11,214 @@ import {
   siteSettings,
   eq,
   ensureSchema,
+  isDatabaseAvailable,
 } from '@esqueleto/core';
 
-// 0. Auto-verificar esquema de base de datos
-try {
-  await ensureSchema();
-} catch (e) {
-  console.warn('Aviso al verificar esquema:', e);
-}
-
-// 1. Obtener configuración del sitio / Apariencia
-let settings = {
-  siteName: 'ESQUELETO',
-  logoColor: '#4f46e5',
-  heroTitle: 'Velocidad extrema. Control total en Docker.',
-  heroSubtitle: 'E-commerce Open Source Plug & Play de alto rendimiento con catálogo interactivo y checkout seguro.',
-  heroImageUrl: 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?auto=format&fit=crop&w=1600&q=80',
-  heroCtaText: 'Explorar Catálogo',
+// 0. Fallback inmediato con temática de Merch de Ilustradora
+const defaultSettings = {
+  siteName: 'LUNA ART STUDIO',
+  logoColor: '#ec4899',
+  heroTitle: 'Ilustración de Autor, Prints & Merch Exclusivo',
+  heroSubtitle: 'Láminas de arte fine art, stickers holográficos, pines esmaltados y papelería ilustrada para alegrar tu día a día.',
+  heroImageUrl: 'https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?w=1600&auto=format&fit=crop&q=80',
+  heroCtaText: 'Explorar Tienda de Arte',
   heroCtaLink: '/catalogo',
 };
 
-try {
-  const settingsList = await db.select().from(siteSettings).where(eq(siteSettings.id, 'default')).execute();
-  if (settingsList && settingsList[0]) {
-    settings = {
-      siteName: settingsList[0].siteName || settings.siteName,
-      logoColor: settingsList[0].logoColor || settings.logoColor,
-      heroTitle: settingsList[0].heroTitle || settings.heroTitle,
-      heroSubtitle: settingsList[0].heroSubtitle || settings.heroSubtitle,
-      heroImageUrl: settingsList[0].heroImageUrl || settings.heroImageUrl,
-      heroCtaText: settingsList[0].heroCtaText || settings.heroCtaText,
-      heroCtaLink: settingsList[0].heroCtaLink || settings.heroCtaLink,
-    };
-  }
-} catch (e) {
-  // Manejo seguro si la base de datos se está aprovisionando
-}
+const defaultCategories = [
+  {
+    id: 'cat-prints-01',
+    name: 'Prints & Láminas de Arte',
+    slug: 'prints-arte',
+    imageUrl: 'https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?w=900&auto=format&fit=crop&q=80',
+    gridSpan: '2x2',
+    displayOrder: 1,
+    productCount: 4,
+  },
+  {
+    id: 'cat-stickers-02',
+    name: 'Stickers & Papelería',
+    slug: 'stickers-papeleria',
+    imageUrl: 'https://images.unsplash.com/photo-1589998059171-988d887df646?w=900&auto=format&fit=crop&q=80',
+    gridSpan: '2x1',
+    displayOrder: 2,
+    productCount: 6,
+  },
+  {
+    id: 'cat-acc-03',
+    name: 'Pines & Llaveros Acrílicos',
+    slug: 'pines-llaveros',
+    imageUrl: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=900&auto=format&fit=crop&q=80',
+    gridSpan: '1x2',
+    displayOrder: 3,
+    productCount: 3,
+  },
+  {
+    id: 'cat-textil-04',
+    name: 'Merch Textil & Totebags',
+    slug: 'merch-textil',
+    imageUrl: 'https://images.unsplash.com/photo-1544816155-12df9643f363?w=900&auto=format&fit=crop&q=80',
+    gridSpan: '2x1',
+    displayOrder: 4,
+    productCount: 2,
+  },
+  {
+    id: 'cat-orig-05',
+    name: 'Obras Originales & Libretas',
+    slug: 'obras-originales',
+    imageUrl: 'https://images.unsplash.com/photo-1513364776144-60967b0f800f?w=900&auto=format&fit=crop&q=80',
+    gridSpan: '1x1',
+    displayOrder: 5,
+    productCount: 1,
+  },
+];
 
-// 2. Obtener Categorías ordenadas para el Bento Grid
-let allCategories: any[] = [];
-try {
-  allCategories = await db
-    .select()
-    .from(categories)
-    .orderBy(categories.displayOrder)
-    .execute();
-} catch (e) {
+const defaultFeaturedProducts = [
+  {
+    id: 'prod-print-jardin',
+    title: 'Print Fine Art "El Jardín de los Recuerdos"',
+    description: 'Lámina de ilustración impresa en papel algodón de 310g con tintas pigmentadas de archivo. Colores vibrantes de larga duración.',
+    imageUrl: 'https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?w=800&auto=format&fit=crop&q=80',
+    basePrice: 18000,
+    categoryName: 'Prints & Láminas de Arte',
+    modifiers: [
+      {
+        id: 'mod-size-01',
+        name: 'Tamaño de Lámina',
+        type: 'single' as const,
+        required: true,
+        options: [
+          { id: 'opt-a5', name: 'A5 (14.8 x 21 cm)', priceDelta: 0, isDefault: true },
+          { id: 'opt-a4', name: 'A4 (21 x 29.7 cm)', priceDelta: 6000, isDefault: false },
+          { id: 'opt-a3', name: 'A3 (29.7 x 42 cm)', priceDelta: 14000, isDefault: false },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'prod-pack-stickers-brujitas',
+    title: 'Pack de Stickers Holográficos "Pequeñas Brujas"',
+    description: 'Set de 5 stickers resistentes al agua y al sol con acabado holográfico brillante arcoíris. Ideales para laptop, termo o libreta.',
+    imageUrl: 'https://images.unsplash.com/photo-1589998059171-988d887df646?w=800&auto=format&fit=crop&q=80',
+    basePrice: 12000,
+    categoryName: 'Stickers & Papelería',
+    modifiers: [],
+  },
+  {
+    id: 'prod-pin-gato-astral',
+    title: 'Pin Metálico Esmaltado "Gato Cósmico"',
+    description: 'Pin de metal dorado con esmalte duro pulido (hard enamel) y cierre de goma doble para mayor seguridad.',
+    imageUrl: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800&auto=format&fit=crop&q=80',
+    basePrice: 15000,
+    categoryName: 'Pines & Llaveros Acrílicos',
+    modifiers: [],
+  },
+  {
+    id: 'prod-totebag-flora',
+    title: 'Totebag 100% Algodón Pesado "Flora & Fauna"',
+    description: 'Bolsa de tela resistente de 280g/m² serigrafiada a 3 tintas con asas reforzadas para libros o compras.',
+    imageUrl: 'https://images.unsplash.com/photo-1544816155-12df9643f363?w=800&auto=format&fit=crop&q=80',
+    basePrice: 28000,
+    categoryName: 'Merch Textil & Totebags',
+    modifiers: [],
+  },
+];
+
+let settings = { ...defaultSettings };
+let categoriesWithCount = [...defaultCategories];
+let featuredProducts = [...defaultFeaturedProducts];
+
+// 1. Comprobación rápida del estado de PostgreSQL (Circuit Breaker)
+const isDbOnline = await isDatabaseAvailable();
+
+if (isDbOnline) {
   try {
-    allCategories = await db.select().from(categories).execute();
-  } catch (err) {
-    console.error('Error cargando categorías:', err);
-  }
-}
+    await ensureSchema();
 
-// Contar productos activos por categoría
-let allActiveProducts: any[] = [];
-try {
-  allActiveProducts = await db
-    .select({ id: products.id, categoryId: products.categoryId })
-    .from(products)
-    .where(eq(products.isActive, true))
-    .execute();
-} catch (e) {
-  console.error('Error cargando conteo de productos:', e);
-}
+    // Cargar apariencia en vivo desde la base de datos
+    const settingsList = await db.select().from(siteSettings).where(eq(siteSettings.id, 'default')).execute();
+    if (settingsList && settingsList[0]) {
+      settings = {
+        siteName: settingsList[0].siteName || settings.siteName,
+        logoColor: settingsList[0].logoColor || settings.logoColor,
+        heroTitle: settingsList[0].heroTitle || settings.heroTitle,
+        heroSubtitle: settingsList[0].heroSubtitle || settings.heroSubtitle,
+        heroImageUrl: settingsList[0].heroImageUrl || settings.heroImageUrl,
+        heroCtaText: settingsList[0].heroCtaText || settings.heroCtaText,
+        heroCtaLink: settingsList[0].heroCtaLink || settings.heroCtaLink,
+      };
+    }
 
-const categoriesWithCount = allCategories.map((cat) => {
-  const count = allActiveProducts.filter((p) => p.categoryId === cat.id).length;
-  return {
-    ...cat,
-    productCount: count,
-  };
-});
+    // Cargar categorías y conteos
+    const dbCats = await db.select().from(categories).orderBy(categories.displayOrder).execute();
+    if (dbCats && dbCats.length > 0) {
+      const allActiveProducts = await db
+        .select({ id: products.id, categoryId: products.categoryId })
+        .from(products)
+        .where(eq(products.isActive, true))
+        .execute();
 
-// 3. Obtener Productos Destacados
-let featuredProductsList: any[] = [];
-try {
-  let featuredRaw = await db
-    .select({
-      id: products.id,
-      title: products.title,
-      description: products.description,
-      imageUrl: products.imageUrl,
-      basePrice: products.basePrice,
-      isFeatured: products.isFeatured,
-      categoryName: categories.name,
-    })
-    .from(products)
-    .leftJoin(categories, eq(products.categoryId, categories.id))
-    .where(eq(products.isActive, true))
-    .execute();
+      categoriesWithCount = dbCats.map((cat) => ({
+        ...cat,
+        productCount: allActiveProducts.filter((p) => p.categoryId === cat.id).length,
+      }));
+    }
 
-  featuredProductsList = featuredRaw.filter((p) => p.isFeatured);
-  if (featuredProductsList.length === 0) {
-    featuredProductsList = featuredRaw.slice(0, 4);
-  }
-} catch (e) {
-  try {
-    const fallbackRaw = await db
+    // Cargar productos destacados
+    const featuredRaw = await db
       .select({
         id: products.id,
         title: products.title,
         description: products.description,
         imageUrl: products.imageUrl,
         basePrice: products.basePrice,
+        isFeatured: products.isFeatured,
         categoryName: categories.name,
       })
       .from(products)
       .leftJoin(categories, eq(products.categoryId, categories.id))
       .where(eq(products.isActive, true))
-      .limit(4)
       .execute();
-    featuredProductsList = fallbackRaw.map((p) => ({ ...p, isFeatured: false }));
+
+    if (featuredRaw && featuredRaw.length > 0) {
+      const selected = featuredRaw.filter((p) => p.isFeatured);
+      const targetList = selected.length > 0 ? selected : featuredRaw.slice(0, 4);
+
+      const allModifiers = await db.select().from(productModifiers).execute();
+      const allOptions = await db.select().from(modifierOptions).execute();
+
+      featuredProducts = targetList.map((prod) => {
+        const prodMods = allModifiers
+          .filter((m) => m.productId === prod.id)
+          .map((mod) => ({
+            id: mod.id,
+            name: mod.name,
+            type: mod.type as 'single' | 'multiple',
+            required: mod.required,
+            options: allOptions
+              .filter((o) => o.modifierId === mod.id)
+              .map((o) => ({
+                id: o.id,
+                name: o.name,
+                priceDelta: o.priceDelta,
+                isDefault: o.isDefault,
+              })),
+          }));
+
+        return {
+          ...prod,
+          modifiers: prodMods,
+        };
+      });
+    }
   } catch (err) {
-    console.error('Error cargando productos destacados:', err);
+    console.warn('Aviso al consultar PostgreSQL en vivo, usando datos precargados:', err);
   }
 }
 
-// Asociar modificadores a los productos destacados
-let allModifiers: any[] = [];
-let allOptions: any[] = [];
-try {
-  allModifiers = await db.select().from(productModifiers).execute();
-  allOptions = await db.select().from(modifierOptions).execute();
-} catch (e) {
-  console.error('Error cargando modificadores:', e);
-}
-
-const featuredProducts = featuredProductsList.map((prod) => {
-  const prodMods = allModifiers
-    .filter((m) => m.productId === prod.id)
-    .map((mod) => {
-      const opts = allOptions
-        .filter((o) => o.modifierId === mod.id)
-        .map((o) => ({
-          id: o.id,
-          name: o.name,
-          priceDelta: o.priceDelta,
-          isDefault: o.isDefault,
-        }));
-      return {
-        id: mod.id,
-        name: mod.name,
-        type: mod.type as 'single' | 'multiple',
-        required: mod.required,
-        options: opts,
-      };
-    });
-
-  return {
-    ...prod,
-    modifiers: prodMods,
-  };
-});
-
-// Helper de clases para el Bento Grid
-const getGridSpanClass = (span: string) => {
-  switch (span) {
-    case 'col-2':
-      return 'col-span-1 md:col-span-2 row-span-1 min-h-[240px]';
-    case 'tall':
-      return 'col-span-1 row-span-2 min-h-[500px]';
-    case 'large':
-      return 'col-span-1 md:col-span-2 row-span-2 min-h-[500px]';
-    case 'col-1':
-    default:
-      return 'col-span-1 row-span-1 min-h-[240px]';
-  }
-};
+// Helper de clases para cualquier tamaño de Bento Grid
+import { getGridSpanClasses } from '@esqueleto/core';
+const getGridSpanClass = (span: string) => getGridSpanClasses(span);
 ---
 
 <Layout title="Inicio" description={settings.heroSubtitle}>
@@ -278,8 +318,8 @@ const getGridSpanClass = (span: string) => {
 
             <!-- Badge Superior: Contador de Productos -->
             <div class="relative z-10 self-start mb-auto">
-              <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-black/60 text-white/90 backdrop-blur-md border border-white/20">
-                <span>📦</span>
+              <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-black/60 text-white/90 backdrop-blur-md border border-white/20">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 text-white/80" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>
                 {cat.productCount} {cat.productCount === 1 ? 'producto' : 'productos'}
               </span>
             </div>
@@ -302,8 +342,9 @@ const getGridSpanClass = (span: string) => {
     <section class="space-y-6 pt-4">
       <div class="flex flex-col sm:flex-row sm:items-end justify-between border-b border-gray-200 pb-4 gap-2">
         <div>
-          <span class="text-xs font-bold uppercase tracking-wider text-amber-800 bg-amber-100 px-2.5 py-0.5 rounded-full inline-flex items-center gap-1">
-            <span>⭐</span> Lo más destacado
+          <span class="text-xs font-bold uppercase tracking-wider text-amber-800 bg-amber-100 px-2.5 py-0.5 rounded-full inline-flex items-center gap-1.5">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 text-amber-700" fill="currentColor" viewBox="0 0 24 24"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>
+            Lo más destacado
           </span>
           <h2 class="text-2xl sm:text-3xl font-extrabold tracking-tight text-gray-900 mt-1">
             Productos Destacados
@@ -340,8 +381,8 @@ const getGridSpanClass = (span: string) => {
     <section class="border-t border-gray-200/80 pt-12 pb-6">
       <div class="grid grid-cols-1 md:grid-cols-3 gap-8 text-center sm:text-left">
         <div class="flex items-start gap-4 p-4 rounded-2xl bg-white border border-gray-100 shadow-sm">
-          <div class="w-12 h-12 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center text-2xl shrink-0">
-            🛡️
+          <div class="w-12 h-12 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>
           </div>
           <div>
             <h4 class="font-bold text-gray-900 text-base">Pagos 100% Protegidos</h4>
@@ -352,8 +393,8 @@ const getGridSpanClass = (span: string) => {
         </div>
 
         <div class="flex items-start gap-4 p-4 rounded-2xl bg-white border border-gray-100 shadow-sm">
-          <div class="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-2xl shrink-0">
-            🚀
+          <div class="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
           </div>
           <div>
             <h4 class="font-bold text-gray-900 text-base">Entrega y Seguimiento</h4>
@@ -364,8 +405,8 @@ const getGridSpanClass = (span: string) => {
         </div>
 
         <div class="flex items-start gap-4 p-4 rounded-2xl bg-white border border-gray-100 shadow-sm">
-          <div class="w-12 h-12 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center text-2xl shrink-0">
-            🎨
+          <div class="w-12 h-12 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
           </div>
           <div>
             <h4 class="font-bold text-gray-900 text-base">Personalización Total</h4>

@@ -119,10 +119,33 @@ export const orders = pgTable('orders', {
     .$defaultFn(() => crypto.randomUUID()),
   userId: text('user_id').references(() => users.id, { onDelete: 'set null' }),
   status: text('status').notNull().default('pending'), // 'pending' | 'paid' | 'shipped' | 'cancelled'
-  total: integer('total').notNull(), // En centavos
+  subtotal: integer('subtotal'), // En centavos
+  discountCode: text('discount_code'), // Código aplicado (ej. "ILUSTRA10")
+  discountAmount: integer('discount_amount').notNull().default(0), // Monto descontado en centavos
+  total: integer('total').notNull(), // En centavos (subtotal - discountAmount)
   customerEmail: text('customer_email'),
   itemsSummary: text('items_summary'), // Resumen legible
   itemsJson: text('items_json'), // Detalle estructurado de productos y modificadores
+  createdAt: timestamp('created_at').notNull().$defaultFn(() => new Date()),
+});
+
+// ==========================================
+// 8. Tabla: discount_codes (Cupones y Códigos de Descuento)
+// ==========================================
+export const discountCodes = pgTable('discount_codes', {
+  id: text('id')
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  code: text('code').notNull().unique(), // Ej: "ILUSTRA10", "STICKERSFREE"
+  description: text('description'), // Ej: "10% de bienvenida para coleccionistas"
+  discountType: text('discount_type').notNull().default('percentage'), // 'percentage' | 'fixed'
+  discountValue: integer('discount_value').notNull(), // Si %: 15 = 15%. Si fixed: centavos (5000 = $50.00 MXN)
+  minPurchase: integer('min_purchase').notNull().default(0), // Compra mínima en centavos
+  maxDiscount: integer('max_discount'), // Descuento máximo tope en centavos (para %)
+  usageLimit: integer('usage_limit'), // Límite total de canjes (null = ilimitado)
+  usedCount: integer('used_count').notNull().default(0), // Usos acumulados
+  isActive: boolean('is_active').notNull().default(true),
+  expiresAt: timestamp('expires_at'),
   createdAt: timestamp('created_at').notNull().$defaultFn(() => new Date()),
 });
 
@@ -201,3 +224,6 @@ export type NewOrder = InferInsertModel<typeof orders>;
 
 export type SiteSettings = InferSelectModel<typeof siteSettings>;
 export type NewSiteSettings = InferInsertModel<typeof siteSettings>;
+
+export type DiscountCode = InferSelectModel<typeof discountCodes>;
+export type NewDiscountCode = InferInsertModel<typeof discountCodes>;

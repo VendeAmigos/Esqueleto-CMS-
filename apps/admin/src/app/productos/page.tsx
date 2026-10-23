@@ -1,33 +1,52 @@
-import { db, products, categories, productModifiers, eq } from '@esqueleto/core';
+import { db, products, categories, productModifiers, ensureSchema } from '@esqueleto/core';
+import { eq } from 'drizzle-orm';
 import { deleteProduct } from '../../actions/products';
 import Link from 'next/link';
 
 export default async function ProductosPage() {
-  const allProducts = await db
-    .select({
-      id: products.id,
-      title: products.title,
-      description: products.description,
-      imageUrl: products.imageUrl,
-      price: products.basePrice,
-      isFeatured: products.isFeatured,
-      categoryName: categories.name,
-    })
-    .from(products)
-    .leftJoin(categories, eq(products.categoryId, categories.id))
-    .execute();
+  await ensureSchema();
 
-  // Obtener conteo de modificadores para cada producto
-  const modifiersList = await db.select().from(productModifiers);
+  let productsWithMods: Array<{
+    id: string;
+    title: string;
+    description: string | null;
+    imageUrl: string | null;
+    price: number;
+    isFeatured: boolean;
+    categoryName: string | null;
+    modifiersCount: number;
+    modifiersNames: string[];
+  }> = [];
 
-  const productsWithMods = allProducts.map((p) => {
-    const mods = modifiersList.filter((m) => m.productId === p.id);
-    return {
-      ...p,
-      modifiersCount: mods.length,
-      modifiersNames: mods.map((m) => m.name),
-    };
-  });
+  try {
+    const allProducts = await db
+      .select({
+        id: products.id,
+        title: products.title,
+        description: products.description,
+        imageUrl: products.imageUrl,
+        price: products.basePrice,
+        isFeatured: products.isFeatured,
+        categoryName: categories.name,
+      })
+      .from(products)
+      .leftJoin(categories, eq(products.categoryId, categories.id))
+      .execute();
+
+    // Obtener conteo de modificadores para cada producto
+    const modifiersList = await db.select().from(productModifiers);
+
+    productsWithMods = allProducts.map((p) => {
+      const mods = modifiersList.filter((m) => m.productId === p.id);
+      return {
+        ...p,
+        modifiersCount: mods.length,
+        modifiersNames: mods.map((m) => m.name),
+      };
+    });
+  } catch (err) {
+    console.error('Error al cargar productos desde la base de datos:', err);
+  }
 
   return (
     <main className="min-h-screen p-8 max-w-7xl mx-auto">
@@ -109,8 +128,9 @@ export default async function ProductosPage() {
                         <div className="flex items-center gap-2">
                           <span className="text-sm font-bold text-gray-900">{product.title}</span>
                           {product.isFeatured && (
-                            <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
-                              ⭐ Destacado
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-2.5 w-2.5 text-amber-600" fill="currentColor" viewBox="0 0 24 24"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>
+                              Destacado
                             </span>
                           )}
                         </div>

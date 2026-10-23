@@ -1,59 +1,83 @@
 ---
 // apps/storefront/src/pages/categorias/index.astro
 import Layout from '../../layouts/Layout.astro';
-import { db, categories, products, eq, ensureSchema } from '@esqueleto/core';
+import { db, categories, products, eq, ensureSchema, isDatabaseAvailable } from '@esqueleto/core';
 
-try {
-  await ensureSchema();
-} catch (e) {}
+const defaultCategories = [
+  {
+    id: 'cat-prints-01',
+    name: 'Prints & Láminas de Arte',
+    slug: 'prints-arte',
+    imageUrl: 'https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?w=900&auto=format&fit=crop&q=80',
+    gridSpan: '2x2',
+    displayOrder: 1,
+    productCount: 4,
+  },
+  {
+    id: 'cat-stickers-02',
+    name: 'Stickers & Papelería',
+    slug: 'stickers-papeleria',
+    imageUrl: 'https://images.unsplash.com/photo-1589998059171-988d887df646?w=900&auto=format&fit=crop&q=80',
+    gridSpan: '2x1',
+    displayOrder: 2,
+    productCount: 6,
+  },
+  {
+    id: 'cat-acc-03',
+    name: 'Pines & Llaveros Acrílicos',
+    slug: 'pines-llaveros',
+    imageUrl: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=900&auto=format&fit=crop&q=80',
+    gridSpan: '1x2',
+    displayOrder: 3,
+    productCount: 3,
+  },
+  {
+    id: 'cat-textil-04',
+    name: 'Merch Textil & Totebags',
+    slug: 'merch-textil',
+    imageUrl: 'https://images.unsplash.com/photo-1544816155-12df9643f363?w=900&auto=format&fit=crop&q=80',
+    gridSpan: '2x1',
+    displayOrder: 4,
+    productCount: 2,
+  },
+  {
+    id: 'cat-orig-05',
+    name: 'Obras Originales & Libretas',
+    slug: 'obras-originales',
+    imageUrl: 'https://images.unsplash.com/photo-1513364776144-60967b0f800f?w=900&auto=format&fit=crop&q=80',
+    gridSpan: '1x1',
+    displayOrder: 5,
+    productCount: 1,
+  },
+];
 
-// Consultar todas las categorías ordenadas
-let allCategories: any[] = [];
-try {
-  allCategories = await db
-    .select()
-    .from(categories)
-    .orderBy(categories.displayOrder)
-    .execute();
-} catch (e) {
+let categoriesWithCount = [...defaultCategories];
+const isDbOnline = await isDatabaseAvailable();
+
+if (isDbOnline) {
   try {
-    allCategories = await db.select().from(categories).execute();
+    await ensureSchema();
+    const dbCats = await db.select().from(categories).orderBy(categories.displayOrder).execute();
+    if (dbCats && dbCats.length > 0) {
+      const allActiveProducts = await db
+        .select({ id: products.id, categoryId: products.categoryId })
+        .from(products)
+        .where(eq(products.isActive, true))
+        .execute();
+
+      categoriesWithCount = dbCats.map((cat) => ({
+        ...cat,
+        productCount: allActiveProducts.filter((p) => p.categoryId === cat.id).length,
+      }));
+    }
   } catch (err) {
-    console.error('Error cargando categorías:', err);
+    console.warn('Aviso cargando categorías en vivo:', err);
   }
 }
 
-// Contar productos activos en cada categoría
-let allActiveProducts: any[] = [];
-try {
-  allActiveProducts = await db
-    .select({ id: products.id, categoryId: products.categoryId })
-    .from(products)
-    .where(eq(products.isActive, true))
-    .execute();
-} catch (e) {}
-
-const categoriesWithCount = allCategories.map((cat) => {
-  const count = allActiveProducts.filter((p) => p.categoryId === cat.id).length;
-  return {
-    ...cat,
-    productCount: count,
-  };
-});
-
-const getGridSpanClass = (span: string) => {
-  switch (span) {
-    case 'col-2':
-      return 'col-span-1 md:col-span-2 row-span-1 min-h-[260px]';
-    case 'tall':
-      return 'col-span-1 row-span-2 min-h-[520px]';
-    case 'large':
-      return 'col-span-1 md:col-span-2 row-span-2 min-h-[520px]';
-    case 'col-1':
-    default:
-      return 'col-span-1 row-span-1 min-h-[260px]';
-  }
-};
+// Helper de clases para cualquier tamaño de Bento Grid
+import { getGridSpanClasses } from '@esqueleto/core';
+const getGridSpanClass = (span: string) => getGridSpanClasses(span);
 ---
 
 <Layout
@@ -82,7 +106,8 @@ const getGridSpanClass = (span: string) => {
         href="/catalogo"
         class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-800 text-sm font-semibold transition-colors"
       >
-        <span>🛍️</span> Ver Catálogo Completo
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" /></svg>
+        Ver Catálogo Completo
       </a>
     </div>
 
@@ -110,7 +135,7 @@ const getGridSpanClass = (span: string) => {
           <!-- Badge Superior -->
           <div class="relative z-10 self-start mb-auto">
             <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-black/60 text-white/90 backdrop-blur-md border border-white/20 shadow-sm">
-              <span>🏷️</span>
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 text-white/80" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" /></svg>
               {cat.productCount} {cat.productCount === 1 ? 'producto' : 'productos'}
             </span>
           </div>

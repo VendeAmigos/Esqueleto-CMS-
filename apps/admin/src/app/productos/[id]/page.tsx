@@ -1,4 +1,4 @@
-import { db, products, categories, productModifiers, modifierOptions, eq } from "@esqueleto/core";
+import { db, products, categories, productModifiers, modifierOptions, eq, ensureSchema } from "@esqueleto/core";
 import ProductForm from "@/components/ProductForm";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -8,6 +8,7 @@ export default async function EditarProductoPage({
 }: {
   params: { id: string };
 }) {
+  await ensureSchema();
   const [product] = await db
     .select()
     .from(products)

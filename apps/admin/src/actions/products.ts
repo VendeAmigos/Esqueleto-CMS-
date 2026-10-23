@@ -1,6 +1,7 @@
 "use server";
 
-import { db, products, productModifiers, modifierOptions, eq } from "@esqueleto/core";
+import { db, products, productModifiers, modifierOptions, ensureSchema } from "@esqueleto/core";
+import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import crypto from "crypto";
@@ -21,6 +22,7 @@ interface ModifierGroupInput {
 }
 
 export async function createProduct(formData: FormData) {
+  await ensureSchema();
   const name = formData.get("name")?.toString();
   const description = formData.get("description")?.toString() || "";
   const price = formData.get("price")?.toString();

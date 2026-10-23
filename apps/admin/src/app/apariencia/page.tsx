@@ -1,16 +1,20 @@
-import { db, siteSettings, eq, ensureSchema } from '@esqueleto/core';
+import { db, siteSettings, ensureSchema } from '@esqueleto/core';
+import { eq } from 'drizzle-orm';
 import AppearanceForm from './AppearanceForm';
 
-export const dynamic = 'force-dynamic';
-
 export default async function AparienciaPage() {
-  await ensureSchema();
+  await ensureSchema().catch(() => {});
 
-  const settingsList = await db
-    .select()
-    .from(siteSettings)
-    .where(eq(siteSettings.id, 'default'))
-    .execute();
+  let settingsList: any[] = [];
+  try {
+    settingsList = await db
+      .select()
+      .from(siteSettings)
+      .where(eq(siteSettings.id, 'default'))
+      .execute();
+  } catch (err) {
+    console.error('Error al cargar configuración de apariencia:', err);
+  }
 
   const currentSettings = settingsList[0] || {
     siteName: 'ESQUELETO',

@@ -1,6 +1,6 @@
 import type { APIRoute } from 'astro';
 import { MercadoPagoConfig, Preference } from 'mercadopago';
-import { db, products, orders, modifierOptions, inArray, ensureSchema } from '@esqueleto/core';
+import { db, products, orders, modifierOptions, discountCodes, inArray, eq, sql, ensureSchema } from '@esqueleto/core';
 
 interface CheckoutItemPayload {
   id: string; // Product ID
@@ -19,9 +19,10 @@ export const POST: APIRoute = async ({ request, url }) => {
   try {
     await ensureSchema().catch(() => {});
 
-    const { items, customerEmail } = (await request.json()) as {
+    const { items, customerEmail, discountCode } = (await request.json()) as {
       items: CheckoutItemPayload[];
       customerEmail?: string;
+      discountCode?: string;
     };
 
     if (!items || items.length === 0) {
@@ -45,10 +46,10 @@ export const POST: APIRoute = async ({ request, url }) => {
       ? await db.select().from(modifierOptions).where(inArray(modifierOptions.id, allOptionIds))
       : [];
 
-    let totalCents = 0;
+    let subtotalCents = 0;
     const itemsSummaryList: string[] = [];
 
-    // 3. Validar productos y calcular totales
+    // 3. Validar productos y calcular subtotales
     const validatedItems = items.map((item) => {
       const product = dbProducts.find((p) => p.id === item.id);
 
@@ -67,7 +68,7 @@ export const POST: APIRoute = async ({ request, url }) => {
       });
 
       const verifiedUnitPriceCents = product.basePrice + modifiersDelta;
-      totalCents += verifiedUnitPriceCents * item.quantity;
+      subtotalCents += verifiedUnitPriceCents * item.quantity;
 
       const titleWithModifiers = modifierLabels.length > 0
         ? `${product.title} (${modifierLabels.join(', ')})`
@@ -81,10 +82,57 @@ export const POST: APIRoute = async ({ request, url }) => {
         quantity: item.quantity,
         unit_price: verifiedUnitPriceCents / 100,
         currency_id: 'MXN',
+        unitPriceCents: verifiedUnitPriceCents,
       };
     });
 
-    // 4. Generar ID único para la orden y persistir en PostgreSQL
+    // 4. Validar y procesar Cupón de Descuento si fue enviado
+    let appliedDiscountCode: string | null = null;
+    let discountAmountCents = 0;
+
+    if (discountCode) {
+      const cleanCode = discountCode.trim().toUpperCase();
+      const coupons = await db
+        .select()
+        .from(discountCodes)
+        .where(eq(discountCodes.code, cleanCode))
+        .limit(1)
+        .execute();
+
+      if (coupons && coupons.length > 0) {
+        const coupon = coupons[0];
+        const isNotExpired = !coupon.expiresAt || new Date(coupon.expiresAt) >= new Date();
+        const hasRemainingUsage = coupon.usageLimit === null || coupon.usedCount < coupon.usageLimit;
+        const meetsMinPurchase = coupon.minPurchase <= 0 || subtotalCents >= coupon.minPurchase;
+
+        if (coupon.isActive && isNotExpired && hasRemainingUsage && meetsMinPurchase) {
+          appliedDiscountCode = coupon.code;
+          if (coupon.discountType === 'percentage') {
+            discountAmountCents = Math.round((subtotalCents * coupon.discountValue) / 100);
+            if (coupon.maxDiscount !== null && discountAmountCents > coupon.maxDiscount) {
+              discountAmountCents = coupon.maxDiscount;
+            }
+          } else {
+            discountAmountCents = Math.min(coupon.discountValue, subtotalCents);
+          }
+
+          // Incrementar contador de usos en segundo plano
+          await db
+            .update(discountCodes)
+            .set({ usedCount: sql`${discountCodes.usedCount} + 1` })
+            .where(eq(discountCodes.id, coupon.id))
+            .execute();
+        }
+      }
+    }
+
+    const finalTotalCents = Math.max(0, subtotalCents - discountAmountCents);
+
+    if (appliedDiscountCode) {
+      itemsSummaryList.push(`[Cupón: ${appliedDiscountCode} (-$${(discountAmountCents / 100).toFixed(2)})]`);
+    }
+
+    // 5. Generar ID único para la orden y persistir en PostgreSQL
     const orderId = crypto.randomUUID();
 
     const rawMpToken = process.env.MP_ACCESS_TOKEN?.trim() || '';
@@ -97,7 +145,10 @@ export const POST: APIRoute = async ({ request, url }) => {
       // Modo Mercado Pago Real
       await db.insert(orders).values({
         id: orderId,
-        total: totalCents,
+        subtotal: subtotalCents,
+        discountCode: appliedDiscountCode,
+        discountAmount: discountAmountCents,
+        total: finalTotalCents,
         status: 'pending',
         customerEmail: customerEmail || null,
         itemsSummary: itemsSummaryList.join(' | '),
@@ -111,9 +162,19 @@ export const POST: APIRoute = async ({ request, url }) => {
         ? `${process.env.PUBLIC_STOREFRONT_URL}/api/webhook`
         : `${url.origin}/api/webhook`;
 
+      // Si hay descuento, ajustar proporcionalmente los ítems para Mercado Pago
+      const discountRatio = subtotalCents > 0 ? (subtotalCents - discountAmountCents) / subtotalCents : 1;
+      const mpItems = validatedItems.map((vi) => ({
+        id: vi.id,
+        title: vi.title,
+        quantity: vi.quantity,
+        unit_price: parseFloat(((vi.unitPriceCents * discountRatio) / 100).toFixed(2)),
+        currency_id: 'MXN',
+      }));
+
       const response = await preference.create({
         body: {
-          items: validatedItems,
+          items: mpItems,
           external_reference: orderId,
           payer: customerEmail ? { email: customerEmail } : undefined,
           back_urls: {
@@ -126,9 +187,13 @@ export const POST: APIRoute = async ({ request, url }) => {
         },
       });
 
+      const checkoutUrl = (rawMpToken.startsWith('TEST-') && response.sandbox_init_point)
+        ? response.sandbox_init_point
+        : (response.init_point || response.sandbox_init_point);
+
       return new Response(
         JSON.stringify({
-          url: response.init_point,
+          url: checkoutUrl,
           orderId,
           isDemo: false,
         }),
@@ -138,10 +203,13 @@ export const POST: APIRoute = async ({ request, url }) => {
         }
       );
     } else {
-      // Modo Prueba / Simulación Automática (Permite verificar el flujo de compra y persistencia en BD)
+      // Modo Prueba / Simulación Automática
       await db.insert(orders).values({
         id: orderId,
-        total: totalCents,
+        subtotal: subtotalCents,
+        discountCode: appliedDiscountCode,
+        discountAmount: discountAmountCents,
+        total: finalTotalCents,
         status: 'paid',
         customerEmail: customerEmail || 'cliente-prueba@afotica.com',
         itemsSummary: itemsSummaryList.join(' | '),
@@ -171,3 +239,4 @@ export const POST: APIRoute = async ({ request, url }) => {
     );
   }
 };
+

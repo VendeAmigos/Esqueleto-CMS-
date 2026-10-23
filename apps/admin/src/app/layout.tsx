@@ -3,7 +3,6 @@ import './globals.css';
 
 import Sidebar from '@/components/Sidebar';
 
-export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
   title: 'Panel de Administración | ESQUELETO',

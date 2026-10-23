@@ -6,27 +6,10 @@ const nextConfig = {
   transpilePackages: ['@esqueleto/core'],
   experimental: {
     serverComponentsExternalPackages: [
-      'libsql', 
-      '@libsql/client', 
-      '@libsql/hrana-client', 
-      '@libsql/isomorphic-ws', 
-      '@libsql/linux-arm64-musl',
+      'postgres', 
       'drizzle-orm'
-    ]
+    ],
   },
-  webpack: (config, { isServer }) => {
-    if (isServer) {
-      config.externals.push(
-        'libsql', 
-        '@libsql/client', 
-        '@libsql/hrana-client', 
-        '@libsql/isomorphic-ws', 
-        '@libsql/linux-arm64-musl',
-        'drizzle-orm'
-      );
-    }
-    return config;
-  }
 };
 
 export default nextConfig;
