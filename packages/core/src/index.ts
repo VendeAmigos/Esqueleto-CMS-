@@ -204,7 +204,6 @@ export async function ensureSchema(): Promise<void> {
 ensureSchema().catch(() => {});
 
 export * from './schema';
-export * from 'drizzle-orm';
 export { eq, ne, gt, gte, lt, lte, and, or, not, sql, desc, asc, inArray, isNull, isNotNull } from 'drizzle-orm';
 
 /**

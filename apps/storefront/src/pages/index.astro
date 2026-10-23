@@ -85,7 +85,7 @@ const defaultFeaturedProducts = [
       {
         id: 'mod-size-01',
         name: 'Tamaño de Lámina',
-        type: 'single' as const,
+        type: 'single' as 'single' | 'multiple',
         required: true,
         options: [
           { id: 'opt-a5', name: 'A5 (14.8 x 21 cm)', priceDelta: 0, isDefault: true },
@@ -126,7 +126,7 @@ const defaultFeaturedProducts = [
 
 let settings = { ...defaultSettings };
 let categoriesWithCount = [...defaultCategories];
-let featuredProducts = [...defaultFeaturedProducts];
+let featuredProducts: any[] = [...defaultFeaturedProducts];
 
 // 1. Comprobación rápida del estado de PostgreSQL (Circuit Breaker)
 const isDbOnline = await isDatabaseAvailable();
