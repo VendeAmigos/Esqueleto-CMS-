@@ -9,7 +9,7 @@ let connectionString =
 
 connectionString = connectionString.replace('@localhost:', '@127.0.0.1:');
 
-const sql = postgres(connectionString);
+const sql = postgres(connectionString, { connect_timeout: 3 });
 const db = drizzle(sql, { schema });
 
 async function initSchema() {
@@ -489,7 +489,25 @@ export async function seed() {
   await sql.end();
 }
 
-seed().catch((err) => {
+seed().catch(async (err: any) => {
+  if (
+    err?.code === 'ECONNREFUSED' ||
+    err?.code === 'CONNECT_TIMEOUT' ||
+    err?.code === 'EACCES' ||
+    err?.code === 'ENOTFOUND' ||
+    err?.errno === -4078 ||
+    err?.errno === -4092
+  ) {
+    console.warn('\n⚠️  PostgreSQL no está corriendo en 127.0.0.1:5432.');
+    console.warn('👉 Si deseas usar base de datos persistente, inicia Docker Desktop y ejecuta:');
+    console.warn('   docker compose up -d postgres\n');
+    console.warn('✅ No te preocupes: puedes ejecutar "pnpm run dev" ahora mismo y la tienda');
+    console.warn('   funcionará automáticamente con el catálogo precargado de LUNA ART STUDIO.\n');
+    try {
+      await sql.end({ timeout: 1 });
+    } catch {}
+    process.exit(0);
+  }
   console.error('❌ Error en el proceso de seed:', err);
   process.exit(1);
 });

@@ -788,21 +788,77 @@ export default function ProductForm({ categories, initialData, isEdit = false }:
         )}
       </div>
 
-      {/* Botones de Acción */}
-      <div className="flex items-center justify-end space-x-4 border-t border-gray-200 pt-6">
-        <Link
-          href="/productos"
-          className="rounded-xl px-5 py-2.5 text-sm font-semibold text-gray-600 hover:text-gray-900 transition-colors"
-        >
-          Cancelar
-        </Link>
-        <button
-          type="submit"
-          disabled={isSubmitting || isCompressing}
-          className="inline-flex justify-center items-center rounded-xl bg-black px-6 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-gray-800 focus:outline-none transition-all disabled:opacity-50"
-        >
-          {isSubmitting ? 'Guardando...' : isEdit ? 'Guardar Cambios' : 'Crear Producto'}
-        </button>
+          {/* Botones de Acción */}
+          <div className="flex items-center justify-end space-x-4 border-t border-gray-200 pt-6">
+            <Link
+              href="/productos"
+              className="rounded-xl px-5 py-2.5 text-sm font-semibold text-gray-600 hover:text-gray-900 transition-colors"
+            >
+              Cancelar
+            </Link>
+            <button
+              type="submit"
+              disabled={isSubmitting || isCompressing}
+              className="inline-flex justify-center items-center rounded-xl bg-black px-6 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-gray-800 focus:outline-none transition-all disabled:opacity-50"
+            >
+              {isSubmitting ? 'Guardando...' : isEdit ? 'Guardar Cambios' : 'Crear Producto'}
+            </button>
+          </div>
+        </div>
+
+        {/* Columna Derecha: Vista Previa en Vivo */}
+        <div className="lg:col-span-5 xl:col-span-4 lg:sticky lg:top-8 space-y-4">
+          <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm space-y-4">
+            <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+              <span className="text-xs font-bold uppercase tracking-wider text-gray-500">
+                Vista Previa en Tienda
+              </span>
+              {isFeatured && (
+                <span className="bg-amber-100 text-amber-800 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                  ★ Destacado
+                </span>
+              )}
+            </div>
+
+            <div className="rounded-2xl overflow-hidden border border-gray-200 bg-white shadow-xs">
+              <div className="aspect-square w-full bg-gray-100 relative overflow-hidden">
+                {imageUrl ? (
+                  <img
+                    src={imageUrl}
+                    alt={title || 'Vista previa'}
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <div className="h-full w-full flex items-center justify-center text-gray-400 text-xs">
+                    Sin imagen seleccionada
+                  </div>
+                )}
+                {categoryId && (
+                  <span className="absolute top-3 left-3 bg-white/90 backdrop-blur-xs px-2.5 py-1 rounded-full text-[11px] font-semibold text-gray-800 shadow-xs">
+                    {categories.find((c) => c.id === categoryId)?.name || 'Categoría'}
+                  </span>
+                )}
+              </div>
+              <div className="p-4 space-y-2">
+                <h3 className="font-bold text-gray-900 text-base line-clamp-1">
+                  {title || 'Nombre del Producto'}
+                </h3>
+                <p className="text-xs text-gray-500 line-clamp-2">
+                  {description || 'La descripción del producto aparecerá aquí...'}
+                </p>
+                <div className="pt-2 flex items-center justify-between border-t border-gray-100">
+                  <span className="text-lg font-extrabold text-gray-900">
+                    ${price ? Number(price).toFixed(2) : '0.00'}{' '}
+                    <span className="text-xs font-normal text-gray-500">MXN</span>
+                  </span>
+                  <span className="text-xs font-semibold bg-black text-white px-3 py-1.5 rounded-lg">
+                    Agregar
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </form>
   );
