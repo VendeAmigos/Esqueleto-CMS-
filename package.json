@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev": "pnpm --filter \"./apps/*\" --parallel run dev",
+    "dev": "node scripts/clean-ports.mjs && pnpm --filter \"./apps/*\" --parallel --no-bail run dev",
     "db:seed": "pnpm --filter @esqueleto/core db:seed",
     "db:push": "pnpm --filter @esqueleto/core db:push"
   }

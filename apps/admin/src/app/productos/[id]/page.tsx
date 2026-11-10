@@ -1,54 +1,23 @@
-import { db, products, categories, productModifiers, modifierOptions, eq, ensureSchema } from "@esqueleto/core";
+import { getStoredProductById, getStoredCategories } from "@esqueleto/core";
 import ProductForm from "@/components/ProductForm";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+
+export const dynamic = 'force-dynamic';
 
 export default async function EditarProductoPage({
   params,
 }: {
   params: { id: string };
 }) {
-  await ensureSchema();
-  const [product] = await db
-    .select()
-    .from(products)
-    .where(eq(products.id, params.id))
-    .limit(1);
+  const [product, allCategories] = await Promise.all([
+    getStoredProductById(params.id),
+    getStoredCategories(),
+  ]);
 
   if (!product) {
     notFound();
   }
-
-  const allCategories = await db.select().from(categories).execute();
-
-  // Obtener modificadores asociados
-  const modifiers = await db
-    .select()
-    .from(productModifiers)
-    .where(eq(productModifiers.productId, product.id));
-
-  // Obtener opciones de cada modificador
-  const modifiersWithOpts = await Promise.all(
-    modifiers.map(async (mod) => {
-      const opts = await db
-        .select()
-        .from(modifierOptions)
-        .where(eq(modifierOptions.modifierId, mod.id));
-
-      return {
-        id: mod.id,
-        name: mod.name,
-        type: mod.type as 'single' | 'multiple',
-        required: mod.required,
-        options: opts.map((o) => ({
-          id: o.id,
-          name: o.name,
-          priceDelta: o.priceDelta,
-          isDefault: o.isDefault,
-        })),
-      };
-    })
-  );
 
   const initialData = {
     id: product.id,
@@ -58,7 +27,7 @@ export default async function EditarProductoPage({
     basePrice: product.basePrice,
     categoryId: product.categoryId,
     isFeatured: Boolean(product.isFeatured),
-    modifiers: modifiersWithOpts,
+    modifiers: product.modifiers || [],
   };
 
   return (

@@ -1,6 +1,18 @@
 "use server";
 
-import { db, products, productModifiers, modifierOptions, ensureSchema, eq } from "@esqueleto/core";
+import {
+  db,
+  products,
+  productModifiers,
+  modifierOptions,
+  isDatabaseAvailable,
+  ensureSchema,
+  eq,
+  createStoredProduct,
+  updateStoredProduct,
+  deleteStoredProduct,
+  type StoredModifierGroup,
+} from "@esqueleto/core";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import crypto from "crypto";
@@ -21,7 +33,6 @@ interface ModifierGroupInput {
 }
 
 export async function createProduct(formData: FormData) {
-  await ensureSchema();
   const name = formData.get("name")?.toString();
   const description = formData.get("description")?.toString() || "";
   const price = formData.get("price")?.toString();
@@ -37,7 +48,33 @@ export async function createProduct(formData: FormData) {
   const priceInCents = Math.round(Number(price) * 100);
   const productId = crypto.randomUUID();
 
-  await db.insert(products).values({
+  const parsedModifiers: StoredModifierGroup[] = [];
+  if (modifiersRaw) {
+    try {
+      const rawMods: ModifierGroupInput[] = JSON.parse(modifiersRaw);
+      for (const mod of rawMods) {
+        if (!mod.name.trim()) continue;
+        parsedModifiers.push({
+          id: crypto.randomUUID(),
+          name: mod.name.trim(),
+          type: mod.type || 'single',
+          required: Boolean(mod.required),
+          options: (mod.options || [])
+            .filter((o) => o.name.trim())
+            .map((o) => ({
+              id: crypto.randomUUID(),
+              name: o.name.trim(),
+              priceDelta: Math.round(Number(o.priceDelta) || 0),
+              isDefault: Boolean(o.isDefault),
+            })),
+        });
+      }
+    } catch (e) {
+      console.error("Error parseando modificadores:", e);
+    }
+  }
+
+  await createStoredProduct({
     id: productId,
     title: name,
     description,
@@ -45,35 +82,42 @@ export async function createProduct(formData: FormData) {
     basePrice: priceInCents,
     categoryId: category || null,
     isFeatured,
+    modifiers: parsedModifiers,
   });
 
-  if (modifiersRaw) {
+  if (await isDatabaseAvailable()) {
     try {
-      const modifiers: ModifierGroupInput[] = JSON.parse(modifiersRaw);
-      for (const mod of modifiers) {
-        if (!mod.name.trim()) continue;
-        const modifierId = crypto.randomUUID();
-        await db.insert(productModifiers).values({
-          id: modifierId,
-          productId,
-          name: mod.name.trim(),
-          type: mod.type || 'single',
-          required: Boolean(mod.required),
-        });
+      await ensureSchema();
+      await db.insert(products).values({
+        id: productId,
+        title: name,
+        description,
+        imageUrl: image,
+        basePrice: priceInCents,
+        categoryId: category || null,
+        isFeatured,
+      });
 
-        for (const opt of mod.options || []) {
-          if (!opt.name.trim()) continue;
+      for (const mod of parsedModifiers) {
+        await db.insert(productModifiers).values({
+          id: mod.id,
+          productId,
+          name: mod.name,
+          type: mod.type,
+          required: mod.required,
+        });
+        for (const opt of mod.options) {
           await db.insert(modifierOptions).values({
-            id: crypto.randomUUID(),
-            modifierId,
-            name: opt.name.trim(),
-            priceDelta: Math.round(Number(opt.priceDelta) || 0),
-            isDefault: Boolean(opt.isDefault),
+            id: opt.id,
+            modifierId: mod.id,
+            name: opt.name,
+            priceDelta: opt.priceDelta,
+            isDefault: opt.isDefault,
           });
         }
       }
     } catch (e) {
-      console.error("Error al registrar modificadores:", e);
+      console.warn("Aviso guardando producto en PostgreSQL:", e);
     }
   }
 
@@ -96,49 +140,79 @@ export async function updateProduct(id: string, formData: FormData) {
   }
 
   const priceInCents = Math.round(Number(price) * 100);
-
-  await db
-    .update(products)
-    .set({
-      title: name,
-      description,
-      imageUrl: image,
-      basePrice: priceInCents,
-      categoryId: category || null,
-      isFeatured,
-    })
-    .where(eq(products.id, id));
+  const parsedModifiers: StoredModifierGroup[] = [];
 
   if (modifiersRaw !== undefined) {
     try {
-      // Al eliminar el modificador se eliminan sus opciones por onDelete: cascade
-      await db.delete(productModifiers).where(eq(productModifiers.productId, id));
-
-      const modifiers: ModifierGroupInput[] = JSON.parse(modifiersRaw);
-      for (const mod of modifiers) {
+      const rawMods: ModifierGroupInput[] = JSON.parse(modifiersRaw || "[]");
+      for (const mod of rawMods) {
         if (!mod.name.trim()) continue;
-        const modifierId = crypto.randomUUID();
-        await db.insert(productModifiers).values({
-          id: modifierId,
-          productId: id,
+        parsedModifiers.push({
+          id: crypto.randomUUID(),
           name: mod.name.trim(),
           type: mod.type || 'single',
           required: Boolean(mod.required),
+          options: (mod.options || [])
+            .filter((o) => o.name.trim())
+            .map((o) => ({
+              id: crypto.randomUUID(),
+              name: o.name.trim(),
+              priceDelta: Math.round(Number(o.priceDelta) || 0),
+              isDefault: Boolean(o.isDefault),
+            })),
         });
+      }
+    } catch (e) {
+      console.error("Error parseando modificadores:", e);
+    }
+  }
 
-        for (const opt of mod.options || []) {
-          if (!opt.name.trim()) continue;
+  await updateStoredProduct({
+    id,
+    title: name,
+    description,
+    imageUrl: image,
+    basePrice: priceInCents,
+    categoryId: category || null,
+    isFeatured,
+    modifiers: parsedModifiers,
+  });
+
+  if (await isDatabaseAvailable()) {
+    try {
+      await db
+        .update(products)
+        .set({
+          title: name,
+          description,
+          imageUrl: image,
+          basePrice: priceInCents,
+          categoryId: category || null,
+          isFeatured,
+        })
+        .where(eq(products.id, id));
+
+      await db.delete(productModifiers).where(eq(productModifiers.productId, id));
+      for (const mod of parsedModifiers) {
+        await db.insert(productModifiers).values({
+          id: mod.id,
+          productId: id,
+          name: mod.name,
+          type: mod.type,
+          required: mod.required,
+        });
+        for (const opt of mod.options) {
           await db.insert(modifierOptions).values({
-            id: crypto.randomUUID(),
-            modifierId,
-            name: opt.name.trim(),
-            priceDelta: Math.round(Number(opt.priceDelta) || 0),
-            isDefault: Boolean(opt.isDefault),
+            id: opt.id,
+            modifierId: mod.id,
+            name: opt.name,
+            priceDelta: opt.priceDelta,
+            isDefault: opt.isDefault,
           });
         }
       }
     } catch (e) {
-      console.error("Error actualizando modificadores:", e);
+      console.warn("Aviso actualizando producto en PostgreSQL:", e);
     }
   }
 
@@ -149,7 +223,10 @@ export async function updateProduct(id: string, formData: FormData) {
 
 export async function deleteProduct(id: string) {
   try {
-    await db.delete(products).where(eq(products.id, id));
+    await deleteStoredProduct(id);
+    if (await isDatabaseAvailable()) {
+      await db.delete(products).where(eq(products.id, id));
+    }
     revalidatePath("/");
     revalidatePath("/productos");
     return { success: true };

@@ -35,7 +35,12 @@ export const db = drizzle(client, { schema });
 
 let dbAlive: boolean | null = null;
 let lastDbCheck = 0;
-const DB_CHECK_INTERVAL = 10000;
+const DB_CHECK_INTERVAL = 15000;
+
+export function markDatabaseOffline(): void {
+  dbAlive = false;
+  lastDbCheck = Date.now();
+}
 
 export async function isDatabaseAvailable(): Promise<boolean> {
   const now = Date.now();
@@ -221,15 +226,23 @@ export async function ensureSchema(): Promise<void> {
         try {
           await client.unsafe(stmt);
         } catch (stmtErr: any) {
-          if (stmtErr?.code === 'CONNECT_TIMEOUT' || stmtErr?.code === 'ECONNREFUSED' || stmtErr?.errno === 'CONNECT_TIMEOUT') {
-            console.warn('No se pudo conectar a PostgreSQL (¿Docker/PostgreSQL está iniciado?). Saltando auto-migración.');
-            break;
+          const code = stmtErr?.code || stmtErr?.cause?.code || stmtErr?.errno;
+          if (
+            code === 'CONNECT_TIMEOUT' ||
+            code === 'ECONNREFUSED' ||
+            code === 'ECONNRESET' ||
+            String(stmtErr?.message || '').includes('ECONNRESET')
+          ) {
+            markDatabaseOffline();
+            console.warn('No se pudo conectar a PostgreSQL (conexión reiniciada o apagada). Usando modo local rápido.');
+            return;
           }
           console.warn('Aviso en paso de migración:', stmtErr);
         }
       }
       schemaEnsured = true;
     } catch (err) {
+      markDatabaseOffline();
       console.error('Error asegurando esquema en PostgreSQL:', err);
     } finally {
       schemaPromise = null;
@@ -239,9 +252,7 @@ export async function ensureSchema(): Promise<void> {
   return schemaPromise;
 }
 
-// Auto-ejecución inmediata no bloqueante
-ensureSchema().catch(() => {});
-
 export * from './schema';
+export * from './categoriesStore';
 export { eq, ne, gt, gte, lt, lte, and, or, not, sql, desc, asc, inArray, isNull, isNotNull } from 'drizzle-orm';
 

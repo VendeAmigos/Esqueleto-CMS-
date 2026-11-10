@@ -1,83 +1,24 @@
 ---
 // apps/storefront/src/pages/categorias/index.astro
 import Layout from '../../layouts/Layout.astro';
-import { db, categories, products, eq, ensureSchema, isDatabaseAvailable } from '@esqueleto/core';
+import { getStoredCategoriesWithCount, getGridSpanClasses, parseGridSpan } from '@esqueleto/core';
 
-const defaultCategories = [
-  {
-    id: 'cat-prints-01',
-    name: 'Prints & Láminas de Arte',
-    slug: 'prints-arte',
-    imageUrl: 'https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?w=900&auto=format&fit=crop&q=80',
-    gridSpan: '2x2',
-    displayOrder: 1,
-    productCount: 4,
-  },
-  {
-    id: 'cat-stickers-02',
-    name: 'Stickers & Papelería',
-    slug: 'stickers-papeleria',
-    imageUrl: 'https://images.unsplash.com/photo-1589998059171-988d887df646?w=900&auto=format&fit=crop&q=80',
-    gridSpan: '2x1',
-    displayOrder: 2,
-    productCount: 6,
-  },
-  {
-    id: 'cat-acc-03',
-    name: 'Pines & Llaveros Acrílicos',
-    slug: 'pines-llaveros',
-    imageUrl: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=900&auto=format&fit=crop&q=80',
-    gridSpan: '1x2',
-    displayOrder: 3,
-    productCount: 3,
-  },
-  {
-    id: 'cat-textil-04',
-    name: 'Merch Textil & Totebags',
-    slug: 'merch-textil',
-    imageUrl: 'https://images.unsplash.com/photo-1544816155-12df9643f363?w=900&auto=format&fit=crop&q=80',
-    gridSpan: '2x1',
-    displayOrder: 4,
-    productCount: 2,
-  },
-  {
-    id: 'cat-orig-05',
-    name: 'Obras Originales & Libretas',
-    slug: 'obras-originales',
-    imageUrl: 'https://images.unsplash.com/photo-1513364776144-60967b0f800f?w=900&auto=format&fit=crop&q=80',
-    gridSpan: '1x1',
-    displayOrder: 5,
-    productCount: 1,
-  },
-];
-
-let categoriesWithCount = [...defaultCategories];
-const isDbOnline = await isDatabaseAvailable();
-
-if (isDbOnline) {
-  try {
-    await ensureSchema();
-    const dbCats = await db.select().from(categories).orderBy(categories.displayOrder).execute();
-    if (dbCats && dbCats.length > 0) {
-      const allActiveProducts = await db
-        .select({ id: products.id, categoryId: products.categoryId })
-        .from(products)
-        .where(eq(products.isActive, true))
-        .execute();
-
-      categoriesWithCount = dbCats.map((cat) => ({
-        ...cat,
-        productCount: allActiveProducts.filter((p) => p.categoryId === cat.id).length,
-      }));
-    }
-  } catch (err) {
-    console.warn('Aviso cargando categorías en vivo:', err);
-  }
-}
-
-// Helper de clases para cualquier tamaño de Bento Grid
-import { getGridSpanClasses } from '@esqueleto/core';
+const categoriesWithCount = await getStoredCategoriesWithCount();
 const getGridSpanClass = (span: string) => getGridSpanClasses(span);
+
+const gridBoardCols = categoriesWithCount.reduce((acc, cat) => {
+  const p = parseGridSpan(cat.gridSpan);
+  const end = (p.colStart ?? 1) + p.colSpan - 1;
+  return Math.max(acc, p.boardCols ?? 4, end);
+}, 4);
+
+const gridBoardRows = categoriesWithCount.reduce((acc, cat) => {
+  const p = parseGridSpan(cat.gridSpan);
+  const end = (p.rowStart ?? 1) + p.rowSpan - 1;
+  return Math.max(acc, p.boardRows ?? 3, end);
+}, 3);
+
+const desktopRowHeightPx = gridBoardRows >= 6 ? 120 : gridBoardRows >= 5 ? 150 : 240;
 ---
 
 <Layout
@@ -112,16 +53,36 @@ const getGridSpanClass = (span: string) => getGridSpanClasses(span);
     </div>
 
     <!-- Bento Grid de Categorías -->
-    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 auto-rows-[260px]">
+    <style>
+      @media (min-width: 1024px) {
+        .bento-grid-container {
+          grid-template-columns: repeat(var(--grid-cols, 4), minmax(0, 1fr)) !important;
+          grid-auto-rows: var(--grid-row-h, 240px) !important;
+        }
+        .bento-grid-card {
+          grid-column: var(--lg-col) !important;
+          grid-row: var(--lg-row) !important;
+          min-height: 0 !important;
+        }
+      }
+    </style>
+    <div
+      class="bento-grid-container grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 auto-rows-[260px]"
+      style={`--grid-cols: ${gridBoardCols}; --grid-row-h: ${desktopRowHeightPx}px;`}
+    >
       {categoriesWithCount.map((cat) => {
-        const isTwoRows = cat.gridSpan?.includes('x2') || cat.gridSpan === 'tall' || cat.gridSpan === 'large';
-        const isThreeRows = cat.gridSpan?.includes('x3');
-        const cardMinH = isTwoRows ? '540px' : isThreeRows ? '820px' : '260px';
+        const parsedSpan = parseGridSpan(cat.gridSpan);
+        const lgCol = parsedSpan.colStart
+          ? `${parsedSpan.colStart} / span ${parsedSpan.colSpan}`
+          : `span ${parsedSpan.colSpan}`;
+        const lgRow = parsedSpan.rowStart
+          ? `${parsedSpan.rowStart} / span ${parsedSpan.rowSpan}`
+          : `span ${parsedSpan.rowSpan}`;
         return (
           <a
             href={`/categorias/${cat.slug}`}
-            style={`min-height: ${cardMinH};`}
-            class={`group relative rounded-3xl overflow-hidden shadow-sm hover:shadow-2xl transition-all duration-500 flex flex-col justify-end p-6 border border-gray-200 ${getGridSpanClass(
+            style={`min-height: 240px; --lg-col: ${lgCol}; --lg-row: ${lgRow};`}
+            class={`bento-grid-card group relative rounded-3xl overflow-hidden shadow-sm hover:shadow-2xl transition-all duration-500 flex flex-col justify-end p-6 border border-gray-200 ${getGridSpanClass(
               cat.gridSpan
             )}`}
           >

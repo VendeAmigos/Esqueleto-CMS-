@@ -10,6 +10,11 @@ export default defineConfig({
     mode: 'standalone'
   }),
   vite: {
+    server: {
+      watch: {
+        ignored: ['**/uploads/**', '**/.next/**']
+      }
+    },
     build: {
       commonjsOptions: {
         ignoreDynamicRequires: true

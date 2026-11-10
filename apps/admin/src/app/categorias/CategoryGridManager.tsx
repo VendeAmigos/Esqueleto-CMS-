@@ -1,16 +1,16 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import {
   createCategory,
   updateCategory,
-  updateCategoryGrid,
-  updateCategoryOrder,
-  reorderCategories,
+  saveCategoryGridLayout,
   deleteCategory,
 } from './actions';
-
-import { getGridSpanClasses, GRID_PRESETS, normalizeSpan } from '@esqueleto/core/grid';
+import {
+  parseGridSpan,
+  formatGridSpan,
+} from '@esqueleto/core/grid';
 
 interface CategoryItem {
   id: string;
@@ -21,40 +21,546 @@ interface CategoryItem {
   displayOrder: number;
 }
 
+interface PlacedCategory extends CategoryItem {
+  colStart: number;
+  rowStart: number;
+  colSpan: number;
+  rowSpan: number;
+  isPlaced: boolean;
+}
+
+interface GridRect {
+  colStart: number;
+  rowStart: number;
+  colSpan: number;
+  rowSpan: number;
+}
+
 interface CategoryGridManagerProps {
   categories: CategoryItem[];
 }
 
-export default function CategoryGridManager({ categories: initialCategories }: CategoryGridManagerProps) {
-  const [categories, setCategories] = useState<CategoryItem[]>(initialCategories);
-  const [isCreating, setIsCreating] = useState(false);
+function rectsOverlap(a: GridRect, b: GridRect): boolean {
+  const aColEnd = a.colStart + a.colSpan - 1;
+  const aRowEnd = a.rowStart + a.rowSpan - 1;
+  const bColEnd = b.colStart + b.colSpan - 1;
+  const bRowEnd = b.rowStart + b.rowSpan - 1;
+
+  return !(
+    aColEnd < b.colStart ||
+    a.colStart > bColEnd ||
+    aRowEnd < b.rowStart ||
+    a.rowStart > bRowEnd
+  );
+}
+
+function findFirstAvailableSlot(
+  occupied: GridRect[],
+  colSpan: number,
+  rowSpan: number,
+  totalCols: number,
+  totalRows: number
+): { colStart: number; rowStart: number } {
+  const clampedColSpan = Math.min(Math.max(colSpan, 1), totalCols);
+  for (let r = 1; r <= Math.max(totalRows, 20); r++) {
+    for (let c = 1; c <= totalCols - clampedColSpan + 1; c++) {
+      const candidate: GridRect = {
+        colStart: c,
+        rowStart: r,
+        colSpan: clampedColSpan,
+        rowSpan,
+      };
+      if (!occupied.some((occ) => rectsOverlap(candidate, occ))) {
+        return { colStart: c, rowStart: r };
+      }
+    }
+  }
+  return { colStart: 1, rowStart: 1 };
+}
+
+function detectInitialBoardSize(rawCategories: CategoryItem[]): { cols: number; rows: number } {
+  let maxCols = 5;
+  let maxRows = 6;
+
+  for (const cat of rawCategories) {
+    const parsed = parseGridSpan(cat.gridSpan);
+    if (parsed.boardCols && parsed.boardRows) {
+      return {
+        cols: Math.min(Math.max(parsed.boardCols, 2), 10),
+        rows: Math.min(Math.max(parsed.boardRows, 2), 12),
+      };
+    }
+    const cEnd = (parsed.colStart || 1) + parsed.colSpan - 1;
+    const rEnd = (parsed.rowStart || 1) + parsed.rowSpan - 1;
+    if (cEnd > maxCols) maxCols = cEnd;
+    if (rEnd + 1 > maxRows) maxRows = rEnd + 1;
+  }
+
+  return {
+    cols: Math.min(Math.max(maxCols, 4), 10),
+    rows: Math.min(Math.max(maxRows, 6), 12),
+  };
+}
+
+function buildInitialPlaced(
+  rawCategories: CategoryItem[],
+  totalCols: number,
+  totalRows: number
+): PlacedCategory[] {
+  const sorted = [...rawCategories].sort((a, b) => a.displayOrder - b.displayOrder);
+  const placed: PlacedCategory[] = [];
+  const deferred: { item: CategoryItem; colSpan: number; rowSpan: number }[] = [];
+
+  for (const item of sorted) {
+    const parsed = parseGridSpan(item.gridSpan);
+    const colSpan = Math.min(Math.max(parsed.colSpan, 1), totalCols);
+    const rowSpan = Math.min(Math.max(parsed.rowSpan, 1), totalRows);
+
+    if (parsed.colStart !== null && parsed.rowStart !== null) {
+      const colStart = Math.min(Math.max(parsed.colStart, 1), totalCols - colSpan + 1);
+      const rowStart = Math.min(Math.max(parsed.rowStart, 1), totalRows - rowSpan + 1);
+      const candidate: GridRect = { colStart, rowStart, colSpan, rowSpan };
+      if (!placed.some((p) => p.isPlaced && rectsOverlap(candidate, p))) {
+        placed.push({
+          ...item,
+          colStart,
+          rowStart,
+          colSpan,
+          rowSpan,
+          isPlaced: true,
+          gridSpan: formatGridSpan(colSpan, rowSpan, colStart, rowStart, totalCols, totalRows),
+        });
+        continue;
+      }
+    }
+
+    deferred.push({ item, colSpan, rowSpan });
+  }
+
+  for (const { item, colSpan, rowSpan } of deferred) {
+    const slot = findFirstAvailableSlot(
+      placed.filter((p) => p.isPlaced),
+      colSpan,
+      rowSpan,
+      totalCols,
+      totalRows
+    );
+    placed.push({
+      ...item,
+      colStart: slot.colStart,
+      rowStart: slot.rowStart,
+      colSpan,
+      rowSpan,
+      isPlaced: true,
+      gridSpan: formatGridSpan(colSpan, rowSpan, slot.colStart, slot.rowStart, totalCols, totalRows),
+    });
+  }
+
+  return placed;
+}
+
+export default function CategoryGridManager({
+  categories: initialCategories,
+}: CategoryGridManagerProps) {
+  const initialBoard = useMemo(() => detectInitialBoardSize(initialCategories), [initialCategories]);
+  const [cols, setCols] = useState<number>(initialBoard.cols);
+  const [rows, setRows] = useState<number>(initialBoard.rows);
+  const [gap, setGap] = useState<number>(8);
+  const [showPhotosInGrid, setShowPhotosInGrid] = useState<boolean>(false);
+
+  const [items, setItems] = useState<PlacedCategory[]>(() =>
+    buildInitialPlaced(initialCategories, initialBoard.cols, initialBoard.rows)
+  );
+
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [isUploading, setIsUploading] = useState<string | null>(null);
+  const [copiedType, setCopiedType] = useState<'html' | 'css' | null>(null);
 
-  // Drag and Drop (Reordenar)
-  const [draggedId, setDraggedId] = useState<string | null>(null);
-  const [dragOverId, setDragOverId] = useState<string | null>(null);
-
-  // Resize interactivo con esquinas (Estirar)
-  const [resizingState, setResizingState] = useState<{
+  // Interacción 1: Mover caja existente por el grid 2D
+  const [dragState, setDragState] = useState<{
     id: string;
-    mode: 'both' | 'col' | 'row';
-    startX: number;
-    startY: number;
-    startCols: number;
-    startRows: number;
-    cardRect: DOMRect;
+    grabOffsetCol: number;
+    grabOffsetRow: number;
   } | null>(null);
 
-  // Formulario nueva categoría
+  // Interacción 2: Estirar esquina inferior derecha '⌟' (como en cssgridgenerator.io)
+  const [resizeState, setResizeState] = useState<{
+    id: string;
+    colStart: number;
+    rowStart: number;
+  } | null>(null);
+
+  // Interacción 3: Clic o arrastrar sobre celdas grises '+' para crear/colocar caja
+  const [drawState, setDrawState] = useState<{
+    startCol: number;
+    startRow: number;
+    endCol: number;
+    endRow: number;
+  } | null>(null);
+
+  // Modal para crear nueva categoría o editar existente
+  const [pendingCellRect, setPendingCellRect] = useState<GridRect | null>(null);
   const [newName, setNewName] = useState('');
   const [newSlug, setNewSlug] = useState('');
   const [newImageUrl, setNewImageUrl] = useState('');
-  const [newGridSpan, setNewGridSpan] = useState('1x1');
-  const [isSaving, setIsSaving] = useState(false);
+  const [isSavingNew, setIsSavingNew] = useState(false);
+
+  const [editingCat, setEditingCat] = useState<PlacedCategory | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editSlug, setEditSlug] = useState('');
+  const [editImageUrl, setEditImageUrl] = useState('');
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [targetUploadId, setTargetUploadId] = useState<string | null>(null);
-  const gridContainerRef = useRef<HTMLDivElement>(null);
+  const gridBoardRef = useRef<HTMLDivElement>(null);
+  const latestItemsRef = useRef<PlacedCategory[]>(items);
+
+  useEffect(() => {
+    latestItemsRef.current = items;
+  }, [items]);
+
+  const activeItems = useMemo(() => items.filter((i) => i.isPlaced), [items]);
+  const unplacedItems = useMemo(() => items.filter((i) => !i.isPlaced), [items]);
+
+  // Guardar layout en el servidor
+  const persistLayout = useCallback(
+    async (listToSave: PlacedCategory[], boardCols = cols, boardRows = rows) => {
+      setSaveStatus('saving');
+      const placedOnly = listToSave
+        .filter((i) => i.isPlaced)
+        .sort((a, b) => (a.rowStart !== b.rowStart ? a.rowStart - b.rowStart : a.colStart - b.colStart));
+
+      const unplacedOnly = listToSave.filter((i) => !i.isPlaced);
+      const combined = [...placedOnly, ...unplacedOnly];
+
+      const payload = combined.map((item, idx) => ({
+        id: item.id,
+        gridSpan: formatGridSpan(
+          item.colSpan,
+          item.rowSpan,
+          item.colStart,
+          item.rowStart,
+          boardCols,
+          boardRows
+        ),
+        displayOrder: idx + 1,
+      }));
+
+      await saveCategoryGridLayout(payload);
+      setSaveStatus('saved');
+      setTimeout(() => {
+        setSaveStatus((prev) => (prev === 'saved' ? 'idle' : prev));
+      }, 2200);
+    },
+    [cols, rows]
+  );
+
+  // Calcular qué celda (col, row) está debajo del mouse
+  const getCellFromClientXY = useCallback(
+    (clientX: number, clientY: number): { col: number; row: number } => {
+      const board = gridBoardRef.current;
+      if (!board) return { col: 1, row: 1 };
+
+      const rect = board.getBoundingClientRect();
+      const relX = clientX - rect.left;
+      const relY = clientY - rect.top;
+
+      const cellWidth = (rect.width - gap * (cols - 1)) / cols;
+      const cellHeight = (rect.height - gap * (rows - 1)) / rows;
+
+      const rawCol = Math.floor(relX / (cellWidth + gap)) + 1;
+      const rawRow = Math.floor(relY / (cellHeight + gap)) + 1;
+
+      return {
+        col: Math.min(Math.max(rawCol, 1), cols),
+        row: Math.min(Math.max(rawRow, 1), rows),
+      };
+    },
+    [cols, rows, gap]
+  );
+
+  // Eventos globales de mouse/pointer para arrastrar cajas, estirar esquinas '⌟' y dibujar en '+'
+  useEffect(() => {
+    if (!dragState && !resizeState && !drawState) return;
+
+    const onPointerMove = (e: PointerEvent) => {
+      const { col, row } = getCellFromClientXY(e.clientX, e.clientY);
+
+      if (dragState) {
+        setItems((prev) => {
+          const target = prev.find((i) => i.id === dragState.id);
+          if (!target) return prev;
+
+          const nextColStart = Math.min(
+            Math.max(col - dragState.grabOffsetCol, 1),
+            cols - target.colSpan + 1
+          );
+          const nextRowStart = Math.min(
+            Math.max(row - dragState.grabOffsetRow, 1),
+            rows - target.rowSpan + 1
+          );
+
+          if (nextColStart === target.colStart && nextRowStart === target.rowStart) {
+            return prev;
+          }
+
+          const candidateRect: GridRect = {
+            colStart: nextColStart,
+            rowStart: nextRowStart,
+            colSpan: target.colSpan,
+            rowSpan: target.rowSpan,
+          };
+
+          // En cssgridgenerator.io las demás cajas NO se mueven solas; solo se permite mover si no choca
+          const collides = prev.some(
+            (other) => other.isPlaced && other.id !== target.id && rectsOverlap(candidateRect, other)
+          );
+
+          if (collides) return prev;
+
+          return prev.map((item) =>
+            item.id === target.id
+              ? {
+                  ...item,
+                  colStart: nextColStart,
+                  rowStart: nextRowStart,
+                  gridSpan: formatGridSpan(
+                    item.colSpan,
+                    item.rowSpan,
+                    nextColStart,
+                    nextRowStart,
+                    cols,
+                    rows
+                  ),
+                }
+              : item
+          );
+        });
+      } else if (resizeState) {
+        setItems((prev) => {
+          const target = prev.find((i) => i.id === resizeState.id);
+          if (!target) return prev;
+
+          const nextColSpan = Math.min(
+            Math.max(col - resizeState.colStart + 1, 1),
+            cols - resizeState.colStart + 1
+          );
+          const nextRowSpan = Math.min(
+            Math.max(row - resizeState.rowStart + 1, 1),
+            rows - resizeState.rowStart + 1
+          );
+
+          if (nextColSpan === target.colSpan && nextRowSpan === target.rowSpan) {
+            return prev;
+          }
+
+          const candidateRect: GridRect = {
+            colStart: target.colStart,
+            rowStart: target.rowStart,
+            colSpan: nextColSpan,
+            rowSpan: nextRowSpan,
+          };
+
+          // No permitir superponerse sobre otra caja existente al estirar
+          const collides = prev.some(
+            (other) => other.isPlaced && other.id !== target.id && rectsOverlap(candidateRect, other)
+          );
+
+          if (collides) return prev;
+
+          return prev.map((item) =>
+            item.id === target.id
+              ? {
+                  ...item,
+                  colSpan: nextColSpan,
+                  rowSpan: nextRowSpan,
+                  gridSpan: formatGridSpan(
+                    nextColSpan,
+                    nextRowSpan,
+                    item.colStart,
+                    item.rowStart,
+                    cols,
+                    rows
+                  ),
+                }
+              : item
+          );
+        });
+      } else if (drawState) {
+        setDrawState((prev) =>
+          prev && (prev.endCol !== col || prev.endRow !== row)
+            ? { ...prev, endCol: col, endRow: row }
+            : prev
+        );
+      }
+    };
+
+    const onPointerUp = async () => {
+      if (dragState) {
+        setDragState(null);
+        await persistLayout(latestItemsRef.current);
+      } else if (resizeState) {
+        setResizeState(null);
+        await persistLayout(latestItemsRef.current);
+      } else if (drawState) {
+        const colStart = Math.min(drawState.startCol, drawState.endCol);
+        const colEnd = Math.max(drawState.startCol, drawState.endCol);
+        const rowStart = Math.min(drawState.startRow, drawState.endRow);
+        const rowEnd = Math.max(drawState.startRow, drawState.endRow);
+
+        const drawnRect: GridRect = {
+          colStart,
+          rowStart,
+          colSpan: colEnd - colStart + 1,
+          rowSpan: rowEnd - rowStart + 1,
+        };
+
+        setDrawState(null);
+
+        // Verificar que no choque con una caja ya colocada
+        const overlapsExisting = latestItemsRef.current.some(
+          (i) => i.isPlaced && rectsOverlap(drawnRect, i)
+        );
+        if (overlapsExisting) return;
+
+        // Si hay una categoría sin colocar en espera, colocarla inmediatamente al hacer clic en '+' (como cssgridgenerator.io)
+        const nextUnplaced = latestItemsRef.current.find((i) => !i.isPlaced);
+        if (nextUnplaced) {
+          const updated = latestItemsRef.current.map((item) =>
+            item.id === nextUnplaced.id
+              ? {
+                  ...item,
+                  colStart: drawnRect.colStart,
+                  rowStart: drawnRect.rowStart,
+                  colSpan: drawnRect.colSpan,
+                  rowSpan: drawnRect.rowSpan,
+                  isPlaced: true,
+                  gridSpan: formatGridSpan(
+                    drawnRect.colSpan,
+                    drawnRect.rowSpan,
+                    drawnRect.colStart,
+                    drawnRect.rowStart,
+                    cols,
+                    rows
+                  ),
+                }
+              : item
+          );
+          setItems(updated);
+          await persistLayout(updated);
+        } else {
+          // Si todas las categorías ya están en el grid, abrir modal para crear nueva categoría en esa celda
+          setPendingCellRect(drawnRect);
+        }
+      }
+    };
+
+    window.addEventListener('pointermove', onPointerMove);
+    window.addEventListener('pointerup', onPointerUp);
+    return () => {
+      window.removeEventListener('pointermove', onPointerMove);
+      window.removeEventListener('pointerup', onPointerUp);
+    };
+  }, [dragState, resizeState, drawState, cols, rows, getCellFromClientXY, persistLayout]);
+
+  // Quitar una caja del grid con el botón rosa 'X' (deja las celdas '+' libres como en cssgridgenerator.io)
+  const handleRemoveFromGrid = async (id: string) => {
+    const updated = items.map((item) =>
+      item.id === id ? { ...item, isPlaced: false } : item
+    );
+    setItems(updated);
+    await persistLayout(updated);
+  };
+
+  // Botón Reset (como en la esquina inferior derecha de cssgridgenerator.io)
+  const handleResetGrid = async () => {
+    // Limpia todas las cajas del lienzo para que todo quede con celdas '+' listas para colocar con 1 clic
+    const cleared = items.map((item) => ({
+      ...item,
+      colSpan: 1,
+      rowSpan: 1,
+      isPlaced: false,
+    }));
+    setItems(cleared);
+  };
+
+  // Cambiar qué categoría ocupa una caja específica desde su selector interno
+  const handleSwapCategoryInBox = async (currentCatId: string, targetCatId: string) => {
+    if (currentCatId === targetCatId) return;
+    const currentBox = items.find((i) => i.id === currentCatId);
+    const targetBox = items.find((i) => i.id === targetCatId);
+    if (!currentBox || !targetBox) return;
+
+    const updated = items.map((item) => {
+      if (item.id === currentCatId) {
+        return {
+          ...item,
+          colStart: targetBox.colStart,
+          rowStart: targetBox.rowStart,
+          colSpan: targetBox.colSpan,
+          rowSpan: targetBox.rowSpan,
+          isPlaced: targetBox.isPlaced,
+          gridSpan: formatGridSpan(
+            targetBox.colSpan,
+            targetBox.rowSpan,
+            targetBox.colStart,
+            targetBox.rowStart,
+            cols,
+            rows
+          ),
+        };
+      }
+      if (item.id === targetCatId) {
+        return {
+          ...item,
+          colStart: currentBox.colStart,
+          rowStart: currentBox.rowStart,
+          colSpan: currentBox.colSpan,
+          rowSpan: currentBox.rowSpan,
+          isPlaced: true,
+          gridSpan: formatGridSpan(
+            currentBox.colSpan,
+            currentBox.rowSpan,
+            currentBox.colStart,
+            currentBox.rowStart,
+            cols,
+            rows
+          ),
+        };
+      }
+      return item;
+    });
+
+    setItems(updated);
+    await persistLayout(updated);
+  };
+
+  // Cambiar número de columnas o filas
+  const handleUpdateBoardDimensions = async (nextCols: number, nextRows: number) => {
+    const c = Math.min(Math.max(nextCols, 2), 10);
+    const r = Math.min(Math.max(nextRows, 2), 12);
+    setCols(c);
+    setRows(r);
+
+    const adjusted = items.map((item) => {
+      const colSpan = Math.min(item.colSpan, c);
+      const rowSpan = Math.min(item.rowSpan, r);
+      const colStart = Math.min(item.colStart, c - colSpan + 1);
+      const rowStart = Math.min(item.rowStart, r - rowSpan + 1);
+      return {
+        ...item,
+        colStart,
+        rowStart,
+        colSpan,
+        rowSpan,
+        gridSpan: formatGridSpan(colSpan, rowSpan, colStart, rowStart, c, r),
+      };
+    });
+
+    setItems(adjusted);
+    await persistLayout(adjusted, c, r);
+  };
 
   // Compresión WebP en el navegador
   const compressImage = async (file: File): Promise<Blob> => {
@@ -117,8 +623,10 @@ export default function CategoryGridManager({ categories: initialCategories }: C
       if (!res.ok) throw new Error('Error al subir la imagen');
       const data = await res.json();
 
-      if (categoryId) {
-        const cat = categories.find((c) => c.id === categoryId);
+      if (categoryId === 'edit-modal') {
+        setEditImageUrl(data.url);
+      } else if (categoryId) {
+        const cat = items.find((c) => c.id === categoryId);
         if (cat) {
           const form = new FormData();
           form.append('id', cat.id);
@@ -129,7 +637,7 @@ export default function CategoryGridManager({ categories: initialCategories }: C
           form.append('displayOrder', cat.displayOrder.toString());
           await updateCategory(form);
 
-          setCategories((prev) =>
+          setItems((prev) =>
             prev.map((c) => (c.id === categoryId ? { ...c, imageUrl: data.url } : c))
           );
         }
@@ -143,179 +651,134 @@ export default function CategoryGridManager({ categories: initialCategories }: C
     }
   };
 
-  const handleGridSpanChange = async (id: string, newSpan: string) => {
-    setCategories((prev) =>
-      prev.map((c) => (c.id === id ? { ...c, gridSpan: newSpan } : c))
-    );
-    await updateCategoryGrid(id, newSpan);
-  };
-
-  const handleMoveOrder = async (id: string, dir: 'up' | 'down') => {
-    await updateCategoryOrder(id, dir);
-    const index = categories.findIndex((c) => c.id === id);
-    if (index === -1) return;
-    const targetIndex = dir === 'up' ? index - 1 : index + 1;
-    if (targetIndex < 0 || targetIndex >= categories.length) return;
-
-    const newCats = [...categories];
-    const temp = newCats[index];
-    newCats[index] = newCats[targetIndex];
-    newCats[targetIndex] = temp;
-    setCategories(newCats);
-  };
-
-  const handleDelete = async (id: string) => {
-    if (!confirm('¿Estás seguro de eliminar esta categoría?')) return;
-    await deleteCategory(id);
-    setCategories((prev) => prev.filter((c) => c.id !== id));
-  };
-
-  // --- DRAG AND DROP (Reordenar) ---
-  const handleDragStart = (e: React.DragEvent, id: string) => {
-    setDraggedId(id);
-    e.dataTransfer.setData('text/plain', id);
-    e.dataTransfer.effectAllowed = 'move';
-  };
-
-  const handleDragOver = (e: React.DragEvent, id: string) => {
-    e.preventDefault();
-    if (draggedId && draggedId !== id) {
-      setDragOverId(id);
-    }
-  };
-
-  const handleDragLeave = () => {
-    setDragOverId(null);
-  };
-
-  const handleDrop = async (e: React.DragEvent, targetId: string) => {
-    e.preventDefault();
-    setDragOverId(null);
-    if (!draggedId || draggedId === targetId) return;
-
-    const fromIndex = categories.findIndex((c) => c.id === draggedId);
-    const toIndex = categories.findIndex((c) => c.id === targetId);
-    if (fromIndex === -1 || toIndex === -1) return;
-
-    const newCats = [...categories];
-    const [moved] = newCats.splice(fromIndex, 1);
-    newCats.splice(toIndex, 0, moved);
-
-    setCategories(newCats);
-    setDraggedId(null);
-
-    // Guardar nuevo orden persistente en backend
-    await reorderCategories(newCats.map((c) => c.id));
-  };
-
-  // --- RESIZE CON ESQUINAS (Estirar) ---
-  const startResizing = (
-    e: React.MouseEvent,
-    id: string,
-    mode: 'both' | 'col' | 'row',
-    cardEl: HTMLElement
-  ) => {
-    e.preventDefault();
-    e.stopPropagation();
-
-    const cat = categories.find((c) => c.id === id);
-    if (!cat) return;
-
-    const norm = normalizeSpan(cat.gridSpan);
-    const match = norm.match(/(\d+)x(\d+)/);
-    const startCols = match ? parseInt(match[1], 10) : 1;
-    const startRows = match ? parseInt(match[2], 10) : 1;
-
-    setResizingState({
-      id,
-      mode,
-      startX: e.clientX,
-      startY: e.clientY,
-      startCols,
-      startRows,
-      cardRect: cardEl.getBoundingClientRect(),
-    });
-  };
-
-  useEffect(() => {
-    if (!resizingState) return;
-
-    const onMouseMove = (e: MouseEvent) => {
-      const { id, mode, startX, startY, startCols, startRows, cardRect } = resizingState;
-
-      // Ancho aproximado de 1 columna (el ancho actual de la tarjeta dividido entre sus columnas iniciales)
-      const approxColWidth = Math.max(cardRect.width / Math.max(startCols, 1), 160);
-      const approxRowHeight = 220; // Altura estándar del grid row
-
-      const deltaX = e.clientX - startX;
-      const deltaY = e.clientY - startY;
-
-      let newCols = startCols;
-      let newRows = startRows;
-
-      if (mode === 'both' || mode === 'col') {
-        const addedCols = Math.round(deltaX / approxColWidth);
-        newCols = Math.min(Math.max(startCols + addedCols, 1), 4);
-      }
-
-      if (mode === 'both' || mode === 'row') {
-        const addedRows = Math.round(deltaY / (approxRowHeight * 0.7));
-        newRows = Math.min(Math.max(startRows + addedRows, 1), 3);
-      }
-
-      const newSpan = `${newCols}x${newRows}`;
-
-      setCategories((prev) =>
-        prev.map((c) => (c.id === id && c.gridSpan !== newSpan ? { ...c, gridSpan: newSpan } : c))
-      );
-    };
-
-    const onMouseUp = async () => {
-      const { id } = resizingState;
-      setResizingState(null);
-
-      const target = categories.find((c) => c.id === id);
-      if (target) {
-        await updateCategoryGrid(id, target.gridSpan);
-      }
-    };
-
-    window.addEventListener('mousemove', onMouseMove);
-    window.addEventListener('mouseup', onMouseUp);
-
-    return () => {
-      window.removeEventListener('mousemove', onMouseMove);
-      window.removeEventListener('mouseup', onMouseUp);
-    };
-  }, [resizingState, categories]);
-
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newName.trim() || !newSlug.trim()) return;
+    if (!newName.trim() || !newSlug.trim() || !pendingCellRect) return;
 
-    setIsSaving(true);
+    setIsSavingNew(true);
+    const spanStr = formatGridSpan(
+      pendingCellRect.colSpan,
+      pendingCellRect.rowSpan,
+      pendingCellRect.colStart,
+      pendingCellRect.rowStart,
+      cols,
+      rows
+    );
+
     const form = new FormData();
     form.append('name', newName.trim());
     form.append('slug', newSlug.trim());
     form.append('imageUrl', newImageUrl.trim());
-    form.append('gridSpan', newGridSpan);
+    form.append('gridSpan', spanStr);
 
     const res = await createCategory(form);
-    setIsSaving(false);
+    setIsSavingNew(false);
 
-    if (res.success) {
+    if (res.success && res.category) {
+      const created: PlacedCategory = {
+        id: res.category.id,
+        name: res.category.name,
+        slug: res.category.slug,
+        imageUrl: res.category.imageUrl,
+        gridSpan: spanStr,
+        displayOrder: items.length + 1,
+        colStart: pendingCellRect.colStart,
+        rowStart: pendingCellRect.rowStart,
+        colSpan: pendingCellRect.colSpan,
+        rowSpan: pendingCellRect.rowSpan,
+        isPlaced: true,
+      };
+      const next = [...items, created];
+      setItems(next);
+      await persistLayout(next);
       setNewName('');
       setNewSlug('');
       setNewImageUrl('');
-      setIsCreating(false);
-      window.location.reload();
+      setPendingCellRect(null);
     } else {
       alert(res.error || 'Error creando la categoría');
     }
   };
 
+  const handleEditSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingCat || !editName.trim() || !editSlug.trim()) return;
+
+    setIsSavingEdit(true);
+    const form = new FormData();
+    form.append('id', editingCat.id);
+    form.append('name', editName.trim());
+    form.append('slug', editSlug.trim());
+    form.append('imageUrl', editImageUrl.trim());
+    form.append('gridSpan', editingCat.gridSpan);
+    form.append('displayOrder', editingCat.displayOrder.toString());
+
+    const res = await updateCategory(form);
+    setIsSavingEdit(false);
+
+    if (res.success) {
+      setItems((prev) =>
+        prev.map((c) =>
+          c.id === editingCat.id
+            ? {
+                ...c,
+                name: editName.trim(),
+                slug: editSlug.trim().toLowerCase().replace(/\s+/g, '-'),
+                imageUrl: editImageUrl.trim() || null,
+              }
+            : c
+        )
+      );
+      setEditingCat(null);
+    }
+  };
+
+  const handleDeletePermanent = async (id: string) => {
+    if (!confirm('¿Eliminar permanentemente esta categoría de la tienda?')) return;
+    await deleteCategory(id);
+    setItems((prev) => prev.filter((c) => c.id !== id));
+  };
+
+  // Rectángulo activo al arrastrar sobre celdas '+'
+  const activeDrawRect: GridRect | null = useMemo(() => {
+    if (!drawState) return null;
+    const colStart = Math.min(drawState.startCol, drawState.endCol);
+    const colEnd = Math.max(drawState.startCol, drawState.endCol);
+    const rowStart = Math.min(drawState.startRow, drawState.endRow);
+    const rowEnd = Math.max(drawState.startRow, drawState.endRow);
+    return {
+      colStart,
+      rowStart,
+      colSpan: colEnd - colStart + 1,
+      rowSpan: rowEnd - rowStart + 1,
+    };
+  }, [drawState]);
+
+  // Código HTML y CSS en vivo idéntico a cssgridgenerator.io
+  const generatedHtml = useMemo(() => {
+    const inner = activeItems
+      .map((item, idx) => `    <div class="div${idx + 1}">${idx + 1} (${item.name})</div>`)
+      .join('\n');
+    return `<div class="parent">\n${inner}\n</div>`;
+  }, [activeItems]);
+
+  const generatedCss = useMemo(() => {
+    const parent = `.parent {\n    display: grid;\n    grid-template-columns: repeat(${cols}, 1fr);\n    grid-template-rows: repeat(${rows}, 1fr);\n    gap: ${gap}px;\n}`;
+    const children = activeItems
+      .map((c, idx) => {
+        const lines: string[] = [];
+        if (c.colSpan > 1) lines.push(`    grid-column: span ${c.colSpan} / span ${c.colSpan};`);
+        if (c.rowSpan > 1) lines.push(`    grid-row: span ${c.rowSpan} / span ${c.rowSpan};`);
+        lines.push(`    grid-column-start: ${c.colStart};`);
+        lines.push(`    grid-row-start: ${c.rowStart};`);
+        return `.div${idx + 1} {\n${lines.join('\n')}\n}`;
+      })
+      .join('\n\n');
+    return `${parent}\n\n${children}`;
+  }, [cols, rows, gap, activeItems]);
+
   return (
-    <div className="space-y-8 select-none">
+    <div className="space-y-6 select-none">
       <input
         type="file"
         ref={fileInputRef}
@@ -328,363 +791,602 @@ export default function CategoryGridManager({ categories: initialCategories }: C
         className="hidden"
       />
 
-      {/* Barra de Acciones Superior */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-2xl border border-gray-200 shadow-sm">
-        <div>
-          <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" /></svg>
-            Editor Visual de Layout en Grid (Drag & Drop + Estirar Esquinas)
-          </h2>
-          <p className="text-sm text-gray-500 mt-1">
-            <strong>Arrastra</strong> las tarjetas para reordenarlas libremente, o <strong>jala la esquina inferior derecha</strong> para estirar su ancho y alto en el grid.
-          </p>
-        </div>
-        <button
-          onClick={() => setIsCreating(!isCreating)}
-          className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-black hover:bg-gray-800 text-white font-semibold text-sm shadow-md transition-all active:scale-95"
-        >
-          {isCreating ? '✕ Cancelar' : '+ Nueva Categoría'}
-        </button>
-      </div>
-
-      {/* FORMULARIO DE NUEVA CATEGORÍA */}
-      {isCreating && (
-        <form
-          onSubmit={handleCreateSubmit}
-          className="bg-white rounded-2xl border border-indigo-200 p-6 shadow-md space-y-5 animate-in fade-in"
-        >
-          <div className="border-b border-gray-100 pb-3">
-            <h3 className="font-bold text-gray-900 text-base">Crear Nueva Categoría</h3>
-            <p className="text-xs text-gray-500">Agrega un título, foto de portada y define su tamaño inicial en el grid.</p>
+      {/* ==================================================================== */}
+      {/* BARRA SUPERIOR DE PARÁMETROS (Columns, Rows, Gap + Acciones)         */}
+      {/* ==================================================================== */}
+      <div className="bg-[#f7f4ee] p-5 rounded-3xl border border-[#e2ddd3] shadow-sm flex flex-wrap items-center justify-between gap-4">
+        <div className="flex flex-wrap items-center gap-4">
+          {/* Columns */}
+          <div className="flex items-center gap-2 bg-white px-3.5 py-2 rounded-xl border border-gray-300 shadow-2xs">
+            <label className="text-xs font-bold text-gray-700">Columns</label>
+            <input
+              type="number"
+              min={2}
+              max={10}
+              value={cols}
+              onChange={(e) => handleUpdateBoardDimensions( Number(e.target.value) || 4, rows )}
+              className="w-14 text-center font-mono font-bold text-sm border border-gray-300 rounded-lg py-0.5 text-gray-900"
+            />
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+          {/* Rows */}
+          <div className="flex items-center gap-2 bg-white px-3.5 py-2 rounded-xl border border-gray-300 shadow-2xs">
+            <label className="text-xs font-bold text-gray-700">Rows</label>
+            <input
+              type="number"
+              min={2}
+              max={12}
+              value={rows}
+              onChange={(e) => handleUpdateBoardDimensions(cols, Number(e.target.value) || 6)}
+              className="w-14 text-center font-mono font-bold text-sm border border-gray-300 rounded-lg py-0.5 text-gray-900"
+            />
+          </div>
+
+          {/* Gap */}
+          <div className="flex items-center gap-2 bg-white px-3.5 py-2 rounded-xl border border-gray-300 shadow-2xs">
+            <label className="text-xs font-bold text-gray-700">Gap (px)</label>
+            <input
+              type="number"
+              min={0}
+              max={32}
+              value={gap}
+              onChange={(e) => setGap(Math.min(Math.max(Number(e.target.value) || 0, 0), 32))}
+              className="w-14 text-center font-mono font-bold text-sm border border-gray-300 rounded-lg py-0.5 text-gray-900"
+            />
+          </div>
+
+          {/* Toggle para ver modo esquema cssgridgenerator.io vs con fotos */}
+          <label className="flex items-center gap-2 bg-white px-3.5 py-2 rounded-xl border border-gray-300 text-xs font-bold text-gray-700 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={showPhotosInGrid}
+              onChange={(e) => setShowPhotosInGrid(e.target.checked)}
+              className="rounded text-black focus:ring-black"
+            />
+            <span>Mostrar fotos de fondo</span>
+          </label>
+        </div>
+
+        <div className="flex items-center gap-3">
+          {saveStatus === 'saving' && (
+            <span className="text-xs font-semibold text-amber-700 bg-amber-100 px-3 py-1.5 rounded-xl">
+              Guardando en tienda...
+            </span>
+          )}
+          {saveStatus === 'saved' && (
+            <span className="text-xs font-bold text-emerald-800 bg-emerald-100 px-3 py-1.5 rounded-xl">
+              ✓ Guardado en tienda
+            </span>
+          )}
+
+          <button
+            type="button"
+            onClick={() => {
+              const slot = findFirstAvailableSlot(activeItems, 1, 1, cols, rows);
+              setPendingCellRect({ ...slot, colSpan: 1, rowSpan: 1 });
+            }}
+            className="px-4 py-2 rounded-xl bg-black hover:bg-gray-800 text-white text-xs font-bold shadow-sm transition-all"
+          >
+            + Nueva Categoría
+          </button>
+        </div>
+      </div>
+
+      {/* Barra de categorías por colocar (cuando el usuario quita alguna con 'X' o da clic en Reset) */}
+      {unplacedItems.length > 0 && (
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-3">
+          <div className="text-xs text-amber-950">
+            <span className="font-bold">
+              Tienes {unplacedItems.length} categoría(s) listas para colocar:
+            </span>{' '}
+            Haz clic o arrastra sobre cualquier cuadro gris <kbd className="px-1.5 py-0.5 bg-[#b5b3ad] text-white rounded font-bold">+</kbd> del grid para colocar{' '}
+            <strong className="underline">{unplacedItems[0].name}</strong>.
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {unplacedItems.map((u, idx) => (
+              <span
+                key={u.id}
+                className={`px-2.5 py-1 rounded-lg text-xs font-bold border ${
+                  idx === 0
+                    ? 'bg-black text-white border-black'
+                    : 'bg-white text-gray-700 border-amber-300'
+                }`}
+              >
+                {idx === 0 ? `▶ Siguiente: ${u.name}` : u.name}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ==================================================================== */}
+      {/* LIENZO 2D IDÉNTICO A HTTPS://CSSGRIDGENERATOR.IO/                    */}
+      {/* ==================================================================== */}
+      <div className="bg-[#f7f4ee] p-6 sm:p-8 rounded-3xl border border-[#e2ddd3] shadow-inner space-y-4">
+        <div
+          ref={gridBoardRef}
+          className="relative grid w-full min-w-[600px]"
+          style={{
+            gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`,
+            gridTemplateRows: `repeat(${rows}, 68px)`,
+            gap: `${gap}px`,
+          }}
+        >
+          {/* ---------------------------------------------------------------- */}
+          {/* CELDAS GRISES CON '+' (IGUAL QUE EN CSSGRIDGENERATOR.IO)         */}
+          {/* ---------------------------------------------------------------- */}
+          {Array.from({ length: rows }).map((_, rIdx) =>
+            Array.from({ length: cols }).map((__, cIdx) => {
+              const cellCol = cIdx + 1;
+              const cellRow = rIdx + 1;
+
+              const isCovered = activeItems.some(
+                (cat) =>
+                  cellCol >= cat.colStart &&
+                  cellCol < cat.colStart + cat.colSpan &&
+                  cellRow >= cat.rowStart &&
+                  cellRow < cat.rowStart + cat.rowSpan
+              );
+
+              const isInsideDraw =
+                activeDrawRect &&
+                cellCol >= activeDrawRect.colStart &&
+                cellCol < activeDrawRect.colStart + activeDrawRect.colSpan &&
+                cellRow >= activeDrawRect.rowStart &&
+                cellRow < activeDrawRect.rowStart + activeDrawRect.rowSpan;
+
+              return (
+                <div
+                  key={`cell-${cellCol}-${cellRow}`}
+                  style={{
+                    gridColumn: `${cellCol} / span 1`,
+                    gridRow: `${cellRow} / span 1`,
+                  }}
+                  onPointerDown={(e) => {
+                    if (isCovered || e.button !== 0) return;
+                    e.preventDefault();
+                    setDrawState({
+                      startCol: cellCol,
+                      startRow: cellRow,
+                      endCol: cellCol,
+                      endRow: cellRow,
+                    });
+                  }}
+                  className={`rounded-lg flex items-center justify-center transition-colors select-none ${
+                    isCovered
+                      ? 'opacity-0 pointer-events-none'
+                      : isInsideDraw
+                      ? 'bg-[#8c8a84] text-white cursor-crosshair shadow-inner'
+                      : 'bg-[#b5b3ad] hover:bg-[#a3a19b] text-white cursor-pointer shadow-xs'
+                  }`}
+                >
+                  <span className="text-lg font-normal leading-none">+</span>
+                </div>
+              );
+            })
+          )}
+
+          {/* ---------------------------------------------------------------- */}
+          {/* CAJAS COLOCADAS (1, 2, 3...) CON BOTÓN ROSA 'X' Y ESQUINA '⌟'    */}
+          {/* ---------------------------------------------------------------- */}
+          {activeItems.map((cat, idx) => {
+            const isBeingDragged = dragState?.id === cat.id;
+            const isBeingResized = resizeState?.id === cat.id;
+
+            return (
+              <div
+                key={cat.id}
+                style={{
+                  gridColumn: `${cat.colStart} / span ${cat.colSpan}`,
+                  gridRow: `${cat.rowStart} / span ${cat.rowSpan}`,
+                }}
+                onPointerDown={(e) => {
+                  if (e.button !== 0) return;
+                  const target = e.target as HTMLElement;
+                  if (target.closest('[data-no-drag="true"]')) return;
+
+                  e.preventDefault();
+                  const { col, row } = getCellFromClientXY(e.clientX, e.clientY);
+                  setDragState({
+                    id: cat.id,
+                    grabOffsetCol: Math.max(0, Math.min(col - cat.colStart, cat.colSpan - 1)),
+                    grabOffsetRow: Math.max(0, Math.min(row - cat.rowStart, cat.rowSpan - 1)),
+                  });
+                }}
+                className={`group relative z-20 rounded-lg overflow-hidden flex flex-col items-center justify-between p-3 cursor-grab active:cursor-grabbing transition-shadow ${
+                  showPhotosInGrid && cat.imageUrl
+                    ? 'bg-gray-900 text-white border-[1.5px] border-gray-900 shadow-md'
+                    : 'bg-[#faf7f2] text-gray-900 border-[1.5px] border-gray-800 shadow-md'
+                } ${
+                  isBeingDragged || isBeingResized
+                    ? 'ring-2 ring-pink-500 shadow-xl z-30'
+                    : 'hover:shadow-lg'
+                }`}
+              >
+                {/* Fondo opcional con foto de la categoría */}
+                {showPhotosInGrid && cat.imageUrl && (
+                  <>
+                    <div
+                      className="absolute inset-0 bg-cover bg-center pointer-events-none"
+                      style={{ backgroundImage: `url('${cat.imageUrl}')` }}
+                    />
+                    <div className="absolute inset-0 bg-black/55 pointer-events-none" />
+                  </>
+                )}
+
+                {/* BOTÓN ROSA 'X' EN LA ESQUINA SUPERIOR DERECHA (IDÉNTICO A CSSGRIDGENERATOR.IO) */}
+                <button
+                  type="button"
+                  data-no-drag="true"
+                  onClick={() => handleRemoveFromGrid(cat.id)}
+                  title="Quitar bloque del grid (liberar celdas +)"
+                  className="absolute top-0 right-0 z-30 w-5 h-5 bg-[#e84a8a] hover:bg-[#d13674] text-white text-[11px] font-normal leading-none flex items-center justify-center rounded-bl-sm transition-colors"
+                >
+                  x
+                </button>
+
+                {/* Número superior centrado (1, 2, 3...) igual que en cssgridgenerator.io */}
+                <div className="relative z-10 text-center w-full pt-0.5">
+                  <span className="text-sm font-medium tracking-tight">
+                    {idx + 1}
+                  </span>
+                </div>
+
+                {/* Contenido central: Selector / Nombre de Categoría y Acciones rápidas */}
+                <div
+                  data-no-drag="true"
+                  className="relative z-10 flex flex-col items-center justify-center gap-1.5 my-auto px-2 max-w-full"
+                >
+                  <select
+                    value={cat.id}
+                    onChange={(e) => handleSwapCategoryInBox(cat.id, e.target.value)}
+                    className={`text-xs font-bold rounded-lg px-2 py-1 border text-center max-w-full truncate cursor-pointer ${
+                      showPhotosInGrid && cat.imageUrl
+                        ? 'bg-black/75 text-white border-white/25'
+                        : 'bg-white/90 text-gray-900 border-gray-300 hover:border-gray-500'
+                    }`}
+                  >
+                    {items.map((opt) => (
+                      <option key={opt.id} value={opt.id} className="bg-white text-gray-900">
+                        {opt.name}
+                      </option>
+                    ))}
+                  </select>
+
+                  <div className="flex items-center gap-1.5 opacity-80 group-hover:opacity-100 transition-opacity">
+                    <span className="text-[10px] font-mono opacity-75">
+                      {cat.colSpan}×{cat.rowSpan}
+                    </span>
+
+                    {/* Subir imagen */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setTargetUploadId(cat.id);
+                        fileInputRef.current?.click();
+                      }}
+                      title="Cambiar foto de portada"
+                      className="px-1.5 py-0.5 rounded bg-black/10 hover:bg-black/20 text-[10px] font-semibold"
+                    >
+                      {isUploading === cat.id ? '...' : '📷 Foto'}
+                    </button>
+
+                    {/* Editar nombre / slug */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingCat(cat);
+                        setEditName(cat.name);
+                        setEditSlug(cat.slug);
+                        setEditImageUrl(cat.imageUrl || '');
+                      }}
+                      title="Editar nombre o URL"
+                      className="px-1.5 py-0.5 rounded bg-black/10 hover:bg-black/20 text-[10px] font-semibold"
+                    >
+                      ✎
+                    </button>
+                  </div>
+                </div>
+
+                {/* Espaciador inferior */}
+                <div className="h-2" />
+
+                {/* MANIJA DE ESQUINA INFERIOR DERECHA '⌟' (IDÉNTICA A CSSGRIDGENERATOR.IO) */}
+                <div
+                  data-no-drag="true"
+                  onPointerDown={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setResizeState({
+                      id: cat.id,
+                      colStart: cat.colStart,
+                      rowStart: cat.rowStart,
+                    });
+                  }}
+                  title="Arrastra esta esquina para estirar columnas y filas en 2D"
+                  className="absolute bottom-1.5 right-1.5 z-30 w-5 h-5 cursor-nwse-resize flex items-end justify-end p-0.5 group/corner"
+                >
+                  <span
+                    className={`w-2.5 h-2.5 border-r-[2.5px] border-b-[2.5px] transition-transform group-hover/corner:scale-125 ${
+                      showPhotosInGrid && cat.imageUrl ? 'border-white' : 'border-gray-900'
+                    }`}
+                  />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Botón Reset inferior derecho (idéntico a cssgridgenerator.io) */}
+        <div className="flex items-center justify-between pt-2">
+          <p className="text-xs text-gray-500">
+            Arrastra la esquina <strong>⌟</strong> de cualquier bloque para estirarlo en 2D, o haz clic en <strong>x</strong> para liberar celdas <strong>+</strong>.
+          </p>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleResetGrid}
+              className="px-4 py-1 rounded-md border border-gray-900 bg-white hover:bg-gray-100 text-gray-900 text-xs font-semibold shadow-2xs transition-colors"
+            >
+              Reset
+            </button>
+            <button
+              type="button"
+              onClick={() => persistLayout(items)}
+              className="px-4 py-1 rounded-md border border-black bg-black hover:bg-gray-800 text-white text-xs font-semibold shadow-2xs transition-colors"
+            >
+              Guardar en Tienda
+            </button>
+          </div>
+        </div>
+
+        {/* ================================================================== */}
+        {/* PANELES INFERIORES 'Copy HTML' Y 'Copy CSS' (COMO EN LA CAPTURA 3) */}
+        {/* ================================================================== */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4">
+          {/* Panel HTML */}
+          <div className="relative pt-3">
+            <button
+              type="button"
+              onClick={() => {
+                navigator.clipboard.writeText(generatedHtml);
+                setCopiedType('html');
+                setTimeout(() => setCopiedType(null), 1500);
+              }}
+              className="absolute top-0 right-4 px-3.5 py-1 rounded-md bg-[#2b2b2b] hover:bg-black text-white text-xs font-bold shadow"
+            >
+              {copiedType === 'html' ? 'Copied!' : 'Copy HTML'}
+            </button>
+            <pre className="bg-white rounded-xl border border-[#e5e0d5] p-5 text-xs font-mono text-gray-800 overflow-x-auto shadow-xs min-h-[140px]">
+              {generatedHtml}
+            </pre>
+          </div>
+
+          {/* Panel CSS */}
+          <div className="relative pt-3">
+            <button
+              type="button"
+              onClick={() => {
+                navigator.clipboard.writeText(generatedCss);
+                setCopiedType('css');
+                setTimeout(() => setCopiedType(null), 1500);
+              }}
+              className="absolute top-0 right-4 px-3.5 py-1 rounded-md bg-[#2b2b2b] hover:bg-black text-white text-xs font-bold shadow"
+            >
+              {copiedType === 'css' ? 'Copied!' : 'Copy CSS'}
+            </button>
+            <pre className="bg-white rounded-xl border border-[#e5e0d5] p-5 text-xs font-mono text-gray-800 overflow-x-auto shadow-xs min-h-[140px]">
+              {generatedCss}
+            </pre>
+          </div>
+        </div>
+      </div>
+
+      {/* ==================================================================== */}
+      {/* MODAL PARA CREAR NUEVA CATEGORÍA EN LA CELDA '+' SELECCIONADA        */}
+      {/* ==================================================================== */}
+      {pendingCellRect && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <form
+            onSubmit={handleCreateSubmit}
+            className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-gray-200 space-y-4"
+          >
+            <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+              <div>
+                <span className="text-[11px] font-mono font-bold text-indigo-600">
+                  Columna {pendingCellRect.colStart}, Fila {pendingCellRect.rowStart} ({pendingCellRect.colSpan}×{pendingCellRect.rowSpan})
+                </span>
+                <h3 className="text-base font-extrabold text-gray-900">
+                  Nueva Categoría en este Bloque
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPendingCellRect(null)}
+                className="w-8 h-8 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-600 flex items-center justify-center font-bold"
+              >
+                ✕
+              </button>
+            </div>
+
             <div>
-              <label className="block text-xs font-semibold text-gray-700">Nombre</label>
+              <label className="block text-xs font-bold text-gray-700">Nombre</label>
               <input
                 type="text"
                 required
+                autoFocus
                 value={newName}
                 onChange={(e) => {
                   setNewName(e.target.value);
-                  if (!newSlug) {
-                    setNewSlug(e.target.value.toLowerCase().replace(/\s+/g, '-'));
-                  }
+                  setNewSlug(
+                    e.target.value
+                      .toLowerCase()
+                      .normalize('NFD')
+                      .replace(/[\u0300-\u036f]/g, '')
+                      .replace(/[^a-z0-9]+/g, '-')
+                      .replace(/(^-|-$)/g, '')
+                  );
                 }}
-                placeholder="Ej. Prints & Ilustraciones"
-                className="mt-1 block w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:border-black focus:ring-black"
+                placeholder="Ej. Ediciones Especiales"
+                className="mt-1 block w-full rounded-xl border border-gray-300 px-3 py-2 text-sm"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-gray-700">Slug (URL)</label>
+              <label className="block text-xs font-bold text-gray-700">Slug (URL)</label>
               <input
                 type="text"
                 required
                 value={newSlug}
                 onChange={(e) => setNewSlug(e.target.value)}
-                placeholder="prints-ilustraciones"
-                className="mt-1 block w-full rounded-xl border border-gray-300 px-3 py-2 text-sm font-mono text-xs focus:border-black focus:ring-black"
+                className="mt-1 block w-full rounded-xl border border-gray-300 px-3 py-2 text-xs font-mono"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-gray-700">Tamaño en el Grid</label>
-              <select
-                value={newGridSpan}
-                onChange={(e) => setNewGridSpan(e.target.value)}
-                className="mt-1 block w-full rounded-xl border border-gray-300 px-3 py-2 text-sm bg-white focus:border-black focus:ring-black font-medium"
-              >
-                {GRID_PRESETS.map((span) => (
-                  <option key={span.id} value={span.id}>
-                    {span.label} ({span.cols} cols × {span.rows} filas)
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-gray-700 mb-1">Imagen de Portada</label>
-            <div className="flex items-center gap-3">
-              <input
-                type="text"
-                value={newImageUrl}
-                onChange={(e) => setNewImageUrl(e.target.value)}
-                placeholder="https://images.unsplash.com/... o sube una imagen"
-                className="flex-1 rounded-xl border border-gray-300 px-3 py-2 text-xs font-mono"
-              />
-              <label className="cursor-pointer px-4 py-2 rounded-xl bg-gray-100 hover:bg-gray-200 text-xs font-semibold text-gray-700 transition-colors flex items-center gap-1.5">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-                {isUploading === 'new' ? 'Subiendo WebP...' : 'Subir Imagen'}
+              <label className="block text-xs font-bold text-gray-700 mb-1">Imagen de Portada</label>
+              <div className="flex items-center gap-2">
                 <input
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) => {
-                    if (e.target.files?.[0]) handleImageFile(e.target.files[0]);
-                  }}
-                  className="hidden"
+                  type="text"
+                  value={newImageUrl}
+                  onChange={(e) => setNewImageUrl(e.target.value)}
+                  placeholder="https://... o sube una foto"
+                  className="flex-1 rounded-xl border border-gray-300 px-3 py-2 text-xs font-mono"
                 />
-              </label>
+                <label className="cursor-pointer px-3 py-2 rounded-xl bg-gray-100 hover:bg-gray-200 text-xs font-bold text-gray-700">
+                  {isUploading === 'new' ? '...' : 'Subir'}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => {
+                      if (e.target.files?.[0]) handleImageFile(e.target.files[0]);
+                    }}
+                    className="hidden"
+                  />
+                </label>
+              </div>
             </div>
-          </div>
 
-          <div className="flex justify-end gap-3 pt-2">
-            <button
-              type="button"
-              onClick={() => setIsCreating(false)}
-              className="px-4 py-2 rounded-xl text-xs font-medium text-gray-600 hover:bg-gray-100"
-            >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              disabled={isSaving}
-              className="px-6 py-2 rounded-xl bg-black text-white text-xs font-bold hover:bg-gray-800 shadow-sm disabled:opacity-50"
-            >
-              {isSaving ? 'Guardando...' : 'Crear Categoría'}
-            </button>
-          </div>
-        </form>
+            <div className="flex justify-end gap-2 pt-3 border-t border-gray-100">
+              <button
+                type="button"
+                onClick={() => setPendingCellRect(null)}
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-gray-600 hover:bg-gray-100"
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                disabled={isSavingNew}
+                className="px-5 py-2 rounded-xl bg-black text-white text-xs font-bold hover:bg-gray-800"
+              >
+                {isSavingNew ? 'Creando...' : 'Crear Bloque'}
+              </button>
+            </div>
+          </form>
+        </div>
       )}
 
-      {/* GRID INTERACTIVO EN TIEMPO REAL CON DRAG & DROP Y ESQUINAS PARA ESTIRAR */}
-      <div className="bg-gray-100/70 p-6 rounded-3xl border border-gray-200" ref={gridContainerRef}>
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-bold text-gray-700 uppercase tracking-wider">
-              Vista Previa Dinámica del Grid ({categories.length} categorías)
-            </span>
-            <span className="bg-indigo-100 text-indigo-800 text-[10px] font-bold px-2 py-0.5 rounded-full">
-              Arrastra para reordenar / Jala esquinas para estirar
-            </span>
-          </div>
-          <span className="text-xs text-gray-500 font-medium">
-            1 a 4 columnas • 1 a 3 filas por tarjeta
-          </span>
-        </div>
+      {/* ==================================================================== */}
+      {/* MODAL PARA EDITAR NOMBRE / SLUG / FOTO O ELIMINAR CATEGORÍA          */}
+      {/* ==================================================================== */}
+      {editingCat && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <form
+            onSubmit={handleEditSubmit}
+            className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-gray-200 space-y-4"
+          >
+            <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+              <h3 className="text-base font-extrabold text-gray-900">
+                Editar Categoría
+              </h3>
+              <button
+                type="button"
+                onClick={() => setEditingCat(null)}
+                className="w-8 h-8 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-600 flex items-center justify-center font-bold"
+              >
+                ✕
+              </button>
+            </div>
 
-        {categories.length === 0 ? (
-          <div className="p-16 text-center bg-white rounded-2xl border border-dashed border-gray-300 text-gray-500">
-            No hay categorías registradas. Haz clic en "+ Nueva Categoría" arriba.
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5 auto-rows-[220px]">
-            {categories.map((cat, idx) => {
-              const currentNormalized = normalizeSpan(cat.gridSpan);
-              const spanMatch = currentNormalized.match(/(\d+)x(\d+)/);
-              const spanCols = spanMatch ? parseInt(spanMatch[1], 10) : 1;
-              const spanRows = spanMatch ? parseInt(spanMatch[2], 10) : 1;
-              const minH = spanRows === 1 ? 220 : spanRows === 2 ? 460 : 700;
+            <div>
+              <label className="block text-xs font-bold text-gray-700">Nombre</label>
+              <input
+                type="text"
+                required
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                className="mt-1 block w-full rounded-xl border border-gray-300 px-3 py-2 text-sm"
+              />
+            </div>
 
-              const isBeingDragged = draggedId === cat.id;
-              const isDragTarget = dragOverId === cat.id;
-              const isBeingResized = resizingState?.id === cat.id;
+            <div>
+              <label className="block text-xs font-bold text-gray-700">Slug (URL)</label>
+              <input
+                type="text"
+                required
+                value={editSlug}
+                onChange={(e) => setEditSlug(e.target.value)}
+                className="mt-1 block w-full rounded-xl border border-gray-300 px-3 py-2 text-xs font-mono"
+              />
+            </div>
 
-              return (
-                <div
-                  key={cat.id}
-                  id={`cat-card-${cat.id}`}
-                  draggable={!resizingState}
-                  onDragStart={(e) => handleDragStart(e, cat.id)}
-                  onDragOver={(e) => handleDragOver(e, cat.id)}
-                  onDragLeave={handleDragLeave}
-                  onDrop={(e) => handleDrop(e, cat.id)}
-                  style={{ minHeight: `${minH}px` }}
-                  className={`group relative rounded-2xl overflow-hidden border transition-all duration-200 flex flex-col justify-between p-5 bg-gray-900 ${getGridSpanClasses(
-                    cat.gridSpan
-                  )} ${
-                    isBeingDragged
-                      ? 'opacity-40 scale-95 border-dashed border-indigo-400'
-                      : isDragTarget
-                      ? 'ring-4 ring-indigo-500 border-indigo-500 scale-[1.02] shadow-2xl'
-                      : isBeingResized
-                      ? 'ring-4 ring-emerald-400 shadow-2xl'
-                      : 'border-gray-300/80 shadow-md hover:shadow-xl'
-                  }`}
+            <div>
+              <label className="block text-xs font-bold text-gray-700 mb-1">Imagen de Portada</label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={editImageUrl}
+                  onChange={(e) => setEditImageUrl(e.target.value)}
+                  className="flex-1 rounded-xl border border-gray-300 px-3 py-2 text-xs font-mono"
+                />
+                <label className="cursor-pointer px-3 py-2 rounded-xl bg-gray-100 hover:bg-gray-200 text-xs font-bold text-gray-700">
+                  {isUploading === 'edit-modal' ? '...' : 'Subir'}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => {
+                      if (e.target.files?.[0]) handleImageFile(e.target.files[0], 'edit-modal');
+                    }}
+                    className="hidden"
+                  />
+                </label>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between pt-3 border-t border-gray-100">
+              <button
+                type="button"
+                onClick={() => {
+                  const id = editingCat.id;
+                  setEditingCat(null);
+                  handleDeletePermanent(id);
+                }}
+                className="text-xs font-bold text-red-600 hover:text-red-800"
+              >
+                Eliminar de la tienda
+              </button>
+
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setEditingCat(null)}
+                  className="px-4 py-2 rounded-xl text-xs font-semibold text-gray-600 hover:bg-gray-100"
                 >
-                  {/* Imagen de Fondo */}
-                  {cat.imageUrl ? (
-                    <div
-                      className="absolute inset-0 bg-cover bg-center transition-transform duration-500 group-hover:scale-105"
-                      style={{ backgroundImage: `url('${cat.imageUrl}')` }}
-                    />
-                  ) : (
-                    <div className="absolute inset-0 bg-gradient-to-br from-gray-800 to-gray-900 flex items-center justify-center">
-                      <span className="text-gray-600 font-mono text-xs">Sin imagen</span>
-                    </div>
-                  )}
-
-                  {/* Overlay oscuro para contraste perfecto */}
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-black/30 group-hover:via-black/50 transition-colors" />
-
-                  {/* Cabecera de la Tarjeta: Grip de Arrastre, Orden y Botones */}
-                  <div className="relative z-10 flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      {/* Grip Drag & Drop */}
-                      <span
-                        title="Arrastra para acomodar esta categoría"
-                        className="cursor-grab active:cursor-grabbing p-1.5 rounded-lg bg-black/60 text-white hover:bg-black/90 backdrop-blur-md border border-white/20 flex items-center gap-1 text-[11px] font-bold"
-                      >
-                        <svg className="h-4 w-4 text-white" viewBox="0 0 24 24" fill="currentColor">
-                          <circle cx="9" cy="6" r="2" />
-                          <circle cx="9" cy="12" r="2" />
-                          <circle cx="9" cy="18" r="2" />
-                          <circle cx="15" cy="6" r="2" />
-                          <circle cx="15" cy="12" r="2" />
-                          <circle cx="15" cy="18" r="2" />
-                        </svg>
-                        <span>#{idx + 1}</span>
-                      </span>
-
-                      {/* Badge con dimensión actual */}
-                      <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-indigo-900/80 text-indigo-200 border border-indigo-400/30">
-                        {spanCols} col × {spanRows} fila
-                      </span>
-                    </div>
-
-                    <div className="flex items-center gap-1 bg-black/60 backdrop-blur-md p-1 rounded-xl border border-white/10 opacity-90 group-hover:opacity-100 transition-opacity">
-                      {/* Subir foto */}
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setTargetUploadId(cat.id);
-                          fileInputRef.current?.click();
-                        }}
-                        title="Cambiar imagen"
-                        className="p-1.5 rounded-lg text-white/80 hover:text-white hover:bg-white/20 transition-colors text-xs flex items-center justify-center"
-                      >
-                        {isUploading === cat.id ? (
-                          <span className="inline-block animate-spin h-3.5 w-3.5 border-2 border-white/60 border-t-white rounded-full" />
-                        ) : (
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 text-white/90" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-                        )}
-                      </button>
-
-                      {/* Mover orden con botones */}
-                      <button
-                        type="button"
-                        disabled={idx === 0}
-                        onClick={() => handleMoveOrder(cat.id, 'up')}
-                        title="Mover antes"
-                        className="p-1 rounded text-white/70 hover:text-white disabled:opacity-30 text-xs"
-                      >
-                        ←
-                      </button>
-                      <button
-                        type="button"
-                        disabled={idx === categories.length - 1}
-                        onClick={() => handleMoveOrder(cat.id, 'down')}
-                        title="Mover después"
-                        className="p-1 rounded text-white/70 hover:text-white disabled:opacity-30 text-xs"
-                      >
-                        →
-                      </button>
-
-                      {/* Eliminar */}
-                      <button
-                        type="button"
-                        onClick={() => handleDelete(cat.id)}
-                        title="Eliminar categoría"
-                        className="p-1.5 rounded-lg text-red-400 hover:text-red-200 hover:bg-red-500/30 transition-colors text-xs flex items-center justify-center"
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Pie de la Tarjeta: Título y Controles */}
-                  <div className="relative z-10 space-y-2.5">
-                    <div>
-                      <h3 className="text-xl font-bold text-white drop-shadow-md tracking-tight">
-                        {cat.name}
-                      </h3>
-                    </div>
-
-                    {/* Selector de Tamaño */}
-                    <div className="bg-black/85 backdrop-blur-md p-2 rounded-xl border border-white/15 space-y-1.5">
-                      <div className="text-[10px] font-semibold text-white/70 uppercase tracking-wider flex items-center justify-between">
-                        <span>Tamaño ({currentNormalized})</span>
-                        <select
-                          value={currentNormalized}
-                          onChange={(e) => handleGridSpanChange(cat.id, e.target.value)}
-                          className="bg-black/90 text-indigo-300 text-[11px] font-bold border border-white/20 rounded-md px-1.5 py-0.5 focus:outline-none"
-                        >
-                          {GRID_PRESETS.map((p) => (
-                            <option key={p.id} value={p.id} className="bg-gray-900 text-white">
-                              {p.label}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-
-                      {/* Botones de Acceso Rápido */}
-                      <div className="grid grid-cols-5 gap-1">
-                        {['1x1', '2x1', '2x2', '3x1', '4x1'].map((presetId) => (
-                          <button
-                            key={presetId}
-                            type="button"
-                            onClick={() => handleGridSpanChange(cat.id, presetId)}
-                            className={`py-1 px-1 rounded-md text-[10px] font-bold transition-all text-center ${
-                              currentNormalized === presetId
-                                ? 'bg-white text-black shadow-sm scale-105'
-                                : 'bg-white/10 text-white/80 hover:bg-white/25 hover:text-white'
-                            }`}
-                          >
-                            {presetId}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* ============================================================== */}
-                  {/* MANIJAS INTERACTIVAS PARA ESTIRAR CON EL MOUSE (ESQUINAS) */}
-                  {/* ============================================================== */}
-
-                  {/* 1. Borde derecho: Estirar columnas horizontalmente */}
-                  <div
-                    onMouseDown={(e) => {
-                      const el = document.getElementById(`cat-card-${cat.id}`);
-                      if (el) startResizing(e, cat.id, 'col', el);
-                    }}
-                    title="Arrastra para estirar ancho en columnas (1 a 4)"
-                    className="absolute top-1/2 right-0 -translate-y-1/2 z-30 h-16 w-3 hover:w-4 bg-indigo-500/0 hover:bg-indigo-500/80 cursor-ew-resize transition-all rounded-l-md flex items-center justify-center group/ew"
-                  >
-                    <span className="hidden group-hover/ew:block w-1 h-6 bg-white rounded-full shadow" />
-                  </div>
-
-                  {/* 2. Borde inferior: Estirar filas verticalmente */}
-                  <div
-                    onMouseDown={(e) => {
-                      const el = document.getElementById(`cat-card-${cat.id}`);
-                      if (el) startResizing(e, cat.id, 'row', el);
-                    }}
-                    title="Arrastra para estirar alto en filas (1 a 3)"
-                    className="absolute bottom-0 left-1/2 -translate-x-1/2 z-30 w-16 h-3 hover:h-4 bg-indigo-500/0 hover:bg-indigo-500/80 cursor-ns-resize transition-all rounded-t-md flex items-center justify-center group/ns"
-                  >
-                    <span className="hidden group-hover/ns:block h-1 w-6 bg-white rounded-full shadow" />
-                  </div>
-
-                  {/* 3. ESQUINA INFERIOR DERECHA: Estirar ambas dimensiones simultáneamente */}
-                  <div
-                    onMouseDown={(e) => {
-                      const el = document.getElementById(`cat-card-${cat.id}`);
-                      if (el) startResizing(e, cat.id, 'both', el);
-                    }}
-                    title="Jala esta esquina para estirar columnas y filas libremente"
-                    className="absolute bottom-1 right-1 z-30 flex items-center justify-center h-8 w-8 rounded-xl bg-indigo-600/90 text-white hover:bg-indigo-500 hover:scale-110 active:scale-95 cursor-nwse-resize shadow-lg transition-transform border border-white/30 backdrop-blur-md"
-                  >
-                    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 13v6m0 0h-6m6 0l-8-8m-3 3v4m0 0h-4m4 0l-5-5" />
-                    </svg>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSavingEdit}
+                  className="px-5 py-2 rounded-xl bg-black text-white text-xs font-bold hover:bg-gray-800"
+                >
+                  Guardar
+                </button>
+              </div>
+            </div>
+          </form>
+        </div>
+      )}
     </div>
   );
 }

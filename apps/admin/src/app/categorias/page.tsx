@@ -1,19 +1,11 @@
-import { db, categories, ensureSchema } from '@esqueleto/core';
+import { getStoredCategories } from '@esqueleto/core';
 import CategoryGridManager from './CategoryGridManager';
 
-export default async function CategoriasPage() {
-  await ensureSchema().catch(() => {});
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
-  let allCategories: any[] = [];
-  try {
-    allCategories = await db
-      .select()
-      .from(categories)
-      .orderBy(categories.displayOrder)
-      .execute();
-  } catch (err) {
-    console.error('Error al cargar categorías desde la base de datos:', err);
-  }
+export default async function CategoriasPage() {
+  const allCategories = await getStoredCategories();
 
   return (
     <main className="min-h-screen p-8 max-w-7xl mx-auto space-y-8">
@@ -26,7 +18,7 @@ export default async function CategoriasPage() {
             Categorías y Layout en Grid
           </h1>
           <p className="mt-2 text-sm text-gray-500">
-            Define la distribución visual de tus categorías en la tienda (Bento Grid), cambia sus imágenes y ajusta qué tamaño ocupa cada una de manera intuitiva.
+            Define la distribución visual de tus categorías en la tienda (estilo CSS Grid Generator), arrastra tarjetas entre celdas y estira sus esquinas en tiempo real.
           </p>
         </div>
       </div>

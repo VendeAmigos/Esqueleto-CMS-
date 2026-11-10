@@ -1,10 +1,11 @@
-import { db, categories, ensureSchema } from "@esqueleto/core";
+import { getStoredCategories } from "@esqueleto/core";
 import ProductForm from "@/components/ProductForm";
 import Link from "next/link";
 
+export const dynamic = 'force-dynamic';
+
 export default async function NuevoProductoPage() {
-  await ensureSchema();
-  const allCategories = await db.select().from(categories).execute();
+  const allCategories = await getStoredCategories();
 
   return (
     <main className="min-h-screen p-8 max-w-4xl mx-auto">

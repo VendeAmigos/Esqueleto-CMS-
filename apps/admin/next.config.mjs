@@ -5,10 +5,7 @@ const nextConfig = {
   output: process.env.DOCKER_BUILD === '1' ? 'standalone' : undefined,
   transpilePackages: ['@esqueleto/core'],
   experimental: {
-    serverComponentsExternalPackages: [
-      'postgres', 
-      'drizzle-orm'
-    ],
+    serverComponentsExternalPackages: ['postgres', 'drizzle-orm'],
   },
 };
 

@@ -3,93 +3,16 @@
 import Layout from '../layouts/Layout.astro';
 import ProductCard from '../components/ProductCard.astro';
 import {
-  db,
-  products,
-  categories,
-  productModifiers,
-  modifierOptions,
-  eq,
-  ensureSchema,
+  getStoredCategories,
+  getStoredProducts,
 } from '@esqueleto/core';
 
-try {
-  await ensureSchema();
-} catch (e) {}
+const [allCategories, fullProducts] = await Promise.all([
+  getStoredCategories(),
+  getStoredProducts(),
+]);
 
-// 1. Obtener todas las categorías ordenadas
-let allCategories: any[] = [];
-try {
-  allCategories = await db
-    .select()
-    .from(categories)
-    .orderBy(categories.displayOrder)
-    .execute();
-} catch (e) {
-  try {
-    allCategories = await db.select().from(categories).execute();
-  } catch (err) {
-    console.error('Error consultando categorías en catálogo:', err);
-  }
-}
-
-// 2. Consultar productos activos
-let dbProducts: any[] = [];
-try {
-  dbProducts = await db
-    .select({
-      id: products.id,
-      title: products.title,
-      description: products.description,
-      imageUrl: products.imageUrl,
-      basePrice: products.basePrice,
-      categoryId: products.categoryId,
-      categoryName: categories.name,
-      categorySlug: categories.slug,
-    })
-    .from(products)
-    .leftJoin(categories, eq(products.categoryId, categories.id))
-    .where(eq(products.isActive, true));
-} catch (err) {
-  console.error('Error consultando catálogo:', err);
-}
-
-// 3. Obtener modificadores asociados
-let allModifiers: any[] = [];
-let allOptions: any[] = [];
-try {
-  allModifiers = await db.select().from(productModifiers);
-  allOptions = await db.select().from(modifierOptions);
-} catch (e) {}
-
-// 4. Organizar modificadores con sus opciones en cada producto
-const fullProducts = dbProducts.map((prod) => {
-  const prodMods = allModifiers
-    .filter((m) => m.productId === prod.id)
-    .map((mod) => {
-      const opts = allOptions
-        .filter((o) => o.modifierId === mod.id)
-        .map((o) => ({
-          id: o.id,
-          name: o.name,
-          priceDelta: o.priceDelta,
-          isDefault: o.isDefault,
-        }));
-      return {
-        id: mod.id,
-        name: mod.name,
-        type: mod.type as 'single' | 'multiple',
-        required: mod.required,
-        options: opts,
-      };
-    });
-
-  return {
-    ...prod,
-    modifiers: prodMods,
-  };
-});
-
-// 5. Agrupar productos por categoría
+// Agrupar productos por categoría
 const categoriesWithProducts = allCategories
   .map((cat) => {
     const prods = fullProducts.filter((p) => p.categoryId === cat.id);

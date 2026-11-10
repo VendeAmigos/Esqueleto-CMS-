@@ -1,28 +1,26 @@
 ---
 // apps/storefront/src/components/Navbar.astro
-import { db, siteSettings, eq, ensureSchema } from '@esqueleto/core';
-
-try {
-  await ensureSchema();
-} catch (e) {}
+import { db, siteSettings, eq, isDatabaseAvailable, markDatabaseOffline } from '@esqueleto/core';
 
 let settings = {
-  siteName: 'ESQUELETO',
+  siteName: 'LUNA ART STUDIO',
   logoSvg: '',
-  logoColor: '#4f46e5',
+  logoColor: '#ec4899',
 };
 
-try {
-  const res = await db.select().from(siteSettings).where(eq(siteSettings.id, 'default')).execute();
-  if (res[0]) {
-    settings = {
-      siteName: res[0].siteName || 'ESQUELETO',
-      logoSvg: res[0].logoSvg || '',
-      logoColor: res[0].logoColor || '#4f46e5',
-    };
+if (await isDatabaseAvailable()) {
+  try {
+    const res = await db.select().from(siteSettings).where(eq(siteSettings.id, 'default')).execute();
+    if (res[0]) {
+      settings = {
+        siteName: res[0].siteName || 'LUNA ART STUDIO',
+        logoSvg: res[0].logoSvg || '',
+        logoColor: res[0].logoColor || '#ec4899',
+      };
+    }
+  } catch (e) {
+    markDatabaseOffline();
   }
-} catch (e) {
-  // En caso de que la tabla aún se esté migrando
 }
 
 const pathname = Astro.url.pathname;

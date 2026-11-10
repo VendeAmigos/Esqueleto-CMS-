@@ -1,51 +1,24 @@
-import { db, products, categories, productModifiers, ensureSchema, eq } from '@esqueleto/core';
+import { getStoredProducts } from '@esqueleto/core';
 import { deleteProduct } from '../../actions/products';
 import Link from 'next/link';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 export default async function ProductosPage() {
-  await ensureSchema();
+  const allProducts = await getStoredProducts();
 
-  let productsWithMods: Array<{
-    id: string;
-    title: string;
-    description: string | null;
-    imageUrl: string | null;
-    price: number;
-    isFeatured: boolean;
-    categoryName: string | null;
-    modifiersCount: number;
-    modifiersNames: string[];
-  }> = [];
-
-  try {
-    const allProducts = await db
-      .select({
-        id: products.id,
-        title: products.title,
-        description: products.description,
-        imageUrl: products.imageUrl,
-        price: products.basePrice,
-        isFeatured: products.isFeatured,
-        categoryName: categories.name,
-      })
-      .from(products)
-      .leftJoin(categories, eq(products.categoryId, categories.id))
-      .execute();
-
-    // Obtener conteo de modificadores para cada producto
-    const modifiersList = await db.select().from(productModifiers);
-
-    productsWithMods = allProducts.map((p) => {
-      const mods = modifiersList.filter((m) => m.productId === p.id);
-      return {
-        ...p,
-        modifiersCount: mods.length,
-        modifiersNames: mods.map((m) => m.name),
-      };
-    });
-  } catch (err) {
-    console.error('Error al cargar productos desde la base de datos:', err);
-  }
+  const productsWithMods = allProducts.map((p) => ({
+    id: p.id,
+    title: p.title,
+    description: p.description,
+    imageUrl: p.imageUrl,
+    price: p.basePrice,
+    isFeatured: Boolean(p.isFeatured),
+    categoryName: p.categoryName || 'General',
+    modifiersCount: p.modifiers?.length || 0,
+    modifiersNames: (p.modifiers || []).map((m) => m.name),
+  }));
 
   return (
     <main className="min-h-screen p-8 max-w-7xl mx-auto">
@@ -72,7 +45,7 @@ export default async function ProductosPage() {
       <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
         {productsWithMods.length === 0 ? (
           <div className="text-center p-12 border-dashed border-gray-300">
-            <p className="text-gray-500">No hay productos registrados en la base de datos.</p>
+            <p className="text-gray-500">No hay productos registrados.</p>
             <div className="mt-4">
               <Link
                 href="/productos/nuevo"

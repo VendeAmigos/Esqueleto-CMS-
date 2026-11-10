@@ -1,19 +1,17 @@
-import { db, orders, desc, ensureSchema } from '@esqueleto/core';
+import { db, orders, desc, isDatabaseAvailable } from '@esqueleto/core';
 import Link from 'next/link';
 import OrdersTable from './OrdersTable';
 
 export const dynamic = 'force-dynamic';
 
 export default async function OrdenesPage() {
-  try {
-    await ensureSchema();
-  } catch (e) {}
-
   let allOrders: any[] = [];
-  try {
-    allOrders = await db.select().from(orders).orderBy(desc(orders.createdAt));
-  } catch (e) {
-    console.error('Error cargando órdenes:', e);
+  if (await isDatabaseAvailable()) {
+    try {
+      allOrders = await db.select().from(orders).orderBy(desc(orders.createdAt));
+    } catch (e) {
+      console.error('Error cargando órdenes:', e);
+    }
   }
 
   return (

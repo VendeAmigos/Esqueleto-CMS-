@@ -1,6 +1,8 @@
-import { db, discountCodes, ensureSchema, desc } from '@esqueleto/core';
+import { db, discountCodes, isDatabaseAvailable, desc } from '@esqueleto/core';
 import CouponManager from './CouponManager';
 import Link from 'next/link';
+
+export const dynamic = 'force-dynamic';
 
 export const metadata = {
   title: 'Códigos de Descuento | CMS Administrador',
@@ -8,17 +10,17 @@ export const metadata = {
 };
 
 export default async function CuponesPage() {
-  await ensureSchema().catch(() => {});
-
   let allCoupons: any[] = [];
-  try {
-    allCoupons = await db
-      .select()
-      .from(discountCodes)
-      .orderBy(desc(discountCodes.createdAt))
-      .execute();
-  } catch (error) {
-    console.error('Error cargando cupones de descuento:', error);
+  if (await isDatabaseAvailable()) {
+    try {
+      allCoupons = await db
+        .select()
+        .from(discountCodes)
+        .orderBy(desc(discountCodes.createdAt))
+        .execute();
+    } catch (error) {
+      console.error('Error cargando cupones de descuento:', error);
+    }
   }
 
   return (

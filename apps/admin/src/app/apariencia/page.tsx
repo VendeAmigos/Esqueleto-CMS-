@@ -1,18 +1,20 @@
-import { db, siteSettings, ensureSchema, eq } from '@esqueleto/core';
+import { db, siteSettings, isDatabaseAvailable, eq } from '@esqueleto/core';
 import AppearanceForm from './AppearanceForm';
 
-export default async function AparienciaPage() {
-  await ensureSchema().catch(() => {});
+export const dynamic = 'force-dynamic';
 
+export default async function AparienciaPage() {
   let settingsList: any[] = [];
-  try {
-    settingsList = await db
-      .select()
-      .from(siteSettings)
-      .where(eq(siteSettings.id, 'default'))
-      .execute();
-  } catch (err) {
-    console.error('Error al cargar configuración de apariencia:', err);
+  if (await isDatabaseAvailable()) {
+    try {
+      settingsList = await db
+        .select()
+        .from(siteSettings)
+        .where(eq(siteSettings.id, 'default'))
+        .execute();
+    } catch (err) {
+      console.error('Error al cargar configuración de apariencia:', err);
+    }
   }
 
   const currentSettings = settingsList[0] || {

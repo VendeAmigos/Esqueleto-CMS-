@@ -1,6 +1,9 @@
 /**
- * Sistema universal de dimensionamiento de Grids para Categorías y Productos.
- * Permite cualquier proporción: 1x1, 2x1, 3x1, 4x1, 1x2, 2x2, 3x2, 4x2, 1x3, 2x3, 3x3, 4x3.
+ * Sistema universal de dimensionamiento y posicionamiento 2D de Grids (estilo cssgridgenerator.io)
+ * para Categorías y Productos.
+ *
+ * Soporta tanto formatos de solo tamaño ('1x1', '2x1', '2x2', etc.) como coordenadas explícitas
+ * en el lienzo 2D ('2x5@2,1|5x8' => colSpan=2, rowSpan=5, colStart=2, rowStart=1 en un grid de 5x8).
  * Totalmente seguro para el cliente (sin dependencias de Node.js / fs).
  */
 
@@ -19,63 +22,122 @@ export const GRID_PRESETS = [
   { id: '4x3', label: '4x3 Mural Completo', cols: 4, rows: 3 },
 ] as const;
 
-export function normalizeSpan(span: string | null | undefined): string {
-  if (!span) return '1x1';
-  if (span === 'col-1') return '1x1';
-  if (span === 'col-2') return '2x1';
-  if (span === 'col-3') return '3x1';
-  if (span === 'col-4' || span === 'full') return '4x1';
-  if (span === 'tall') return '1x2';
-  if (span === 'large') return '2x2';
-  return span;
+export interface ParsedGridSpan {
+  colSpan: number;
+  rowSpan: number;
+  colStart: number | null;
+  rowStart: number | null;
+  boardCols: number | null;
+  boardRows: number | null;
+  sizeId: string;
 }
 
 /**
- * Traduce cualquier dimensión (por ej. '2x1', '2x2', '3x2', 'col-2', 'large')
- * a clases responsivas de Tailwind CSS.
- * 
- * Contiene cadenas literales completas para que el escáner de Tailwind JIT
- * las detecte y genere siempre el CSS correspondiente sin depender de runtime dynamic interpolation.
+ * Parsea una cadena de gridSpan como '2x5@2,1|5x8', '2x2@1,1', '2x1', 'col-2', 'large', 'tall'.
  */
-export function getGridSpanClasses(span: string | null | undefined): string {
-  const norm = normalizeSpan(span);
+export function parseGridSpan(span: string | null | undefined): ParsedGridSpan {
+  if (!span) {
+    return {
+      colSpan: 1,
+      rowSpan: 1,
+      colStart: null,
+      rowStart: null,
+      boardCols: null,
+      boardRows: null,
+      sizeId: '1x1',
+    };
+  }
 
-  switch (norm) {
-    case '1x1':
-      return 'col-span-1 row-span-1 min-h-[220px]';
-    case '2x1':
-      return 'col-span-1 sm:col-span-2 md:col-span-2 row-span-1 min-h-[220px]';
-    case '3x1':
-      return 'col-span-1 sm:col-span-2 md:col-span-3 lg:col-span-3 row-span-1 min-h-[220px]';
-    case '4x1':
-      return 'col-span-1 sm:col-span-2 md:col-span-3 lg:col-span-4 row-span-1 min-h-[240px]';
-    case '1x2':
-      return 'col-span-1 row-span-2 min-h-[460px]';
-    case '2x2':
-      return 'col-span-1 sm:col-span-2 md:col-span-2 row-span-2 min-h-[460px]';
-    case '3x2':
-      return 'col-span-1 sm:col-span-2 md:col-span-3 lg:col-span-3 row-span-2 min-h-[460px]';
-    case '4x2':
-      return 'col-span-1 sm:col-span-2 md:col-span-3 lg:col-span-4 row-span-2 min-h-[480px]';
-    case '1x3':
-      return 'col-span-1 row-span-3 min-h-[700px]';
-    case '2x3':
-      return 'col-span-1 sm:col-span-2 md:col-span-2 row-span-3 min-h-[700px]';
-    case '3x3':
-      return 'col-span-1 sm:col-span-2 md:col-span-3 lg:col-span-3 row-span-3 min-h-[700px]';
-    case '4x3':
-      return 'col-span-1 sm:col-span-2 md:col-span-3 lg:col-span-4 row-span-3 min-h-[720px]';
-    default: {
-      // Parser dinámico para casos no estándar
-      const match = norm.match(/(\d+)x(\d+)/i);
-      if (match) {
-        const c = Math.min(Math.max(parseInt(match[1], 10), 1), 4);
-        const r = Math.min(Math.max(parseInt(match[2], 10), 1), 4);
-        const colClass = c === 1 ? 'col-span-1' : c === 2 ? 'col-span-1 sm:col-span-2 md:col-span-2' : c === 3 ? 'col-span-1 sm:col-span-2 md:col-span-3 lg:col-span-3' : 'col-span-1 sm:col-span-2 md:col-span-3 lg:col-span-4';
-        const rowClass = r === 1 ? 'row-span-1 min-h-[220px]' : r === 2 ? 'row-span-2 min-h-[460px]' : r === 3 ? 'row-span-3 min-h-[700px]' : 'row-span-4 min-h-[940px]';
-        return `${colClass} ${rowClass}`;
-      }
-      return 'col-span-1 row-span-1 min-h-[220px]';
+  const trimmed = span.trim();
+  const [mainPart, boardPart] = trimmed.split('|');
+  const [rawSize, rawPos] = (mainPart || '').split('@');
+
+  let sizePart = rawSize || '1x1';
+  if (sizePart === 'col-1') sizePart = '1x1';
+  else if (sizePart === 'col-2') sizePart = '2x1';
+  else if (sizePart === 'col-3') sizePart = '3x1';
+  else if (sizePart === 'col-4' || sizePart === 'full') sizePart = '4x1';
+  else if (sizePart === 'tall') sizePart = '1x2';
+  else if (sizePart === 'large') sizePart = '2x2';
+
+  const sizeMatch = sizePart.match(/(\d+)x(\d+)/i);
+  const colSpan = sizeMatch ? Math.min(Math.max(parseInt(sizeMatch[1], 10), 1), 12) : 1;
+  const rowSpan = sizeMatch ? Math.min(Math.max(parseInt(sizeMatch[2], 10), 1), 12) : 1;
+
+  let colStart: number | null = null;
+  let rowStart: number | null = null;
+
+  if (rawPos) {
+    const posMatch = rawPos.match(/(\d+)[,:](\d+)/);
+    if (posMatch) {
+      colStart = Math.min(Math.max(parseInt(posMatch[1], 10), 1), 12);
+      rowStart = Math.min(Math.max(parseInt(posMatch[2], 10), 1), 12);
     }
   }
+
+  let boardCols: number | null = null;
+  let boardRows: number | null = null;
+  if (boardPart) {
+    const bMatch = boardPart.match(/(\d+)x(\d+)/i);
+    if (bMatch) {
+      boardCols = Math.min(Math.max(parseInt(bMatch[1], 10), 1), 12);
+      boardRows = Math.min(Math.max(parseInt(bMatch[2], 10), 1), 12);
+    }
+  }
+
+  return {
+    colSpan,
+    rowSpan,
+    colStart,
+    rowStart,
+    boardCols,
+    boardRows,
+    sizeId: `${colSpan}x${rowSpan}`,
+  };
+}
+
+/**
+ * Formatea dimensiones, coordenadas y tamaño de tablero opcional en el string persistido en DB
+ * (ej. '2x5@2,1|5x8').
+ */
+export function formatGridSpan(
+  colSpan: number,
+  rowSpan: number,
+  colStart?: number | null,
+  rowStart?: number | null,
+  boardCols?: number | null,
+  boardRows?: number | null
+): string {
+  const cSpan = Math.min(Math.max(Math.round(colSpan), 1), 12);
+  const rSpan = Math.min(Math.max(Math.round(rowSpan), 1), 12);
+  let base = `${cSpan}x${rSpan}`;
+  if (colStart && rowStart && colStart >= 1 && rowStart >= 1) {
+    base += `@${Math.round(colStart)},${Math.round(rowStart)}`;
+  }
+  if (boardCols && boardRows && boardCols >= 1 && boardRows >= 1) {
+    base += `|${Math.round(boardCols)}x${Math.round(boardRows)}`;
+  }
+  return base;
+}
+
+/**
+ * Devuelve únicamente la proporción normalizada ('1x1', '2x2', etc.) sin las coordenadas.
+ */
+export function normalizeSpan(span: string | null | undefined): string {
+  return parseGridSpan(span).sizeId;
+}
+
+export function getGridSpanClasses(span: string | null | undefined): string {
+  const parsed = parseGridSpan(span);
+  const c = Math.min(Math.max(parsed.colSpan, 1), 4);
+  const colClass =
+    c === 1
+      ? 'col-span-1'
+      : c === 2
+      ? 'col-span-1 sm:col-span-2'
+      : c === 3
+      ? 'col-span-1 sm:col-span-2 md:col-span-3'
+      : 'col-span-1 sm:col-span-2 md:col-span-3 lg:col-span-4';
+
+  return `${colClass} min-h-[220px]`;
 }

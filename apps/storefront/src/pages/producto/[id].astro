@@ -3,19 +3,10 @@
 import Layout from '../../layouts/Layout.astro';
 import ProductCard from '../../components/ProductCard.astro';
 import {
-  db,
-  products,
-  categories,
-  productModifiers,
-  modifierOptions,
-  eq,
-  and,
-  ensureSchema,
+  getStoredProductById,
+  getStoredProducts,
+  getStoredCategories,
 } from '@esqueleto/core';
-
-try {
-  await ensureSchema();
-} catch (e) {}
 
 const { id } = Astro.params;
 
@@ -23,95 +14,25 @@ if (!id) {
   return Astro.redirect('/catalogo');
 }
 
-// 1. Obtener datos del producto
-let product: any = null;
-try {
-  const [prod] = await db
-    .select()
-    .from(products)
-    .where(and(eq(products.id, id), eq(products.isActive, true)))
-    .limit(1);
-  product = prod;
-} catch (e) {
-  console.error('Error buscando producto:', e);
-}
+const [product, allProducts, allCategories] = await Promise.all([
+  getStoredProductById(id),
+  getStoredProducts(),
+  getStoredCategories(),
+]);
 
 if (!product) {
   return Astro.redirect('/catalogo');
 }
 
-// 2. Obtener categoría del producto
-let category: any = null;
-if (product.categoryId) {
-  try {
-    const [cat] = await db
-      .select()
-      .from(categories)
-      .where(eq(categories.id, product.categoryId))
-      .limit(1);
-    category = cat;
-  } catch (e) {}
-}
+const category = product.categoryId
+  ? allCategories.find((c) => c.id === product.categoryId) || null
+  : null;
 
-// 3. Obtener modificadores asociados al producto
-let modifiersWithOpts: any[] = [];
-try {
-  const modifiers = await db
-    .select()
-    .from(productModifiers)
-    .where(eq(productModifiers.productId, product.id));
+const modifiersWithOpts = product.modifiers || [];
 
-  const allOpts = await db.select().from(modifierOptions);
-
-  modifiersWithOpts = modifiers.map((mod) => {
-    const opts = allOpts
-      .filter((o) => o.modifierId === mod.id)
-      .map((o) => ({
-        id: o.id,
-        name: o.name,
-        priceDelta: o.priceDelta,
-        isDefault: o.isDefault,
-      }));
-
-    return {
-      id: mod.id,
-      name: mod.name,
-      type: mod.type as 'single' | 'multiple',
-      required: mod.required,
-      options: opts,
-    };
-  });
-} catch (e) {
-  console.error('Error cargando modificadores del producto:', e);
-}
-
-// 4. Obtener productos relacionados (de la misma categoría o activos)
-let relatedProducts: any[] = [];
-try {
-  const rawRelated = await db
-    .select({
-      id: products.id,
-      title: products.title,
-      description: products.description,
-      imageUrl: products.imageUrl,
-      basePrice: products.basePrice,
-      categoryId: products.categoryId,
-      categoryName: categories.name,
-    })
-    .from(products)
-    .leftJoin(categories, eq(products.categoryId, categories.id))
-    .where(eq(products.isActive, true))
-    .limit(8)
-    .execute();
-
-  relatedProducts = rawRelated
-    .filter((p) => p.id !== product.id)
-    .slice(0, 4)
-    .map((p) => ({
-      ...p,
-      modifiers: [],
-    }));
-} catch (e) {}
+const relatedProducts = allProducts
+  .filter((p) => p.id !== product.id)
+  .slice(0, 4);
 
 const formattedBasePrice = new Intl.NumberFormat('es-MX', {
   style: 'currency',
