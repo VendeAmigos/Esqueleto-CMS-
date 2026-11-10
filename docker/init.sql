@@ -1,5 +1,5 @@
 -- docker/init.sql
--- Inicialización automática de PostgreSQL en Docker
+-- Inicialización automática de PostgreSQL en Docker para Tienda de Ilustradora
 
 CREATE TABLE IF NOT EXISTS users (
   id TEXT PRIMARY KEY,
@@ -14,12 +14,12 @@ CREATE TABLE IF NOT EXISTS categories (
   name TEXT NOT NULL,
   slug TEXT NOT NULL UNIQUE,
   image_url TEXT,
-  grid_span TEXT NOT NULL DEFAULT 'col-1',
+  grid_span TEXT NOT NULL DEFAULT '1x1',
   display_order INTEGER NOT NULL DEFAULT 0
 );
 
 ALTER TABLE categories ADD COLUMN IF NOT EXISTS image_url TEXT;
-ALTER TABLE categories ADD COLUMN IF NOT EXISTS grid_span TEXT NOT NULL DEFAULT 'col-1';
+ALTER TABLE categories ADD COLUMN IF NOT EXISTS grid_span TEXT NOT NULL DEFAULT '1x1';
 ALTER TABLE categories ADD COLUMN IF NOT EXISTS display_order INTEGER NOT NULL DEFAULT 0;
 
 CREATE TABLE IF NOT EXISTS products (
@@ -38,25 +38,27 @@ ALTER TABLE products ADD COLUMN IF NOT EXISTS is_featured BOOLEAN NOT NULL DEFAU
 
 CREATE TABLE IF NOT EXISTS site_settings (
   id TEXT PRIMARY KEY,
-  site_name TEXT NOT NULL DEFAULT 'ESQUELETO',
+  site_name TEXT NOT NULL DEFAULT 'LUNA ART STUDIO',
   logo_svg TEXT,
-  logo_color TEXT NOT NULL DEFAULT '#4f46e5',
-  hero_title TEXT NOT NULL DEFAULT 'Velocidad extrema. Control total en Docker.',
-  hero_subtitle TEXT NOT NULL DEFAULT 'E-commerce Open Source Plug & Play de alto rendimiento con catálogo interactivo y checkout seguro.',
-  hero_image_url TEXT DEFAULT 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?auto=format&fit=crop&w=1600&q=80',
-  hero_cta_text TEXT NOT NULL DEFAULT 'Explorar Catálogo',
+  logo_color TEXT NOT NULL DEFAULT '#ec4899',
+  hero_title TEXT NOT NULL DEFAULT 'Ilustración de Autor, Prints & Merch Exclusivo',
+  hero_subtitle TEXT NOT NULL DEFAULT 'Láminas de arte fine art, stickers holográficos, pines esmaltados y papelería ilustrada para alegrar tu día a día.',
+  hero_image_url TEXT DEFAULT 'https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?w=1600&auto=format&fit=crop&q=80',
+  hero_cta_text TEXT NOT NULL DEFAULT 'Explorar Tienda de Arte',
   hero_cta_link TEXT NOT NULL DEFAULT '/catalogo',
   updated_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
-INSERT INTO site_settings (id, site_name, logo_color, hero_title, hero_subtitle, hero_image_url)
+INSERT INTO site_settings (id, site_name, logo_color, hero_title, hero_subtitle, hero_image_url, hero_cta_text, hero_cta_link)
 VALUES (
   'default',
-  'ESQUELETO',
-  '#4f46e5',
-  'Velocidad extrema. Control total en Docker.',
-  'E-commerce Open Source Plug & Play de alto rendimiento con catálogo interactivo y checkout seguro.',
-  'https://images.unsplash.com/photo-1441986300917-64674bd600d8?auto=format&fit=crop&w=1600&q=80'
+  'LUNA ART STUDIO',
+  '#ec4899',
+  'Ilustración de Autor, Prints & Merch Exclusivo',
+  'Láminas de arte fine art, stickers holográficos, pines esmaltados y papelería ilustrada para alegrar tu día a día.',
+  'https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?w=1600&auto=format&fit=crop&q=80',
+  'Explorar Tienda de Arte',
+  '/catalogo'
 ) ON CONFLICT (id) DO NOTHING;
 
 CREATE TABLE IF NOT EXISTS product_modifiers (
@@ -76,19 +78,28 @@ CREATE TABLE IF NOT EXISTS modifier_options (
   is_default BOOLEAN NOT NULL DEFAULT false
 );
 
-CREATE TABLE IF NOT EXISTS product_variants (
+CREATE TABLE IF NOT EXISTS discount_codes (
   id TEXT PRIMARY KEY,
-  product_id TEXT NOT NULL REFERENCES products(id) ON DELETE CASCADE,
-  name TEXT NOT NULL,
-  sku TEXT NOT NULL UNIQUE,
-  price INTEGER NOT NULL,
-  stock INTEGER NOT NULL DEFAULT 0
+  code TEXT NOT NULL UNIQUE,
+  description TEXT,
+  discount_type TEXT NOT NULL DEFAULT 'percentage',
+  discount_value INTEGER NOT NULL,
+  min_purchase INTEGER NOT NULL DEFAULT 0,
+  max_discount INTEGER,
+  usage_limit INTEGER,
+  used_count INTEGER NOT NULL DEFAULT 0,
+  is_active BOOLEAN NOT NULL DEFAULT true,
+  expires_at TIMESTAMP,
+  created_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
 CREATE TABLE IF NOT EXISTS orders (
   id TEXT PRIMARY KEY,
-  user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+  user_id TEXT,
   status TEXT NOT NULL DEFAULT 'pending',
+  subtotal INTEGER,
+  discount_code TEXT,
+  discount_amount INTEGER NOT NULL DEFAULT 0,
   total INTEGER NOT NULL,
   customer_email TEXT,
   items_summary TEXT,
@@ -97,14 +108,15 @@ CREATE TABLE IF NOT EXISTS orders (
 );
 
 -- ============================================================
--- Categorías con Imágenes de Alta Calidad y Tamaños de Grid
+-- Categorías de Ilustradora (Bento Grid)
 -- ============================================================
 INSERT INTO categories (id, name, slug, image_url, grid_span, display_order)
 VALUES 
-  ('cat-ropa-01', 'Ropa y Estilo', 'ropa', 'https://images.unsplash.com/photo-1489987707025-afc232f7ea0f?w=900&auto=format&fit=crop&q=80', 'col-2', 1),
-  ('cat-tec-02', 'Tecnología', 'tecnologia', 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=900&auto=format&fit=crop&q=80', 'col-1', 2),
-  ('cat-gourmet-03', 'Café & Gourmet', 'gourmet', 'https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?w=900&auto=format&fit=crop&q=80', 'col-1', 3),
-  ('cat-acc-04', 'Accesorios', 'accesorios', 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=900&auto=format&fit=crop&q=80', 'col-2', 4)
+  ('cat-prints-01', 'Prints & Láminas de Arte', 'prints-arte', 'https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?w=900&auto=format&fit=crop&q=80', '2x2', 1),
+  ('cat-stickers-02', 'Stickers & Papelería', 'stickers-papeleria', 'https://images.unsplash.com/photo-1589998059171-988d887df646?w=900&auto=format&fit=crop&q=80', '2x1', 2),
+  ('cat-acc-03', 'Pines & Llaveros Acrílicos', 'pines-llaveros', 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=900&auto=format&fit=crop&q=80', '1x2', 3),
+  ('cat-textil-04', 'Merch Textil & Totebags', 'merch-textil', 'https://images.unsplash.com/photo-1544816155-12df9643f363?w=900&auto=format&fit=crop&q=80', '2x1', 4),
+  ('cat-orig-05', 'Obras Originales & Libretas', 'obras-originales', 'https://images.unsplash.com/photo-1513364776144-60967b0f800f?w=900&auto=format&fit=crop&q=80', '1x1', 5)
 ON CONFLICT (id) DO UPDATE SET 
   name = EXCLUDED.name, 
   slug = EXCLUDED.slug,
@@ -113,189 +125,64 @@ ON CONFLICT (id) DO UPDATE SET
   display_order = EXCLUDED.display_order;
 
 -- ============================================================
--- Productos con Imágenes Reales y Modificadores de Precio
+-- Productos de Merch Ilustradora
 -- ============================================================
-
--- 1. Playera
 INSERT INTO products (id, title, description, image_url, base_price, is_active, is_featured, category_id)
-VALUES (
-  'prod-playera-01',
-  'Playera Heavyweight Streetwear',
-  'Corte boxy fit confeccionada en 100% algodón pesado de 240 GSM. Durabilidad y caída impecable.',
-  'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=800&auto=format&fit=crop&q=80',
-  34900,
-  true,
-  true,
-  'cat-ropa-01'
-) ON CONFLICT (id) DO UPDATE SET is_featured = EXCLUDED.is_featured;
+VALUES
+  ('prod-print-jardin', 'Print Fine Art "El Jardín de los Recuerdos"', 'Lámina de ilustración impresa en papel algodón de 310g con tintas pigmentadas de archivo. Colores vibrantes de larga duración.', 'https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?w=800&auto=format&fit=crop&q=80', 18000, true, true, 'cat-prints-01'),
+  ('prod-print-estrellas', 'Lámina de Autor "Cazadora de Estrellas"', 'Ilustración digital de atmósfera nocturna y fantasía botánica sobre papel texturizado Fine Art.', 'https://images.unsplash.com/photo-1578301978693-85fa9c0320b9?w=800&auto=format&fit=crop&q=80', 22000, true, true, 'cat-prints-01'),
+  ('prod-pack-stickers', 'Pack de 6 Stickers Holográficos "Criaturas Mágicas"', 'Set de 6 adhesivos de vinilo grueso ultra-resistente al agua, raspaduras y sol UV. Brillo holográfico premium.', 'https://images.unsplash.com/photo-1589998059171-988d887df646?w=800&auto=format&fit=crop&q=80', 9500, true, true, 'cat-stickers-02'),
+  ('prod-pin-corazon', 'Pin Metálico Esmaltado "Corazón Florecido" (Hard Enamel)', 'Broche metálico coleccionable de 3.5cm en esmalte duro pulido con baño en oro y tarjeta ilustrada de respaldo.', 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800&auto=format&fit=crop&q=80', 14000, true, true, 'cat-acc-03'),
+  ('prod-llavero-zorro', 'Llavero Acrílico Translúcido Glitter "Zorro Astral"', 'Llavero de doble cara de acrílico resistente de 6.5cm con destellos glitter suspendidos y capa epóxica anti-rayas.', 'https://images.unsplash.com/photo-1588850561407-ed78c282e89b?w=800&auto=format&fit=crop&q=80', 12500, true, false, 'cat-acc-03'),
+  ('prod-totebag-lectura', 'Totebag Ilustrada "Lectura Nocturna" (100% Algodón Pesado)', 'Bolsa de lona resistente de 320g con serigrafía artesanal duradera. Perfecta para libros, libretas y compras.', 'https://images.unsplash.com/photo-1544816155-12df9643f363?w=800&auto=format&fit=crop&q=80', 28000, true, false, 'cat-textil-04'),
+  ('prod-hoodie-eclipse', 'Hoodie Oversize Bordada "Eclipse Floral"', 'Sudadera con capucha en felpa perchada de 340g con bordado de alta densidad en el pecho y print dorsal.', 'https://images.unsplash.com/photo-1556905055-8f358a7a47b2?w=800&auto=format&fit=crop&q=80', 65000, true, false, 'cat-textil-04'),
+  ('prod-sketchbook-autor', 'Sketchbook Tapa Dura "Pinceladas del Alma" (200g)', 'Cuaderno cosido a mano con 160 páginas en papel mix media libre de ácido. Ideal para gouache, tinta y acuarela.', 'https://images.unsplash.com/photo-1513364776144-60967b0f800f?w=800&auto=format&fit=crop&q=80', 24000, true, false, 'cat-orig-05')
+ON CONFLICT (id) DO UPDATE SET
+  title = EXCLUDED.title,
+  description = EXCLUDED.description,
+  image_url = EXCLUDED.image_url,
+  base_price = EXCLUDED.base_price,
+  is_active = EXCLUDED.is_active,
+  is_featured = EXCLUDED.is_featured,
+  category_id = EXCLUDED.category_id;
 
+-- Modificadores Print Jardín
 INSERT INTO product_modifiers (id, product_id, name, type, required)
 VALUES 
-  ('mod-playera-talla', 'prod-playera-01', 'Talla', 'single', true),
-  ('mod-playera-color', 'prod-playera-01', 'Color', 'single', true),
-  ('mod-playera-regalo', 'prod-playera-01', 'Empaque Especial', 'multiple', false)
+  ('mod-jardin-size', 'prod-print-jardin', 'Tamaño de Lámina', 'single', true),
+  ('mod-jardin-finish', 'prod-print-jardin', 'Acabado Artístico', 'single', true)
 ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO modifier_options (id, modifier_id, name, price_delta, is_default)
 VALUES
-  ('opt-talla-s', 'mod-playera-talla', 'Chica (S)', 0, true),
-  ('opt-talla-m', 'mod-playera-talla', 'Mediana (M)', 0, false),
-  ('opt-talla-l', 'mod-playera-talla', 'Grande (L)', 3000, false),
-  ('opt-talla-xl', 'mod-playera-talla', 'Extra Grande (XL)', 5000, false),
-  ('opt-color-negro', 'mod-playera-color', 'Negro Carbón', 0, true),
-  ('opt-color-blanco', 'mod-playera-color', 'Blanco Vintage', 0, false),
-  ('opt-color-verde', 'mod-playera-color', 'Verde Militar', 2000, false),
-  ('opt-regalo-caja', 'mod-playera-regalo', 'Caja Premium con Lazo y Tarjeta', 4500, false)
+  ('opt-jardin-a5', 'mod-jardin-size', 'A5 (14.8 x 21 cm)', 0, true),
+  ('opt-jardin-a4', 'mod-jardin-size', 'A4 (21 x 29.7 cm)', 6000, false),
+  ('opt-jardin-a3', 'mod-jardin-size', 'A3 (29.7 x 42 cm)', 14000, false),
+  ('opt-jardin-matte', 'mod-jardin-finish', 'Papel Algodón Mate Suave', 0, true),
+  ('opt-jardin-holo', 'mod-jardin-finish', 'Efecto Holográfico Glass', 3000, false)
 ON CONFLICT (id) DO NOTHING;
 
--- 2. Audífonos
-INSERT INTO products (id, title, description, image_url, base_price, is_active, is_featured, category_id)
-VALUES (
-  'prod-audifonos-02',
-  'Audífonos Over-Ear Pro ANC',
-  'Cancelación activa de ruido híbrida de 40dB, transductores de 40mm de biocelulosa y hasta 65h de batería.',
-  'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800&auto=format&fit=crop&q=80',
-  159900,
-  true,
-  true,
-  'cat-tec-02'
-) ON CONFLICT (id) DO UPDATE SET is_featured = EXCLUDED.is_featured;
-
+-- Modificadores Stickers
 INSERT INTO product_modifiers (id, product_id, name, type, required)
-VALUES 
-  ('mod-aud-acabado', 'prod-audifonos-02', 'Acabado y Material', 'single', true),
-  ('mod-aud-garantia', 'prod-audifonos-02', 'Cobertura Adicional', 'single', false),
-  ('mod-aud-extras', 'prod-audifonos-02', 'Complementos de Audio', 'multiple', false)
+VALUES ('mod-stickers-lam', 'prod-pack-stickers', 'Tipo de Laminado', 'single', true)
 ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO modifier_options (id, modifier_id, name, price_delta, is_default)
 VALUES
-  ('opt-aud-negro', 'mod-aud-acabado', 'Negro Mate Grafito', 0, true),
-  ('opt-aud-plata', 'mod-aud-acabado', 'Plata Cepillada Espacial', 15000, false),
-  ('opt-aud-medianoche', 'mod-aud-acabado', 'Edición Especial Medianoche', 25000, false),
-  ('opt-aud-gar1', 'mod-aud-garantia', 'Garantía Estándar 1 Año', 0, true),
-  ('opt-aud-gar2', 'mod-aud-garantia', 'Garantía Extendida Total 2 Años', 29900, false),
-  ('opt-aud-estuche', 'mod-aud-extras', 'Estuche Rígido de Viaje Anti-impactos', 18000, false),
-  ('opt-aud-almohadillas', 'mod-aud-extras', 'Almohadillas Reemplazables de Gel', 12000, false)
+  ('opt-stk-holo', 'mod-stickers-lam', 'Holográfico Arcoíris Especial', 0, true),
+  ('opt-stk-glitter', 'mod-stickers-lam', 'Glitter Polvo de Estrellas', 1500, false),
+  ('opt-stk-matte', 'mod-stickers-lam', 'Vinilo Mate Suave', -1000, false)
 ON CONFLICT (id) DO NOTHING;
 
--- 3. Smartwatch
-INSERT INTO products (id, title, description, image_url, base_price, is_active, is_featured, category_id)
-VALUES (
-  'prod-smartwatch-03',
-  'Smartwatch Cronógrafo Titanium V3',
-  'Bisel de titanio aeroespacial grado 5, pantalla AMOLED Always-On protegida por cristal de zafiro y GPS dual.',
-  'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=800&auto=format&fit=crop&q=80',
-  249900,
-  true,
-  true,
-  'cat-tec-02'
-) ON CONFLICT (id) DO UPDATE SET is_featured = EXCLUDED.is_featured;
-
-INSERT INTO product_modifiers (id, product_id, name, type, required)
+-- Cupones
+INSERT INTO discount_codes (id, code, description, discount_type, discount_value, min_purchase, max_discount, usage_limit, is_active)
 VALUES 
-  ('mod-watch-correa', 'prod-smartwatch-03', 'Tipo de Correa', 'single', true),
-  ('mod-watch-mica', 'prod-smartwatch-03', 'Protección', 'multiple', false)
-ON CONFLICT (id) DO NOTHING;
+  ('disc-01', 'ARTE10', '10% de descuento de bienvenida en cualquier compra de arte', 'percentage', 10, 0, NULL, 500, true),
+  ('disc-02', 'PRINTS20', '20% de descuento en pedidos mayores a $300 MXN', 'percentage', 20, 30000, 15000, 200, true),
+  ('disc-03', 'REGALO50', '$50 MXN de regalo directo en compras mayores a $250 MXN', 'fixed', 5000, 25000, NULL, 100, true)
+ON CONFLICT (code) DO NOTHING;
 
-INSERT INTO modifier_options (id, modifier_id, name, price_delta, is_default)
-VALUES
-  ('opt-watch-silicon', 'mod-watch-correa', 'Silicón Fluoroelastómero Deportivo', 0, true),
-  ('opt-watch-cuero', 'mod-watch-correa', 'Cuero Genuino Café Tostado', 35000, false),
-  ('opt-watch-acero', 'mod-watch-correa', 'Eslabones de Acero y Titanio', 45000, false),
-  ('opt-watch-cristal', 'mod-watch-mica', 'Mica de Cristal Templado 9H Instalada', 9900, false)
-ON CONFLICT (id) DO NOTHING;
-
--- 4. Café
-INSERT INTO products (id, title, description, image_url, base_price, is_active, is_featured, category_id)
-VALUES (
-  'prod-cafe-04',
-  'Café de Especialidad Chiapas Finca 500g',
-  'Granos 100% Arábica de altura (1,450 msnm), notas de chocolate oscuro, miel de azahar y nuez tostada.',
-  'https://images.unsplash.com/photo-1559056199-641a0ac8b55e?w=800&auto=format&fit=crop&q=80',
-  22000,
-  true,
-  true,
-  'cat-gourmet-03'
-) ON CONFLICT (id) DO UPDATE SET is_featured = EXCLUDED.is_featured;
-
-INSERT INTO product_modifiers (id, product_id, name, type, required)
-VALUES 
-  ('mod-cafe-molienda', 'prod-cafe-04', 'Tipo de Molienda', 'single', true),
-  ('mod-cafe-tueste', 'prod-cafe-04', 'Nivel de Tueste', 'single', true),
-  ('mod-cafe-vaso', 'prod-cafe-04', 'Extras Gourmet', 'multiple', false)
-ON CONFLICT (id) DO NOTHING;
-
-INSERT INTO modifier_options (id, modifier_id, name, price_delta, is_default)
-VALUES
-  ('opt-cafe-grano', 'mod-cafe-molienda', 'Grano Entero (Recomendado)', 0, true),
-  ('opt-cafe-espresso', 'mod-cafe-molienda', 'Molido Fino (Espresso)', 1000, false),
-  ('opt-cafe-filtro', 'mod-cafe-molienda', 'Molido Medio (Filtro / V60)', 1000, false),
-  ('opt-cafe-prensa', 'mod-cafe-molienda', 'Molido Grueso (Prensa Francesa)', 1000, false),
-  ('opt-cafe-tueste-medio', 'mod-cafe-tueste', 'Tueste Medio Cacao', 0, true),
-  ('opt-cafe-tueste-obscuro', 'mod-cafe-tueste', 'Tueste Obscuro Intenso', 1500, false),
-  ('opt-cafe-vaso-termico', 'mod-cafe-vaso', 'Vaso Térmico de Viaje Acero', 18000, false)
-ON CONFLICT (id) DO NOTHING;
-
--- 5. Mochila
-INSERT INTO products (id, title, description, image_url, base_price, is_active, is_featured, category_id)
-VALUES (
-  'prod-mochila-05',
-  'Mochila Técnica Urbana Impermeable 25L',
-  'Tejido Cordura balístico 1000D repelente al agua, compartimento acolchado para laptop de hasta 16" y cremalleras YKK.',
-  'https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=800&auto=format&fit=crop&q=80',
-  89900,
-  true,
-  true,
-  'cat-acc-04'
-) ON CONFLICT (id) DO UPDATE SET is_featured = EXCLUDED.is_featured;
-
-INSERT INTO product_modifiers (id, product_id, name, type, required)
-VALUES 
-  ('mod-mochila-color', 'prod-mochila-05', 'Color de Tela', 'single', true),
-  ('mod-mochila-acc', 'prod-mochila-05', 'Accesorios Compatibles', 'multiple', false)
-ON CONFLICT (id) DO NOTHING;
-
-INSERT INTO modifier_options (id, modifier_id, name, price_delta, is_default)
-VALUES
-  ('opt-mochila-oxford', 'mod-mochila-color', 'Gris Oxford Técnico', 0, true),
-  ('opt-mochila-tactico', 'mod-mochila-color', 'Negro Táctico', 0, false),
-  ('opt-mochila-marino', 'mod-mochila-color', 'Azul Marino Profundo', 5000, false),
-  ('opt-mochila-powerbank', 'mod-mochila-acc', 'Powerbank Ultra-Slim 10,000 mAh', 29900, false),
-  ('opt-mochila-funda', 'mod-mochila-acc', 'Cubre-mochila Fluo para Lluvia', 8900, false)
-ON CONFLICT (id) DO NOTHING;
-
--- 6. Gorra
-INSERT INTO products (id, title, description, image_url, base_price, is_active, category_id)
-VALUES (
-  'prod-gorra-06',
-  'Gorra Snapback Premium Estructurada',
-  'Corona estructurada de 6 paneles en mezcla de lana peinada con visera plana moldeable y cierre retro ajustable.',
-  'https://images.unsplash.com/photo-1588850561407-ed78c282e89b?w=800&auto=format&fit=crop&q=80',
-  29900,
-  true,
-  'cat-acc-04'
-) ON CONFLICT (id) DO NOTHING;
-
-INSERT INTO product_modifiers (id, product_id, name, type, required)
-VALUES 
-  ('mod-gorra-color', 'prod-gorra-06', 'Color Base', 'single', true),
-  ('mod-gorra-bordado', 'prod-gorra-06', 'Bordado Personalizado', 'single', false)
-ON CONFLICT (id) DO NOTHING;
-
-INSERT INTO modifier_options (id, modifier_id, name, price_delta, is_default)
-VALUES
-  ('opt-gorra-negro', 'mod-gorra-color', 'Negro Monocromático', 0, true),
-  ('opt-gorra-melange', 'mod-gorra-color', 'Gris Melange', 0, false),
-  ('opt-gorra-beige', 'mod-gorra-color', 'Beige Desierto', 2000, false),
-  ('opt-gorra-liso', 'mod-gorra-bordado', 'Sin Bordado (Liso)', 0, true),
-  ('opt-gorra-iniciales', 'mod-gorra-bordado', 'Iniciales Bordadas en Hilo Plata', 6000, false),
-  ('opt-gorra-3d', 'mod-gorra-bordado', 'Logo Custom Frontal en Relieve 3D', 9500, false)
-ON CONFLICT (id) DO NOTHING;
-
--- ============================================================
--- Usuario Administrador por Defecto
--- ============================================================
+-- Usuario Admin
 INSERT INTO users (id, email, password_hash, role)
 VALUES ('admin-01', 'admin@esqueleto.local', 'esqueleto_hash', 'admin')
 ON CONFLICT (email) DO NOTHING;

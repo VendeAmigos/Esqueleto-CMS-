@@ -114,33 +114,30 @@ export async function ensureSchema(): Promise<void> {
         );`,
         `ALTER TABLE categories ADD COLUMN IF NOT EXISTS image_url TEXT;`,
         `ALTER TABLE categories ADD COLUMN IF NOT EXISTS grid_span TEXT NOT NULL DEFAULT '1x1';`,
-        `ALTER TABLE categories ADD COLUMN IF NOT EXISTS display_order INTEGER NOT NULL DEFAULT 0;`,
         `ALTER TABLE products ADD COLUMN IF NOT EXISTS is_featured BOOLEAN NOT NULL DEFAULT false;`,
         `CREATE TABLE IF NOT EXISTS site_settings (
           id TEXT PRIMARY KEY,
-          site_name TEXT NOT NULL DEFAULT 'ESQUELETO',
+          site_name TEXT NOT NULL DEFAULT 'LUNA ART STUDIO',
           logo_svg TEXT,
-          logo_color TEXT NOT NULL DEFAULT '#4f46e5',
-          hero_title TEXT NOT NULL DEFAULT 'Velocidad extrema. Control total en Docker.',
-          hero_subtitle TEXT NOT NULL DEFAULT 'E-commerce Open Source Plug & Play de alto rendimiento con catálogo interactivo y checkout seguro.',
-          hero_image_url TEXT DEFAULT 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?auto=format&fit=crop&w=1600&q=80',
-          hero_cta_text TEXT NOT NULL DEFAULT 'Explorar Catálogo',
+          logo_color TEXT NOT NULL DEFAULT '#ec4899',
+          hero_title TEXT NOT NULL DEFAULT 'Ilustración de Autor, Prints & Merch Exclusivo',
+          hero_subtitle TEXT NOT NULL DEFAULT 'Láminas de arte fine art, stickers holográficos, pines esmaltados y papelería ilustrada para alegrar tu día a día.',
+          hero_image_url TEXT DEFAULT 'https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?w=1600&auto=format&fit=crop&q=80',
+          hero_cta_text TEXT NOT NULL DEFAULT 'Explorar Tienda de Arte',
           hero_cta_link TEXT NOT NULL DEFAULT '/catalogo',
           updated_at TIMESTAMP NOT NULL DEFAULT NOW()
         );`,
-        `INSERT INTO site_settings (id, site_name, logo_color, hero_title, hero_subtitle, hero_image_url)
+        `INSERT INTO site_settings (id, site_name, logo_color, hero_title, hero_subtitle, hero_image_url, hero_cta_text, hero_cta_link)
          VALUES (
            'default',
-           'ESQUELETO',
-           '#4f46e5',
-           'Velocidad extrema. Control total en Docker.',
-           'E-commerce Open Source Plug & Play de alto rendimiento con catálogo interactivo y checkout seguro.',
-           'https://images.unsplash.com/photo-1441986300917-64674bd600d8?auto=format&fit=crop&w=1600&q=80'
+           'LUNA ART STUDIO',
+           '#ec4899',
+           'Ilustración de Autor, Prints & Merch Exclusivo',
+           'Láminas de arte fine art, stickers holográficos, pines esmaltados y papelería ilustrada para alegrar tu día a día.',
+           'https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?w=1600&auto=format&fit=crop&q=80',
+           'Explorar Tienda de Arte',
+           '/catalogo'
          ) ON CONFLICT (id) DO NOTHING;`,
-        `UPDATE categories SET image_url = 'https://images.unsplash.com/photo-1489987707025-afc232f7ea0f?w=900&auto=format&fit=crop&q=80', grid_span = 'col-2', display_order = 1 WHERE slug = 'ropa' AND (image_url IS NULL OR image_url = '');`,
-        `UPDATE categories SET image_url = 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=900&auto=format&fit=crop&q=80', grid_span = 'col-1', display_order = 2 WHERE slug = 'tecnologia' AND (image_url IS NULL OR image_url = '');`,
-        `UPDATE categories SET image_url = 'https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?w=900&auto=format&fit=crop&q=80', grid_span = 'col-1', display_order = 3 WHERE slug = 'gourmet' AND (image_url IS NULL OR image_url = '');`,
-        `UPDATE categories SET image_url = 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=900&auto=format&fit=crop&q=80', grid_span = 'col-2', display_order = 4 WHERE slug = 'accesorios' AND (image_url IS NULL OR image_url = '');`,
         `CREATE TABLE IF NOT EXISTS orders (
           id TEXT PRIMARY KEY,
           user_id TEXT,
@@ -157,6 +154,20 @@ export async function ensureSchema(): Promise<void> {
         `ALTER TABLE orders ADD COLUMN IF NOT EXISTS subtotal INTEGER;`,
         `ALTER TABLE orders ADD COLUMN IF NOT EXISTS discount_code TEXT;`,
         `ALTER TABLE orders ADD COLUMN IF NOT EXISTS discount_amount INTEGER NOT NULL DEFAULT 0;`,
+        `ALTER TABLE orders ADD COLUMN IF NOT EXISTS customer_name TEXT;`,
+        `ALTER TABLE orders ADD COLUMN IF NOT EXISTS customer_phone TEXT;`,
+        `ALTER TABLE orders ADD COLUMN IF NOT EXISTS shipping_street TEXT;`,
+        `ALTER TABLE orders ADD COLUMN IF NOT EXISTS shipping_ext_number TEXT;`,
+        `ALTER TABLE orders ADD COLUMN IF NOT EXISTS shipping_int_number TEXT;`,
+        `ALTER TABLE orders ADD COLUMN IF NOT EXISTS shipping_neighborhood TEXT;`,
+        `ALTER TABLE orders ADD COLUMN IF NOT EXISTS shipping_municipality TEXT;`,
+        `ALTER TABLE orders ADD COLUMN IF NOT EXISTS shipping_city TEXT;`,
+        `ALTER TABLE orders ADD COLUMN IF NOT EXISTS shipping_state TEXT;`,
+        `ALTER TABLE orders ADD COLUMN IF NOT EXISTS shipping_zip TEXT;`,
+        `ALTER TABLE orders ADD COLUMN IF NOT EXISTS shipping_references TEXT;`,
+        `ALTER TABLE orders ADD COLUMN IF NOT EXISTS shipping_lat DOUBLE PRECISION;`,
+        `ALTER TABLE orders ADD COLUMN IF NOT EXISTS shipping_lng DOUBLE PRECISION;`,
+        `ALTER TABLE orders ADD COLUMN IF NOT EXISTS location_source TEXT;`,
         `CREATE TABLE IF NOT EXISTS discount_codes (
           id TEXT PRIMARY KEY,
           code TEXT NOT NULL UNIQUE,
@@ -175,7 +186,6 @@ export async function ensureSchema(): Promise<void> {
         `CREATE INDEX IF NOT EXISTS idx_products_active ON products(is_active);`,
         `CREATE INDEX IF NOT EXISTS idx_discount_codes_code ON discount_codes(code);`,
         `CREATE INDEX IF NOT EXISTS idx_orders_created_at ON orders(created_at DESC);`,
-        `UPDATE products SET is_featured = true WHERE id IN ('prod-playera-01', 'prod-audifonos-02', 'prod-smartwatch-03', 'prod-cafe-04');`,
       ];
 
       for (const stmt of statements) {
@@ -205,46 +215,4 @@ ensureSchema().catch(() => {});
 
 export * from './schema';
 export { eq, ne, gt, gte, lt, lte, and, or, not, sql, desc, asc, inArray, isNull, isNotNull } from 'drizzle-orm';
-
-/**
- * Genera clases responsivas de Tailwind CSS para cualquier tamaño de Bento Grid
- * Soporta formatos: 'col-1', 'col-2', 'tall', 'large', 'full' y cualquier dimensión tipo '3x1', '2x2', '4x2', etc.
- */
-export function getGridSpanClasses(span: string): string {
-  if (!span) return 'col-span-1 row-span-1 min-h-[220px]';
-
-  // Formatos históricos
-  if (span === 'col-1' || span === '1x1') return 'col-span-1 row-span-1 min-h-[220px]';
-  if (span === 'col-2' || span === '2x1') return 'col-span-1 md:col-span-2 row-span-1 min-h-[220px]';
-  if (span === 'col-3' || span === '3x1') return 'col-span-1 md:col-span-3 row-span-1 min-h-[220px]';
-  if (span === 'col-4' || span === '4x1' || span === 'full') return 'col-span-1 md:col-span-3 lg:col-span-4 row-span-1 min-h-[240px]';
-  if (span === 'tall' || span === '1x2') return 'col-span-1 row-span-2 min-h-[460px]';
-  if (span === 'large' || span === '2x2') return 'col-span-1 md:col-span-2 row-span-2 min-h-[460px]';
-  if (span === '3x2') return 'col-span-1 md:col-span-3 row-span-2 min-h-[460px]';
-  if (span === '4x2') return 'col-span-1 md:col-span-3 lg:col-span-4 row-span-2 min-h-[480px]';
-  if (span === '1x3') return 'col-span-1 row-span-3 min-h-[700px]';
-  if (span === '2x3') return 'col-span-1 md:col-span-2 row-span-3 min-h-[700px]';
-  if (span === '3x3') return 'col-span-1 md:col-span-3 row-span-3 min-h-[700px]';
-  if (span === '4x3') return 'col-span-1 md:col-span-3 lg:col-span-4 row-span-3 min-h-[720px]';
-
-  // Parser dinámico para cualquier tamaño personalizado {columnas}x{filas}
-  const match = span.match(/(\d+)x(\d+)/i) || span.match(/cols?-?(\d+)[^\d]+rows?-?(\d+)/i);
-  if (match) {
-    const cols = Math.min(Math.max(parseInt(match[1], 10), 1), 4);
-    const rows = Math.min(Math.max(parseInt(match[2], 10), 1), 3);
-
-    let colClass = 'col-span-1';
-    if (cols === 2) colClass = 'col-span-1 md:col-span-2';
-    else if (cols === 3) colClass = 'col-span-1 md:col-span-3';
-    else if (cols >= 4) colClass = 'col-span-1 md:col-span-3 lg:col-span-4';
-
-    let rowClass = 'row-span-1 min-h-[220px]';
-    if (rows === 2) rowClass = 'row-span-2 min-h-[460px]';
-    else if (rows >= 3) rowClass = 'row-span-3 min-h-[700px]';
-
-    return `${colClass} ${rowClass}`;
-  }
-
-  return 'col-span-1 row-span-1 min-h-[220px]';
-}
 

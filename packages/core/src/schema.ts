@@ -1,5 +1,5 @@
 import { relations, type InferSelectModel, type InferInsertModel } from 'drizzle-orm';
-import { pgTable, text, integer, boolean, timestamp } from 'drizzle-orm/pg-core';
+import { pgTable, text, integer, boolean, timestamp, doublePrecision } from 'drizzle-orm/pg-core';
 
 // ==========================================
 // 1. Tabla: users
@@ -126,6 +126,21 @@ export const orders = pgTable('orders', {
   customerEmail: text('customer_email'),
   itemsSummary: text('items_summary'), // Resumen legible
   itemsJson: text('items_json'), // Detalle estructurado de productos y modificadores
+  // --- Datos de contacto y envío ---
+  customerName: text('customer_name'),
+  customerPhone: text('customer_phone'), // 10 dígitos (México)
+  shippingStreet: text('shipping_street'),
+  shippingExtNumber: text('shipping_ext_number'),
+  shippingIntNumber: text('shipping_int_number'),
+  shippingNeighborhood: text('shipping_neighborhood'), // Colonia / asentamiento
+  shippingMunicipality: text('shipping_municipality'),
+  shippingCity: text('shipping_city'),
+  shippingState: text('shipping_state'),
+  shippingZip: text('shipping_zip'),
+  shippingReferences: text('shipping_references'), // Fachada, entre calles, etc.
+  shippingLat: doublePrecision('shipping_lat'),
+  shippingLng: doublePrecision('shipping_lng'),
+  locationSource: text('location_source'), // 'gps' | 'map' | 'zip'
   createdAt: timestamp('created_at').notNull().$defaultFn(() => new Date()),
 });
 

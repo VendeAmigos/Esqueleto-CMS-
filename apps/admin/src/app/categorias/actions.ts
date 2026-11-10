@@ -126,3 +126,22 @@ export async function deleteCategory(id: string) {
     return { success: false };
   }
 }
+
+export async function reorderCategories(orderedIds: string[]) {
+  await ensureSchema();
+  try {
+    for (let i = 0; i < orderedIds.length; i++) {
+      await db
+        .update(categories)
+        .set({ displayOrder: i })
+        .where(eq(categories.id, orderedIds[i]));
+    }
+    revalidatePath('/categorias');
+    revalidatePath('/');
+    return { success: true };
+  } catch (error: any) {
+    console.error('Error reordering categories:', error);
+    return { success: false, error: error.message };
+  }
+}
+

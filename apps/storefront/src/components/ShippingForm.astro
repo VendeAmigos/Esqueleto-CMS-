@@ -1,0 +1,550 @@
+---
+// apps/storefront/src/components/ShippingForm.astro
+// Formulario de datos de envío con:
+//  - Ubicación actual del dispositivo (GPS) + mapa de Google con pin arrastrable
+//  - Autollenado por Código Postal (SEPOMEX vía /api/postal-code/[cp])
+// La API key de Google Maps se lee en tiempo de ejecución (no se hornea en el build).
+const mapsKey = process.env.GOOGLE_MAPS_API_KEY?.trim() || '';
+const mapId = process.env.GOOGLE_MAPS_MAP_ID?.trim() || 'DEMO_MAP_ID';
+
+const inputCls =
+  'w-full rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 transition-colors focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/10';
+const labelCls = 'block text-xs font-semibold text-gray-700 mb-1.5';
+---
+
+<section
+  id="shipping-section"
+  class="rounded-2xl border border-gray-200/90 bg-white p-5 sm:p-6 shadow-sm"
+  data-maps-key={mapsKey}
+  data-map-id={mapId}
+>
+  <div class="flex items-start justify-between gap-4 border-b border-gray-100 pb-4">
+    <div>
+      <h2 class="text-lg font-bold text-gray-900 flex items-center gap-2">
+        <span class="inline-flex h-7 w-7 items-center justify-center rounded-full bg-gray-900 text-xs font-bold text-white">2</span>
+        Datos de envío
+      </h2>
+      <p class="mt-1 text-xs text-gray-500">¿A dónde llevamos tu pedido? Usa tu ubicación para que te encontremos más fácil.</p>
+    </div>
+  </div>
+
+  <!-- Contacto -->
+  <div class="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
+    <div data-field-wrap="fullName">
+      <label for="ship-fullName" class={labelCls}>Nombre completo de quien recibe *</label>
+      <input id="ship-fullName" data-ship-field="fullName" type="text" autocomplete="name" placeholder="Ej. María López Hernández" class={inputCls} />
+      <p class="field-error hidden mt-1 text-[11px] font-medium text-red-600"></p>
+    </div>
+    <div data-field-wrap="phone">
+      <label for="ship-phone" class={labelCls}>Teléfono / WhatsApp *</label>
+      <div class="flex">
+        <span class="inline-flex items-center rounded-l-xl border border-r-0 border-gray-200 bg-gray-50 px-3 text-sm font-medium text-gray-500">+52</span>
+        <input id="ship-phone" data-ship-field="phone" type="tel" inputmode="numeric" autocomplete="tel-national" maxlength="14" placeholder="10 dígitos" class={`${inputCls} rounded-l-none`} />
+      </div>
+      <p class="field-error hidden mt-1 text-[11px] font-medium text-red-600"></p>
+    </div>
+  </div>
+
+  <!-- Selector de método -->
+  <div class="mt-6">
+    <p class={labelCls}>¿Cómo quieres capturar tu dirección?</p>
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <button
+        type="button"
+        id="ship-use-location"
+        class="ship-mode-btn group flex items-start gap-3 rounded-2xl border-2 border-gray-200 bg-white p-4 text-left transition-all hover:border-gray-900 hover:shadow-sm"
+      >
+        <span class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600 transition-colors group-hover:bg-indigo-600 group-hover:text-white">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17.657 16.657L13.414 20.9a2 2 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+        </span>
+        <span>
+          <span class="block text-sm font-bold text-gray-900">Usar mi ubicación actual</span>
+          <span class="block text-xs text-gray-500 mt-0.5">Te ubicamos en el mapa y llenamos la dirección por ti.</span>
+        </span>
+      </button>
+      <button
+        type="button"
+        id="ship-use-zip"
+        class="ship-mode-btn group flex items-start gap-3 rounded-2xl border-2 border-gray-200 bg-white p-4 text-left transition-all hover:border-gray-900 hover:shadow-sm"
+      >
+        <span class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-600 transition-colors group-hover:bg-amber-500 group-hover:text-white">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+        </span>
+        <span>
+          <span class="block text-sm font-bold text-gray-900">Escribir mi código postal</span>
+          <span class="block text-xs text-gray-500 mt-0.5">Llenamos estado, municipio y colonias automáticamente.</span>
+        </span>
+      </button>
+    </div>
+    <p id="ship-location-status" class="hidden mt-3 rounded-xl px-3.5 py-2.5 text-xs font-medium"></p>
+  </div>
+
+  <!-- Mapa -->
+  <div id="ship-map-wrap" class="hidden mt-5">
+    <div class="relative overflow-hidden rounded-2xl border border-gray-200 bg-gray-100">
+      <div id="ship-map" class="h-72 w-full"></div>
+      <div class="pointer-events-none absolute left-3 top-3 rounded-full bg-white/95 px-3 py-1.5 text-[11px] font-semibold text-gray-800 shadow-sm backdrop-blur-sm">
+        ✋ Arrastra el pin hasta la puerta de tu casa
+      </div>
+    </div>
+    <div class="mt-2 flex flex-wrap items-center justify-between gap-2 text-[11px] text-gray-500">
+      <span id="ship-coords-label"></span>
+      <button type="button" id="ship-clear-location" class="font-semibold text-gray-500 hover:text-red-600 transition-colors">Quitar ubicación</button>
+    </div>
+  </div>
+
+  <!-- Dirección -->
+  <div id="ship-address-fields" class="mt-6 grid grid-cols-1 sm:grid-cols-6 gap-4">
+    <div class="sm:col-span-2" data-field-wrap="zip">
+      <label for="ship-zip" class={labelCls}>Código postal *</label>
+      <div class="relative">
+        <input id="ship-zip" data-ship-field="zip" type="text" inputmode="numeric" autocomplete="postal-code" maxlength="5" placeholder="Ej. 64000" class={`${inputCls} font-mono tracking-widest`} />
+        <svg id="ship-zip-spinner" class="hidden absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg>
+      </div>
+      <p id="ship-zip-msg" class="field-error hidden mt-1 text-[11px] font-medium text-red-600"></p>
+    </div>
+    <div class="sm:col-span-2" data-field-wrap="state">
+      <label for="ship-state" class={labelCls}>Estado *</label>
+      <input id="ship-state" data-ship-field="state" type="text" autocomplete="address-level1" class={inputCls} />
+      <p class="field-error hidden mt-1 text-[11px] font-medium text-red-600"></p>
+    </div>
+    <div class="sm:col-span-2" data-field-wrap="municipality">
+      <label for="ship-municipality" class={labelCls}>Municipio / Alcaldía *</label>
+      <input id="ship-municipality" data-ship-field="municipality" type="text" autocomplete="address-level2" class={inputCls} />
+      <p class="field-error hidden mt-1 text-[11px] font-medium text-red-600"></p>
+    </div>
+
+    <div class="sm:col-span-3" data-field-wrap="neighborhood">
+      <label for="ship-neighborhood-select" class={labelCls}>Colonia *</label>
+      <select id="ship-neighborhood-select" class={`${inputCls} hidden`}></select>
+      <input id="ship-neighborhood" data-ship-field="neighborhood" type="text" autocomplete="address-level3" placeholder="Escribe tu colonia" class={`${inputCls} mt-0`} />
+      <p class="field-error hidden mt-1 text-[11px] font-medium text-red-600"></p>
+    </div>
+    <div class="sm:col-span-3">
+      <label for="ship-city" class={labelCls}>Ciudad</label>
+      <input id="ship-city" data-ship-field="city" type="text" autocomplete="address-level2" class={inputCls} />
+    </div>
+
+    <div class="sm:col-span-4" data-field-wrap="street">
+      <label for="ship-street" class={labelCls}>Calle *</label>
+      <input id="ship-street" data-ship-field="street" type="text" autocomplete="address-line1" placeholder="Ej. Av. Constitución" class={inputCls} />
+      <p class="field-error hidden mt-1 text-[11px] font-medium text-red-600"></p>
+    </div>
+    <div class="sm:col-span-1" data-field-wrap="extNumber">
+      <label for="ship-extNumber" class={labelCls}>No. ext *</label>
+      <input id="ship-extNumber" data-ship-field="extNumber" type="text" placeholder="123" class={inputCls} />
+      <p class="field-error hidden mt-1 text-[11px] font-medium text-red-600"></p>
+    </div>
+    <div class="sm:col-span-1">
+      <label for="ship-intNumber" class={labelCls}>No. int</label>
+      <input id="ship-intNumber" data-ship-field="intNumber" type="text" placeholder="4B" class={inputCls} />
+    </div>
+
+    <div class="sm:col-span-6">
+      <label for="ship-references" class={labelCls}>Referencias para encontrar tu casa</label>
+      <textarea id="ship-references" data-ship-field="references" rows="2" maxlength="500" placeholder="Ej. Casa blanca con portón negro, entre calle Juárez y Morelos, frente a la tienda" class={`${inputCls} resize-none`}></textarea>
+    </div>
+  </div>
+
+  <button
+    type="button"
+    id="ship-locate-address"
+    class="hidden mt-4 inline-flex items-center gap-2 rounded-xl border border-dashed border-gray-300 px-4 py-2.5 text-xs font-semibold text-gray-700 transition-colors hover:border-gray-900 hover:text-gray-900"
+  >
+    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" /></svg>
+    Marcar mi casa en el mapa (opcional)
+  </button>
+</section>
+
+<script>
+  import { $shipping, updateShipping, type ShippingData } from '../store/shipping';
+
+  type Field = keyof ShippingData;
+  const TEXT_FIELDS: Field[] = [
+    'fullName', 'phone', 'street', 'extNumber', 'intNumber',
+    'neighborhood', 'municipality', 'city', 'state', 'zip', 'references',
+  ];
+
+  declare global {
+    interface Window {
+      google?: any;
+      __gmapsLoading?: Promise<any>;
+      __initGMaps?: () => void;
+    }
+  }
+
+  function initShippingForm(): void {
+    const section = document.getElementById('shipping-section');
+    if (!section || section.dataset.initialized === 'true') return;
+    section.dataset.initialized = 'true';
+
+    const mapsKey = section.dataset.mapsKey || '';
+    const mapId = section.dataset.mapId || 'DEMO_MAP_ID';
+
+    const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T | null;
+    const statusEl = $('ship-location-status');
+    const mapWrap = $('ship-map-wrap');
+    const mapEl = $('ship-map');
+    const coordsLabel = $('ship-coords-label');
+    const zipSpinner = $('ship-zip-spinner');
+    const zipMsg = $('ship-zip-msg');
+    const coloniaSelect = $<HTMLSelectElement>('ship-neighborhood-select');
+    const coloniaInput = $<HTMLInputElement>('ship-neighborhood');
+    const locateAddressBtn = $('ship-locate-address');
+    const useLocationBtn = $('ship-use-location');
+    const useZipBtn = $('ship-use-zip');
+
+    // ---------- Utilidades UI ----------
+    const setStatus = (msg: string, kind: 'info' | 'ok' | 'error' = 'info') => {
+      if (!statusEl) return;
+      if (!msg) { statusEl.classList.add('hidden'); return; }
+      const styles = {
+        info: 'bg-indigo-50 text-indigo-800 border border-indigo-100',
+        ok: 'bg-emerald-50 text-emerald-800 border border-emerald-100',
+        error: 'bg-red-50 text-red-700 border border-red-100',
+      };
+      statusEl.className = `mt-3 rounded-xl px-3.5 py-2.5 text-xs font-medium ${styles[kind]}`;
+      statusEl.textContent = msg;
+    };
+
+    const setActiveMode = (mode: 'gps' | 'zip') => {
+      [useLocationBtn, useZipBtn].forEach((b) => b?.classList.remove('border-gray-900', 'bg-gray-50', 'shadow-sm'));
+      const active = mode === 'gps' ? useLocationBtn : useZipBtn;
+      active?.classList.add('border-gray-900', 'bg-gray-50', 'shadow-sm');
+    };
+
+    const getInput = (f: Field) => document.getElementById(`ship-${f}`) as HTMLInputElement | HTMLTextAreaElement | null;
+
+    const setField = (f: Field, value: string) => {
+      const el = getInput(f);
+      if (el) el.value = value;
+      clearFieldError(f);
+      updateShipping({ [f]: value } as Partial<ShippingData>);
+    };
+
+    const clearFieldError = (f: Field) => {
+      const wrap = section.querySelector(`[data-field-wrap="${f}"]`);
+      wrap?.querySelectorAll('input, select').forEach((i) => i.classList.remove('border-red-400', 'ring-2', 'ring-red-100'));
+      const err = wrap?.querySelector('.field-error');
+      if (err && f !== 'zip') err.classList.add('hidden');
+    };
+
+    // ---------- Hidratar desde localStorage ----------
+    const saved = $shipping.get();
+    TEXT_FIELDS.forEach((f) => {
+      const el = getInput(f);
+      if (el && typeof saved[f] === 'string') el.value = saved[f] as string;
+      el?.addEventListener('input', () => {
+        let v = el.value;
+        if (f === 'zip') { v = v.replace(/\D/g, '').slice(0, 5); el.value = v; }
+        if (f === 'phone') { v = v.replace(/[^\d\s-]/g, ''); el.value = v; }
+        updateShipping({ [f]: v } as Partial<ShippingData>);
+        clearFieldError(f);
+        if (f === 'zip') onZipInput(v);
+        refreshLocateBtn();
+      });
+    });
+
+    // ---------- Colonias ----------
+    const OTHER = '__other__';
+    const renderColonias = (colonias: string[], preferred?: string) => {
+      if (!coloniaSelect || !coloniaInput) return;
+      coloniaSelect.innerHTML = '';
+      if (!colonias.length) {
+        coloniaSelect.classList.add('hidden');
+        coloniaInput.classList.remove('hidden');
+        return;
+      }
+      const ph = document.createElement('option');
+      ph.value = ''; ph.textContent = `Selecciona tu colonia (${colonias.length})`;
+      coloniaSelect.appendChild(ph);
+      colonias.forEach((c) => {
+        const o = document.createElement('option');
+        o.value = c; o.textContent = c;
+        coloniaSelect.appendChild(o);
+      });
+      const other = document.createElement('option');
+      other.value = OTHER; other.textContent = 'Mi colonia no aparece…';
+      coloniaSelect.appendChild(other);
+
+      coloniaSelect.classList.remove('hidden');
+      const current = (preferred ?? coloniaInput.value).trim();
+      const match = colonias.find((c) => normalize(c) === normalize(current))
+        || colonias.find((c) => current && (normalize(c).includes(normalize(current)) || normalize(current).includes(normalize(c))));
+
+      if (match) {
+        coloniaSelect.value = match;
+        coloniaInput.classList.add('hidden');
+        setField('neighborhood', match);
+      } else if (current) {
+        coloniaSelect.value = OTHER;
+        coloniaInput.classList.remove('hidden');
+      } else if (colonias.length === 1) {
+        coloniaSelect.value = colonias[0];
+        coloniaInput.classList.add('hidden');
+        setField('neighborhood', colonias[0]);
+      } else {
+        coloniaSelect.value = '';
+        coloniaInput.classList.add('hidden');
+      }
+    };
+
+    coloniaSelect?.addEventListener('change', () => {
+      if (!coloniaInput) return;
+      if (coloniaSelect.value === OTHER) {
+        coloniaInput.classList.remove('hidden');
+        setField('neighborhood', '');
+        coloniaInput.focus();
+      } else {
+        coloniaInput.classList.add('hidden');
+        setField('neighborhood', coloniaSelect.value);
+      }
+    });
+
+    const normalize = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+
+    // ---------- Código Postal ----------
+    let zipTimer: number | undefined;
+    let lastZipLooked = '';
+
+    const onZipInput = (zip: string) => {
+      window.clearTimeout(zipTimer);
+      if (zipMsg) zipMsg.classList.add('hidden');
+      if (zip.length === 5) zipTimer = window.setTimeout(() => lookupZip(zip), 250);
+    };
+
+    async function lookupZip(zip: string, preferredColonia?: string): Promise<void> {
+      if (!/^\d{5}$/.test(zip) || zip === lastZipLooked) return;
+      lastZipLooked = zip;
+      zipSpinner?.classList.remove('hidden');
+      try {
+        const res = await fetch(`/api/postal-code/${zip}`);
+        const data = await res.json();
+        if (!res.ok) throw new Error(data?.error || 'Código postal no encontrado');
+
+        if (data.estado) setField('state', data.estado);
+        if (data.municipio) setField('municipality', data.municipio);
+        if (data.ciudad) setField('city', data.ciudad);
+        renderColonias(data.colonias || [], preferredColonia);
+        if (zipMsg) {
+          zipMsg.className = 'mt-1 text-[11px] font-medium text-emerald-600';
+          zipMsg.textContent = `✓ ${data.municipio}, ${data.estado}`;
+        }
+      } catch (e: any) {
+        lastZipLooked = '';
+        renderColonias([]);
+        if (zipMsg) {
+          zipMsg.className = 'field-error mt-1 text-[11px] font-medium text-amber-600';
+          zipMsg.textContent = `${e.message}. Puedes escribir los datos manualmente.`;
+        }
+      } finally {
+        zipSpinner?.classList.add('hidden');
+      }
+    }
+
+    // ---------- Google Maps ----------
+    let map: any = null;
+    let marker: any = null;
+    let geocoder: any = null;
+
+    function loadGoogleMaps(): Promise<any> {
+      if (window.google?.maps?.Map) return Promise.resolve(window.google);
+      if (window.__gmapsLoading) return window.__gmapsLoading;
+      if (!mapsKey) return Promise.reject(new Error('NO_KEY'));
+
+      window.__gmapsLoading = new Promise((resolve, reject) => {
+        window.__initGMaps = () => resolve(window.google);
+        const s = document.createElement('script');
+        s.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(mapsKey)}&v=weekly&libraries=marker,geocoding&language=es&region=MX&loading=async&callback=__initGMaps`;
+        s.async = true;
+        s.onerror = () => { window.__gmapsLoading = undefined; reject(new Error('LOAD_FAILED')); };
+        document.head.appendChild(s);
+      });
+      return window.__gmapsLoading;
+    }
+
+    async function showMap(lat: number, lng: number, zoom = 18): Promise<boolean> {
+      try {
+        const google = await loadGoogleMaps();
+        mapWrap?.classList.remove('hidden');
+        const pos = { lat, lng };
+        if (!map) {
+          const { Map } = await google.maps.importLibrary('maps');
+          const { AdvancedMarkerElement } = await google.maps.importLibrary('marker');
+          const { Geocoder } = await google.maps.importLibrary('geocoding');
+          geocoder = new Geocoder();
+          map = new Map(mapEl, {
+            center: pos,
+            zoom,
+            mapId,
+            disableDefaultUI: true,
+            zoomControl: true,
+            fullscreenControl: true,
+            gestureHandling: 'cooperative',
+            clickableIcons: false,
+          });
+          marker = new AdvancedMarkerElement({ map, position: pos, gmpDraggable: true, title: 'Tu casa' });
+          marker.addListener('dragend', () => {
+            const p = marker.position;
+            const nlat = typeof p.lat === 'function' ? p.lat() : p.lat;
+            const nlng = typeof p.lng === 'function' ? p.lng() : p.lng;
+            setCoords(nlat, nlng, 'map');
+            setStatus('📍 Ubicación ajustada. ¡Gracias! Así el repartidor llega directo.', 'ok');
+          });
+          map.addListener('click', (ev: any) => {
+            if (!ev.latLng) return;
+            marker.position = ev.latLng;
+            setCoords(ev.latLng.lat(), ev.latLng.lng(), 'map');
+          });
+        } else {
+          map.setCenter(pos);
+          map.setZoom(zoom);
+          marker.position = pos;
+        }
+        return true;
+      } catch (e: any) {
+        if (e?.message === 'NO_KEY') {
+          setStatus('Guardamos tus coordenadas, pero el mapa no está disponible por ahora. Completa tu dirección abajo.', 'info');
+        } else {
+          setStatus('No se pudo cargar el mapa. Guardamos tus coordenadas; completa tu dirección abajo.', 'error');
+        }
+        return false;
+      }
+    }
+
+    function setCoords(lat: number, lng: number, source: 'gps' | 'map') {
+      updateShipping({ lat: Number(lat.toFixed(7)), lng: Number(lng.toFixed(7)), locationSource: source });
+      if (coordsLabel) coordsLabel.textContent = `📌 ${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+      refreshLocateBtn();
+    }
+
+    function clearCoords() {
+      updateShipping({ lat: null, lng: null, locationSource: 'zip' });
+      mapWrap?.classList.add('hidden');
+      setStatus('');
+      refreshLocateBtn();
+    }
+
+    $('ship-clear-location')?.addEventListener('click', clearCoords);
+
+    async function reverseGeocode(lat: number, lng: number) {
+      if (!geocoder) return;
+      try {
+        const { results } = await geocoder.geocode({ location: { lat, lng } });
+        const best = results?.find((r: any) => r.types.includes('street_address') || r.types.includes('premise'))
+          || results?.[0];
+        if (!best) return;
+        const get = (type: string) => best.address_components.find((c: any) => c.types.includes(type))?.long_name || '';
+
+        const street = get('route');
+        const number = get('street_number');
+        const zip = get('postal_code');
+        const colonia = get('sublocality_level_1') || get('neighborhood') || get('sublocality');
+        const locality = get('locality');
+        const municipality = get('administrative_area_level_2') || locality;
+        const state = get('administrative_area_level_1');
+
+        if (street) setField('street', street);
+        if (number) setField('extNumber', number);
+        if (state) setField('state', state);
+        if (municipality) setField('municipality', municipality);
+        if (locality) setField('city', locality);
+        if (colonia) setField('neighborhood', colonia);
+        if (zip) {
+          setField('zip', zip);
+          lastZipLooked = '';
+          await lookupZip(zip, colonia);
+        }
+      } catch (e) {
+        console.warn('Reverse geocoding falló:', e);
+      }
+    }
+
+    // ---------- Modo: Ubicación actual ----------
+    useLocationBtn?.addEventListener('click', () => {
+      setActiveMode('gps');
+      if (!('geolocation' in navigator)) {
+        setStatus('Tu navegador no permite obtener la ubicación. Escribe tu código postal.', 'error');
+        setActiveMode('zip');
+        return;
+      }
+      setStatus('Buscando tu ubicación… acepta el permiso del navegador.', 'info');
+      navigator.geolocation.getCurrentPosition(
+        async (pos) => {
+          const { latitude, longitude, accuracy } = pos.coords;
+          setCoords(latitude, longitude, 'gps');
+          const ok = await showMap(latitude, longitude);
+          if (ok) {
+            const acc = Math.round(accuracy);
+            setStatus(
+              acc > 60
+                ? `Te ubicamos con precisión aproximada de ±${acc} m. Arrastra el pin hasta tu puerta y revisa la dirección.`
+                : '¡Listo! Te ubicamos. Revisa que la dirección y el pin sean correctos.',
+              acc > 60 ? 'info' : 'ok'
+            );
+            await reverseGeocode(latitude, longitude);
+          }
+        },
+        (err) => {
+          const msg = err.code === err.PERMISSION_DENIED
+            ? 'No diste permiso de ubicación. No pasa nada: escribe tu código postal abajo.'
+            : 'No pudimos obtener tu ubicación. Escribe tu código postal abajo.';
+          setStatus(msg, 'error');
+          setActiveMode('zip');
+          getInput('zip')?.focus();
+        },
+        { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 }
+      );
+    });
+
+    // ---------- Modo: Código postal ----------
+    useZipBtn?.addEventListener('click', () => {
+      setActiveMode('zip');
+      setStatus('');
+      const zipEl = getInput('zip');
+      zipEl?.focus();
+      zipEl?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
+
+    // ---------- Ubicar dirección escrita en el mapa (opcional) ----------
+    const refreshLocateBtn = () => {
+      const s = $shipping.get();
+      const hasAddress = s.street.trim() && /^\d{5}$/.test(s.zip);
+      const hasCoords = s.lat != null && s.lng != null;
+      locateAddressBtn?.classList.toggle('hidden', !mapsKey || !hasAddress || hasCoords);
+    };
+
+    locateAddressBtn?.addEventListener('click', async () => {
+      const s = $shipping.get();
+      const query = [
+        `${s.street} ${s.extNumber}`.trim(), s.neighborhood, `${s.zip} ${s.municipality}`.trim(), s.state, 'México',
+      ].filter(Boolean).join(', ');
+      setStatus('Buscando tu dirección en el mapa…', 'info');
+      try {
+        await loadGoogleMaps();
+        const { Geocoder } = await window.google.maps.importLibrary('geocoding');
+        geocoder = geocoder || new Geocoder();
+        const { results } = await geocoder.geocode({ address: query, region: 'MX' });
+        const loc = results?.[0]?.geometry?.location;
+        if (!loc) throw new Error('not found');
+        setCoords(loc.lat(), loc.lng(), 'map');
+        await showMap(loc.lat(), loc.lng(), 17);
+        setStatus('Encontramos tu dirección. Arrastra el pin exactamente a tu puerta.', 'ok');
+      } catch {
+        setStatus('No encontramos esa dirección en el mapa. Revisa la calle y el código postal.', 'error');
+      }
+    });
+
+    // ---------- Restaurar estado previo ----------
+    if (saved.zip && /^\d{5}$/.test(saved.zip)) lookupZip(saved.zip, saved.neighborhood);
+    if (saved.lat != null && saved.lng != null && mapsKey) {
+      if (coordsLabel) coordsLabel.textContent = `📌 ${saved.lat.toFixed(6)}, ${saved.lng.toFixed(6)}`;
+      setActiveMode('gps');
+      showMap(saved.lat, saved.lng);
+    }
+    refreshLocateBtn();
+  }
+
+  initShippingForm();
+  document.addEventListener('astro:page-load', initShippingForm);
+</script>

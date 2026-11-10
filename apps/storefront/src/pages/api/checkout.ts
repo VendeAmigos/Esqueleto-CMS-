@@ -15,14 +15,88 @@ interface CheckoutItemPayload {
   }[];
 }
 
+interface ShippingPayload {
+  fullName?: string;
+  phone?: string;
+  street?: string;
+  extNumber?: string;
+  intNumber?: string;
+  neighborhood?: string;
+  municipality?: string;
+  city?: string;
+  state?: string;
+  zip?: string;
+  references?: string;
+  lat?: number | null;
+  lng?: number | null;
+  locationSource?: string;
+}
+
+const clean = (v: unknown, max = 200): string =>
+  typeof v === 'string' ? v.trim().replace(/\s+/g, ' ').slice(0, max) : '';
+
+/** Valida y normaliza los datos de envío. Lanza Error con mensaje legible si falta algo. */
+function validateShipping(raw: ShippingPayload | undefined) {
+  if (!raw) throw new Error('Faltan los datos de envío');
+
+  const phoneDigits = clean(raw.phone, 30).replace(/\D/g, '').replace(/^52(?=\d{10}$)/, '');
+  const data = {
+    customerName: clean(raw.fullName, 120),
+    customerPhone: phoneDigits,
+    shippingStreet: clean(raw.street),
+    shippingExtNumber: clean(raw.extNumber, 20),
+    shippingIntNumber: clean(raw.intNumber, 20) || null,
+    shippingNeighborhood: clean(raw.neighborhood),
+    shippingMunicipality: clean(raw.municipality),
+    shippingCity: clean(raw.city) || null,
+    shippingState: clean(raw.state, 80),
+    shippingZip: clean(raw.zip, 5),
+    shippingReferences: clean(raw.references, 500) || null,
+    shippingLat: null as number | null,
+    shippingLng: null as number | null,
+    locationSource: 'zip' as string,
+  };
+
+  const missing: string[] = [];
+  if (data.customerName.length < 3) missing.push('nombre completo');
+  if (!/^\d{10}$/.test(data.customerPhone)) missing.push('teléfono a 10 dígitos');
+  if (!data.shippingStreet) missing.push('calle');
+  if (!data.shippingExtNumber) missing.push('número exterior');
+  if (!data.shippingNeighborhood) missing.push('colonia');
+  if (!/^\d{5}$/.test(data.shippingZip)) missing.push('código postal');
+  if (!data.shippingMunicipality) missing.push('municipio');
+  if (!data.shippingState) missing.push('estado');
+  if (missing.length) {
+    throw new Error(`Completa los datos de envío: ${missing.join(', ')}`);
+  }
+
+  const lat = Number(raw.lat);
+  const lng = Number(raw.lng);
+  // Coordenadas válidas y dentro (aprox.) de México
+  if (
+    raw.lat != null && raw.lng != null &&
+    Number.isFinite(lat) && Number.isFinite(lng) &&
+    lat >= 14 && lat <= 33.5 && lng >= -118.5 && lng <= -86
+  ) {
+    data.shippingLat = lat;
+    data.shippingLng = lng;
+    data.locationSource = raw.locationSource === 'gps' ? 'gps' : 'map';
+  }
+
+  return data;
+}
+
+class ValidationError extends Error {}
+
 export const POST: APIRoute = async ({ request, url }) => {
   try {
     await ensureSchema().catch(() => {});
 
-    const { items, customerEmail, discountCode } = (await request.json()) as {
+    const { items, customerEmail, discountCode, shipping: shippingRaw } = (await request.json()) as {
       items: CheckoutItemPayload[];
       customerEmail?: string;
       discountCode?: string;
+      shipping?: ShippingPayload;
     };
 
     if (!items || items.length === 0) {
@@ -30,6 +104,13 @@ export const POST: APIRoute = async ({ request, url }) => {
         status: 400,
         headers: { 'Content-Type': 'application/json' },
       });
+    }
+
+    let shipping: ReturnType<typeof validateShipping>;
+    try {
+      shipping = validateShipping(shippingRaw);
+    } catch (e: any) {
+      throw new ValidationError(e.message);
     }
 
     const itemIds = Array.from(new Set(items.map((item) => item.id)));
@@ -153,6 +234,7 @@ export const POST: APIRoute = async ({ request, url }) => {
         customerEmail: customerEmail || null,
         itemsSummary: itemsSummaryList.join(' | '),
         itemsJson: JSON.stringify(items),
+        ...shipping,
       });
 
       const client = new MercadoPagoConfig({ accessToken: rawMpToken });
@@ -176,7 +258,16 @@ export const POST: APIRoute = async ({ request, url }) => {
         body: {
           items: mpItems,
           external_reference: orderId,
-          payer: customerEmail ? { email: customerEmail } : undefined,
+          payer: {
+            ...(customerEmail ? { email: customerEmail } : {}),
+            name: shipping.customerName,
+            phone: { area_code: '52', number: shipping.customerPhone },
+            address: {
+              zip_code: shipping.shippingZip,
+              street_name: shipping.shippingStreet,
+              street_number: shipping.shippingExtNumber,
+            },
+          },
           back_urls: {
             success: `${url.origin}/orden-confirmada?order_id=${orderId}&status=approved`,
             failure: `${url.origin}/carrito?status=failure`,
@@ -214,6 +305,7 @@ export const POST: APIRoute = async ({ request, url }) => {
         customerEmail: customerEmail || 'cliente-prueba@afotica.com',
         itemsSummary: itemsSummaryList.join(' | '),
         itemsJson: JSON.stringify(items),
+        ...shipping,
       });
 
       return new Response(
@@ -233,7 +325,7 @@ export const POST: APIRoute = async ({ request, url }) => {
     return new Response(
       JSON.stringify({ error: error.message || 'Error procesando el pago' }),
       {
-        status: 500,
+        status: error instanceof ValidationError ? 400 : 500,
         headers: { 'Content-Type': 'application/json' },
       }
     );

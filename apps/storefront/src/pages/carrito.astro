@@ -1,6 +1,7 @@
 ---
 // apps/storefront/src/pages/carrito.astro
 import Layout from '../layouts/Layout.astro';
+import ShippingForm from '../components/ShippingForm.astro';
 ---
 
 <Layout
@@ -32,6 +33,11 @@ import Layout from '../layouts/Layout.astro';
             </svg>
             <span>Cargando artículos...</span>
           </div>
+        </div>
+
+        <!-- Sección de Datos de Envío y Ubicación -->
+        <div class="mt-8">
+          <ShippingForm />
         </div>
       </section>
 
@@ -163,6 +169,7 @@ import Layout from '../layouts/Layout.astro';
 
 <script>
   import { $cart, removeItem, updateQuantity } from '../store/cart';
+  import { $shipping, getShippingErrors } from '../store/shipping';
 
   const currencyFormatter = new Intl.NumberFormat('es-MX', {
     style: 'currency',
@@ -382,7 +389,13 @@ import Layout from '../layouts/Layout.astro';
     renderCart();
   });
 
-  document.addEventListener('astro:page-load', () => {
+  // Nota: el sitio no usa <ClientRouter />, así que 'astro:page-load' no se dispara.
+  // Se inicializa directamente y también en page-load (por si se agregan View Transitions).
+  function initCartPage(): void {
+    const root = document.getElementById('checkout-btn');
+    if (!root || root.dataset.initialized === 'true') return;
+    root.dataset.initialized = 'true';
+
     renderCart();
 
     // 1. Manejo de Cupón de Descuento
@@ -485,6 +498,21 @@ import Layout from '../layouts/Layout.astro';
         const cartItems = $cart.get();
         if (cartItems.length === 0) return;
 
+        // 1. Validar datos de envío obligatorios
+        const shippingData = $shipping.get();
+        const errors = getShippingErrors(shippingData);
+        if (errors.length > 0) {
+          const first = errors[0];
+          alert(`⚠️ Datos de envío incompletos: ${first.message}`);
+          const targetInput = document.getElementById(`ship-${first.field}`);
+          if (targetInput) {
+            targetInput.focus();
+            targetInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            targetInput.classList.add('border-red-400', 'ring-2', 'ring-red-100');
+          }
+          return;
+        }
+
         const emailInput = document.getElementById('customer-email') as HTMLInputElement | null;
         const customerEmail = emailInput?.value?.trim() || '';
 
@@ -508,6 +536,7 @@ import Layout from '../layouts/Layout.astro';
               items: cartItems,
               customerEmail,
               discountCode: activeCoupon ? activeCoupon.code : undefined,
+              shipping: shippingData,
             }),
           });
 
@@ -527,5 +556,8 @@ import Layout from '../layouts/Layout.astro';
         }
       });
     }
-  });
+  }
+
+  initCartPage();
+  document.addEventListener('astro:page-load', initCartPage);
 </script>

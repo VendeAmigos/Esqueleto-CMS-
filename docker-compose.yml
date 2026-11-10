@@ -37,6 +37,8 @@ services:
     env_file:
       - path: .env
         required: false
+    ports:
+      - "4321:4321"
     volumes:
       - ./uploads:/app/uploads
     networks:
@@ -59,6 +61,8 @@ services:
     env_file:
       - path: .env
         required: false
+    ports:
+      - "3001:3001"
     volumes:
       - ./uploads:/app/uploads
     networks:

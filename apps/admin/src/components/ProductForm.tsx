@@ -325,11 +325,14 @@ export default function ProductForm({ categories, initialData, isEdit = false }:
 
   return (
     <form onSubmit={handleSubmit} className="space-y-8">
-      {/* 1. Datos Principales del Producto */}
-      <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm space-y-5">
-        <h2 className="text-lg font-bold text-gray-900 border-b border-gray-100 pb-3">
-          Información Básica
-        </h2>
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+        {/* Columna Izquierda: Formulario de Edición */}
+        <div className="lg:col-span-7 xl:col-span-8 space-y-8">
+          {/* 1. Datos Principales del Producto */}
+          <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm space-y-5">
+            <h2 className="text-lg font-bold text-gray-900 border-b border-gray-100 pb-3">
+              Información Básica
+            </h2>
 
         <div>
           <label htmlFor="title" className="block text-sm font-semibold text-gray-700">
