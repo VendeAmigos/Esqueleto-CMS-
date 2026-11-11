@@ -1,10 +1,8 @@
 import type { APIRoute } from 'astro';
-import { db, discountCodes, eq, ensureSchema } from '@esqueleto/core';
+import { db, discountCodes, eq, isDatabaseAvailable, markDatabaseOffline } from '@esqueleto/core';
 
 export const POST: APIRoute = async ({ request }) => {
   try {
-    await ensureSchema().catch(() => {});
-
     const body = await request.json();
     const rawCode = (body.code || '').trim().toUpperCase();
     const cartSubtotal = parseInt(body.cartSubtotal || '0', 10); // En centavos
@@ -23,22 +21,39 @@ export const POST: APIRoute = async ({ request }) => {
       );
     }
 
-    // 1. Buscar el cupón en PostgreSQL
-    const results = await db
-      .select()
-      .from(discountCodes)
-      .where(eq(discountCodes.code, rawCode))
-      .limit(1)
-      .execute();
+    // 1. Buscar el cupón en PostgreSQL o en el catálogo local de respaldo
+    let coupon: any = null;
+    if (await isDatabaseAvailable()) {
+      try {
+        const results = await db
+          .select()
+          .from(discountCodes)
+          .where(eq(discountCodes.code, rawCode))
+          .limit(1)
+          .execute();
+        if (results && results.length > 0) {
+          coupon = results[0];
+        }
+      } catch {
+        markDatabaseOffline();
+      }
+    }
 
-    if (!results || results.length === 0) {
+    if (!coupon) {
+      const defaultCoupons: Record<string, any> = {
+        ARTE10: { id: 'disc-01', code: 'ARTE10', description: '10% de descuento de bienvenida', discountType: 'percentage', discountValue: 10, minPurchase: 0, maxDiscount: null, usageLimit: 500, usedCount: 0, isActive: true, expiresAt: null },
+        PRINTS20: { id: 'disc-02', code: 'PRINTS20', description: '20% de descuento en pedidos mayores a $300 MXN', discountType: 'percentage', discountValue: 20, minPurchase: 30000, maxDiscount: 15000, usageLimit: 200, usedCount: 0, isActive: true, expiresAt: null },
+        REGALO50: { id: 'disc-03', code: 'REGALO50', description: '$50 MXN de regalo directo en compras mayores a $250 MXN', discountType: 'fixed', discountValue: 5000, minPurchase: 25000, maxDiscount: null, usageLimit: 100, usedCount: 0, isActive: true, expiresAt: null },
+      };
+      coupon = defaultCoupons[rawCode] || null;
+    }
+
+    if (!coupon) {
       return new Response(
         JSON.stringify({ valid: false, error: `El código "${rawCode}" no es válido` }),
         { status: 404, headers: { 'Content-Type': 'application/json' } }
       );
     }
-
-    const coupon = results[0];
 
     // 2. Validar estado activo
     if (!coupon.isActive) {

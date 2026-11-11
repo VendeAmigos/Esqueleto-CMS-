@@ -130,8 +130,12 @@ export async function ensureSchema(): Promise<void> {
           hero_image_url TEXT DEFAULT 'https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?w=1600&auto=format&fit=crop&q=80',
           hero_cta_text TEXT NOT NULL DEFAULT 'Explorar Tienda de Arte',
           hero_cta_link TEXT NOT NULL DEFAULT '/catalogo',
+          heading_font TEXT NOT NULL DEFAULT 'Plus Jakarta Sans',
+          body_font TEXT NOT NULL DEFAULT 'Inter',
           updated_at TIMESTAMP NOT NULL DEFAULT NOW()
         );`,
+        `ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS heading_font TEXT NOT NULL DEFAULT 'Plus Jakarta Sans';`,
+        `ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS body_font TEXT NOT NULL DEFAULT 'Inter';`,
         `INSERT INTO site_settings (id, site_name, logo_color, hero_title, hero_subtitle, hero_image_url, hero_cta_text, hero_cta_link)
          VALUES (
            'default',
@@ -173,6 +177,20 @@ export async function ensureSchema(): Promise<void> {
         `ALTER TABLE orders ADD COLUMN IF NOT EXISTS shipping_lat DOUBLE PRECISION;`,
         `ALTER TABLE orders ADD COLUMN IF NOT EXISTS shipping_lng DOUBLE PRECISION;`,
         `ALTER TABLE orders ADD COLUMN IF NOT EXISTS location_source TEXT;`,
+        `ALTER TABLE orders ADD COLUMN IF NOT EXISTS mp_preference_id TEXT;`,
+        `ALTER TABLE orders ADD COLUMN IF NOT EXISTS mp_payment_id TEXT;`,
+        `CREATE TABLE IF NOT EXISTS payment_settings (
+          id TEXT PRIMARY KEY DEFAULT 'default',
+          mp_enabled BOOLEAN NOT NULL DEFAULT false,
+          mp_mode TEXT NOT NULL DEFAULT 'production',
+          mp_public_key TEXT,
+          mp_access_token TEXT,
+          mp_webhook_secret TEXT,
+          storefront_url TEXT,
+          statement_descriptor TEXT NOT NULL DEFAULT 'TIENDA ONLINE',
+          binary_mode BOOLEAN NOT NULL DEFAULT false,
+          updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+        );`,
         `CREATE TABLE IF NOT EXISTS discount_codes (
           id TEXT PRIMARY KEY,
           code TEXT NOT NULL UNIQUE,
@@ -254,5 +272,6 @@ export async function ensureSchema(): Promise<void> {
 
 export * from './schema';
 export * from './categoriesStore';
+export * from './paymentStore';
 export { eq, ne, gt, gte, lt, lte, and, or, not, sql, desc, asc, inArray, isNull, isNotNull } from 'drizzle-orm';
 

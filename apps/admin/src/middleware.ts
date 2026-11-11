@@ -4,11 +4,11 @@ import { verifySessionToken, verifyCredentials, SESSION_COOKIE_NAME } from '@/li
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
-  // 1. Excluir rutas públicas, APIs internas y recursos estáticos
+  // 1. Excluir rutas públicas estáticas y healthcheck de Docker (NUNCA excluir /api/upload)
   if (
     pathname.startsWith('/_next') ||
-    pathname.startsWith('/api/upload') ||
     pathname.startsWith('/uploads') ||
+    pathname === '/api/health' ||
     pathname === '/favicon.ico'
   ) {
     return NextResponse.next();

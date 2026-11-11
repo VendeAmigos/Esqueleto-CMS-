@@ -62,7 +62,7 @@ function findFirstAvailableSlot(
   totalRows: number
 ): { colStart: number; rowStart: number } {
   const clampedColSpan = Math.min(Math.max(colSpan, 1), totalCols);
-  for (let r = 1; r <= Math.max(totalRows, 20); r++) {
+  for (let r = 1; r <= Math.max(totalRows, 24); r++) {
     for (let c = 1; c <= totalCols - clampedColSpan + 1; c++) {
       const candidate: GridRect = {
         colStart: c,
@@ -78,6 +78,87 @@ function findFirstAvailableSlot(
   return { colStart: 1, rowStart: 1 };
 }
 
+/**
+ * Reacomoda automáticamente los bloques que colisionen cuando el usuario mueve o
+ * redimensiona libremente un bloque `pinned`, priorizando el intercambio (swap)
+ * hacia la posición anterior del bloque movido.
+ */
+function resolveCollisionsAndReflow(
+  allItems: PlacedCategory[],
+  pinned: PlacedCategory,
+  previousRect: GridRect,
+  totalCols: number,
+  totalRows: number
+): PlacedCategory[] {
+  const placedResult: PlacedCategory[] = [
+    {
+      ...pinned,
+      gridSpan: formatGridSpan(
+        pinned.colSpan,
+        pinned.rowSpan,
+        pinned.colStart,
+        pinned.rowStart,
+        totalCols,
+        totalRows
+      ),
+    },
+  ];
+
+  const othersPlaced = allItems.filter((i) => i.isPlaced && i.id !== pinned.id);
+
+  // Primero mantenemos fijos los que NO chocan con la nueva posición de `pinned`
+  const nonColliding: PlacedCategory[] = [];
+  const colliding: PlacedCategory[] = [];
+
+  for (const item of othersPlaced) {
+    if (rectsOverlap(pinned, item)) {
+      colliding.push(item);
+    } else {
+      nonColliding.push(item);
+      placedResult.push(item);
+    }
+  }
+
+  // Para los bloques que sí chocaron, intentamos primero colocarlos en el hueco anterior (swap)
+  for (const item of colliding) {
+    const colSpan = Math.min(Math.max(item.colSpan, 1), totalCols);
+    const rowSpan = Math.min(Math.max(item.rowSpan, 1), Math.max(totalRows, 12));
+
+    const swapColStart = Math.min(Math.max(previousRect.colStart, 1), totalCols - colSpan + 1);
+    const swapRowStart = Math.max(previousRect.rowStart, 1);
+    const swapCandidate: GridRect = {
+      colStart: swapColStart,
+      rowStart: swapRowStart,
+      colSpan,
+      rowSpan,
+    };
+
+    if (!placedResult.some((occ) => rectsOverlap(swapCandidate, occ))) {
+      placedResult.push({
+        ...item,
+        colStart: swapColStart,
+        rowStart: swapRowStart,
+        colSpan,
+        rowSpan,
+        gridSpan: formatGridSpan(colSpan, rowSpan, swapColStart, swapRowStart, totalCols, totalRows),
+      });
+    } else {
+      const slot = findFirstAvailableSlot(placedResult, colSpan, rowSpan, totalCols, totalRows);
+      placedResult.push({
+        ...item,
+        colStart: slot.colStart,
+        rowStart: slot.rowStart,
+        colSpan,
+        rowSpan,
+        gridSpan: formatGridSpan(colSpan, rowSpan, slot.colStart, slot.rowStart, totalCols, totalRows),
+      });
+    }
+  }
+
+  const byId = new Map(placedResult.map((p) => [p.id, p]));
+  return allItems.map((orig) => byId.get(orig.id) ?? orig);
+}
+
 function detectInitialBoardSize(rawCategories: CategoryItem[]): { cols: number; rows: number } {
   let maxCols = 5;
   let maxRows = 6;
@@ -87,7 +168,7 @@ function detectInitialBoardSize(rawCategories: CategoryItem[]): { cols: number; 
     if (parsed.boardCols && parsed.boardRows) {
       return {
         cols: Math.min(Math.max(parsed.boardCols, 2), 10),
-        rows: Math.min(Math.max(parsed.boardRows, 2), 12),
+        rows: Math.min(Math.max(parsed.boardRows, 2), 14),
       };
     }
     const cEnd = (parsed.colStart || 1) + parsed.colSpan - 1;
@@ -98,7 +179,7 @@ function detectInitialBoardSize(rawCategories: CategoryItem[]): { cols: number; 
 
   return {
     cols: Math.min(Math.max(maxCols, 4), 10),
-    rows: Math.min(Math.max(maxRows, 6), 12),
+    rows: Math.min(Math.max(maxRows, 6), 14),
   };
 }
 
@@ -165,8 +246,8 @@ export default function CategoryGridManager({
   const initialBoard = useMemo(() => detectInitialBoardSize(initialCategories), [initialCategories]);
   const [cols, setCols] = useState<number>(initialBoard.cols);
   const [rows, setRows] = useState<number>(initialBoard.rows);
-  const [gap, setGap] = useState<number>(8);
-  const [showPhotosInGrid, setShowPhotosInGrid] = useState<boolean>(false);
+  const [gap, setGap] = useState<number>(10);
+  const [showPhotosInGrid, setShowPhotosInGrid] = useState<boolean>(true);
 
   const [items, setItems] = useState<PlacedCategory[]>(() =>
     buildInitialPlaced(initialCategories, initialBoard.cols, initialBoard.rows)
@@ -174,23 +255,22 @@ export default function CategoryGridManager({
 
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [isUploading, setIsUploading] = useState<string | null>(null);
-  const [copiedType, setCopiedType] = useState<'html' | 'css' | null>(null);
 
-  // Interacción 1: Mover caja existente por el grid 2D
+  // Interacción 1: Mover caja existente libremente por el grid 2D (con auto-swap/reflow)
   const [dragState, setDragState] = useState<{
     id: string;
     grabOffsetCol: number;
     grabOffsetRow: number;
   } | null>(null);
 
-  // Interacción 2: Estirar esquina inferior derecha '⌟' (como en cssgridgenerator.io)
+  // Interacción 2: Estirar esquina inferior derecha '⌟'
   const [resizeState, setResizeState] = useState<{
     id: string;
     colStart: number;
     rowStart: number;
   } | null>(null);
 
-  // Interacción 3: Clic o arrastrar sobre celdas grises '+' para crear/colocar caja
+  // Interacción 3: Clic o arrastrar sobre celdas '+' para crear/colocar caja
   const [drawState, setDrawState] = useState<{
     startCol: number;
     startRow: number;
@@ -209,6 +289,8 @@ export default function CategoryGridManager({
   const [editName, setEditName] = useState('');
   const [editSlug, setEditSlug] = useState('');
   const [editImageUrl, setEditImageUrl] = useState('');
+  const [editColSpan, setEditColSpan] = useState(1);
+  const [editRowSpan, setEditRowSpan] = useState(1);
   const [isSavingEdit, setIsSavingEdit] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -223,9 +305,19 @@ export default function CategoryGridManager({
   const activeItems = useMemo(() => items.filter((i) => i.isPlaced), [items]);
   const unplacedItems = useMemo(() => items.filter((i) => !i.isPlaced), [items]);
 
+  // Asegurar que el tablero crezca en filas si algún bloque fue empujado más abajo
+  const effectiveRows = useMemo(() => {
+    let maxR = rows;
+    for (const item of activeItems) {
+      const endR = item.rowStart + item.rowSpan - 1;
+      if (endR > maxR) maxR = endR;
+    }
+    return maxR;
+  }, [rows, activeItems]);
+
   // Guardar layout en el servidor
   const persistLayout = useCallback(
-    async (listToSave: PlacedCategory[], boardCols = cols, boardRows = rows) => {
+    async (listToSave: PlacedCategory[], boardCols = cols, boardRows = effectiveRows) => {
       setSaveStatus('saving');
       const placedOnly = listToSave
         .filter((i) => i.isPlaced)
@@ -253,10 +345,10 @@ export default function CategoryGridManager({
         setSaveStatus((prev) => (prev === 'saved' ? 'idle' : prev));
       }, 2200);
     },
-    [cols, rows]
+    [cols, effectiveRows]
   );
 
-  // Calcular qué celda (col, row) está debajo del mouse
+  // Calcular qué celda (col, row) está debajo del puntero
   const getCellFromClientXY = useCallback(
     (clientX: number, clientY: number): { col: number; row: number } => {
       const board = gridBoardRef.current;
@@ -267,20 +359,20 @@ export default function CategoryGridManager({
       const relY = clientY - rect.top;
 
       const cellWidth = (rect.width - gap * (cols - 1)) / cols;
-      const cellHeight = (rect.height - gap * (rows - 1)) / rows;
+      const cellHeight = (rect.height - gap * (effectiveRows - 1)) / effectiveRows;
 
       const rawCol = Math.floor(relX / (cellWidth + gap)) + 1;
       const rawRow = Math.floor(relY / (cellHeight + gap)) + 1;
 
       return {
         col: Math.min(Math.max(rawCol, 1), cols),
-        row: Math.min(Math.max(rawRow, 1), rows),
+        row: Math.min(Math.max(rawRow, 1), effectiveRows),
       };
     },
-    [cols, rows, gap]
+    [cols, effectiveRows, gap]
   );
 
-  // Eventos globales de mouse/pointer para arrastrar cajas, estirar esquinas '⌟' y dibujar en '+'
+  // Eventos globales de puntero para mover libremente, redimensionar con '⌟' y dibujar en '+'
   useEffect(() => {
     if (!dragState && !resizeState && !drawState) return;
 
@@ -298,44 +390,27 @@ export default function CategoryGridManager({
           );
           const nextRowStart = Math.min(
             Math.max(row - dragState.grabOffsetRow, 1),
-            rows - target.rowSpan + 1
+            Math.max(effectiveRows - target.rowSpan + 1, 1)
           );
 
           if (nextColStart === target.colStart && nextRowStart === target.rowStart) {
             return prev;
           }
 
-          const candidateRect: GridRect = {
-            colStart: nextColStart,
-            rowStart: nextRowStart,
+          const previousRect: GridRect = {
+            colStart: target.colStart,
+            rowStart: target.rowStart,
             colSpan: target.colSpan,
             rowSpan: target.rowSpan,
           };
 
-          // En cssgridgenerator.io las demás cajas NO se mueven solas; solo se permite mover si no choca
-          const collides = prev.some(
-            (other) => other.isPlaced && other.id !== target.id && rectsOverlap(candidateRect, other)
-          );
+          const movedTarget: PlacedCategory = {
+            ...target,
+            colStart: nextColStart,
+            rowStart: nextRowStart,
+          };
 
-          if (collides) return prev;
-
-          return prev.map((item) =>
-            item.id === target.id
-              ? {
-                  ...item,
-                  colStart: nextColStart,
-                  rowStart: nextRowStart,
-                  gridSpan: formatGridSpan(
-                    item.colSpan,
-                    item.rowSpan,
-                    nextColStart,
-                    nextRowStart,
-                    cols,
-                    rows
-                  ),
-                }
-              : item
-          );
+          return resolveCollisionsAndReflow(prev, movedTarget, previousRect, cols, effectiveRows);
         });
       } else if (resizeState) {
         setItems((prev) => {
@@ -348,44 +423,27 @@ export default function CategoryGridManager({
           );
           const nextRowSpan = Math.min(
             Math.max(row - resizeState.rowStart + 1, 1),
-            rows - resizeState.rowStart + 1
+            Math.max(effectiveRows - resizeState.rowStart + 1, 1)
           );
 
           if (nextColSpan === target.colSpan && nextRowSpan === target.rowSpan) {
             return prev;
           }
 
-          const candidateRect: GridRect = {
+          const previousRect: GridRect = {
             colStart: target.colStart,
             rowStart: target.rowStart,
+            colSpan: target.colSpan,
+            rowSpan: target.rowSpan,
+          };
+
+          const resizedTarget: PlacedCategory = {
+            ...target,
             colSpan: nextColSpan,
             rowSpan: nextRowSpan,
           };
 
-          // No permitir superponerse sobre otra caja existente al estirar
-          const collides = prev.some(
-            (other) => other.isPlaced && other.id !== target.id && rectsOverlap(candidateRect, other)
-          );
-
-          if (collides) return prev;
-
-          return prev.map((item) =>
-            item.id === target.id
-              ? {
-                  ...item,
-                  colSpan: nextColSpan,
-                  rowSpan: nextRowSpan,
-                  gridSpan: formatGridSpan(
-                    nextColSpan,
-                    nextRowSpan,
-                    item.colStart,
-                    item.rowStart,
-                    cols,
-                    rows
-                  ),
-                }
-              : item
-          );
+          return resolveCollisionsAndReflow(prev, resizedTarget, previousRect, cols, effectiveRows);
         });
       } else if (drawState) {
         setDrawState((prev) =>
@@ -418,13 +476,11 @@ export default function CategoryGridManager({
 
         setDrawState(null);
 
-        // Verificar que no choque con una caja ya colocada
         const overlapsExisting = latestItemsRef.current.some(
           (i) => i.isPlaced && rectsOverlap(drawnRect, i)
         );
         if (overlapsExisting) return;
 
-        // Si hay una categoría sin colocar en espera, colocarla inmediatamente al hacer clic en '+' (como cssgridgenerator.io)
         const nextUnplaced = latestItemsRef.current.find((i) => !i.isPlaced);
         if (nextUnplaced) {
           const updated = latestItemsRef.current.map((item) =>
@@ -442,7 +498,7 @@ export default function CategoryGridManager({
                     drawnRect.colStart,
                     drawnRect.rowStart,
                     cols,
-                    rows
+                    effectiveRows
                   ),
                 }
               : item
@@ -450,7 +506,6 @@ export default function CategoryGridManager({
           setItems(updated);
           await persistLayout(updated);
         } else {
-          // Si todas las categorías ya están en el grid, abrir modal para crear nueva categoría en esa celda
           setPendingCellRect(drawnRect);
         }
       }
@@ -462,9 +517,43 @@ export default function CategoryGridManager({
       window.removeEventListener('pointermove', onPointerMove);
       window.removeEventListener('pointerup', onPointerUp);
     };
-  }, [dragState, resizeState, drawState, cols, rows, getCellFromClientXY, persistLayout]);
+  }, [dragState, resizeState, drawState, cols, effectiveRows, getCellFromClientXY, persistLayout]);
 
-  // Quitar una caja del grid con el botón rosa 'X' (deja las celdas '+' libres como en cssgridgenerator.io)
+  // Ajustar ancho/alto directamente desde los botones rápidos del bloque
+  const handleQuickResizeBlock = async (id: string, deltaCol: number, deltaRow: number) => {
+    const target = items.find((i) => i.id === id);
+    if (!target) return;
+
+    const nextColSpan = Math.min(
+      Math.max(target.colSpan + deltaCol, 1),
+      cols - target.colStart + 1
+    );
+    const nextRowSpan = Math.min(
+      Math.max(target.rowSpan + deltaRow, 1),
+      Math.max(effectiveRows, 12)
+    );
+
+    if (nextColSpan === target.colSpan && nextRowSpan === target.rowSpan) return;
+
+    const previousRect: GridRect = {
+      colStart: target.colStart,
+      rowStart: target.rowStart,
+      colSpan: target.colSpan,
+      rowSpan: target.rowSpan,
+    };
+
+    const resizedTarget: PlacedCategory = {
+      ...target,
+      colSpan: nextColSpan,
+      rowSpan: nextRowSpan,
+    };
+
+    const updated = resolveCollisionsAndReflow(items, resizedTarget, previousRect, cols, effectiveRows);
+    setItems(updated);
+    await persistLayout(updated);
+  };
+
+  // Quitar una caja del grid con el botón 'X'
   const handleRemoveFromGrid = async (id: string) => {
     const updated = items.map((item) =>
       item.id === id ? { ...item, isPlaced: false } : item
@@ -473,9 +562,8 @@ export default function CategoryGridManager({
     await persistLayout(updated);
   };
 
-  // Botón Reset (como en la esquina inferior derecha de cssgridgenerator.io)
+  // Botón Reset (limpia el lienzo para reacomodar desde cero con 1 clic)
   const handleResetGrid = async () => {
-    // Limpia todas las cajas del lienzo para que todo quede con celdas '+' listas para colocar con 1 clic
     const cleared = items.map((item) => ({
       ...item,
       colSpan: 1,
@@ -507,7 +595,7 @@ export default function CategoryGridManager({
             targetBox.colStart,
             targetBox.rowStart,
             cols,
-            rows
+            effectiveRows
           ),
         };
       }
@@ -525,7 +613,7 @@ export default function CategoryGridManager({
             currentBox.colStart,
             currentBox.rowStart,
             cols,
-            rows
+            effectiveRows
           ),
         };
       }
@@ -539,7 +627,7 @@ export default function CategoryGridManager({
   // Cambiar número de columnas o filas
   const handleUpdateBoardDimensions = async (nextCols: number, nextRows: number) => {
     const c = Math.min(Math.max(nextCols, 2), 10);
-    const r = Math.min(Math.max(nextRows, 2), 12);
+    const r = Math.min(Math.max(nextRows, 2), 14);
     setCols(c);
     setRows(r);
 
@@ -662,7 +750,7 @@ export default function CategoryGridManager({
       pendingCellRect.colStart,
       pendingCellRect.rowStart,
       cols,
-      rows
+      effectiveRows
     );
 
     const form = new FormData();
@@ -705,30 +793,53 @@ export default function CategoryGridManager({
     if (!editingCat || !editName.trim() || !editSlug.trim()) return;
 
     setIsSavingEdit(true);
+    const clampedColSpan = Math.min(Math.max(editColSpan, 1), cols - editingCat.colStart + 1);
+    const clampedRowSpan = Math.min(Math.max(editRowSpan, 1), 12);
+    const updatedSpanStr = formatGridSpan(
+      clampedColSpan,
+      clampedRowSpan,
+      editingCat.colStart,
+      editingCat.rowStart,
+      cols,
+      effectiveRows
+    );
+
     const form = new FormData();
     form.append('id', editingCat.id);
     form.append('name', editName.trim());
     form.append('slug', editSlug.trim());
     form.append('imageUrl', editImageUrl.trim());
-    form.append('gridSpan', editingCat.gridSpan);
+    form.append('gridSpan', updatedSpanStr);
     form.append('displayOrder', editingCat.displayOrder.toString());
 
     const res = await updateCategory(form);
     setIsSavingEdit(false);
 
     if (res.success) {
-      setItems((prev) =>
-        prev.map((c) =>
-          c.id === editingCat.id
-            ? {
-                ...c,
-                name: editName.trim(),
-                slug: editSlug.trim().toLowerCase().replace(/\s+/g, '-'),
-                imageUrl: editImageUrl.trim() || null,
-              }
-            : c
-        )
+      const previousRect: GridRect = {
+        colStart: editingCat.colStart,
+        rowStart: editingCat.rowStart,
+        colSpan: editingCat.colSpan,
+        rowSpan: editingCat.rowSpan,
+      };
+      const modifiedTarget: PlacedCategory = {
+        ...editingCat,
+        name: editName.trim(),
+        slug: editSlug.trim().toLowerCase().replace(/\s+/g, '-'),
+        imageUrl: editImageUrl.trim() || null,
+        colSpan: clampedColSpan,
+        rowSpan: clampedRowSpan,
+        gridSpan: updatedSpanStr,
+      };
+      const next = resolveCollisionsAndReflow(
+        items.map((c) => (c.id === editingCat.id ? modifiedTarget : c)),
+        modifiedTarget,
+        previousRect,
+        cols,
+        effectiveRows
       );
+      setItems(next);
+      await persistLayout(next);
       setEditingCat(null);
     }
   };
@@ -754,29 +865,6 @@ export default function CategoryGridManager({
     };
   }, [drawState]);
 
-  // Código HTML y CSS en vivo idéntico a cssgridgenerator.io
-  const generatedHtml = useMemo(() => {
-    const inner = activeItems
-      .map((item, idx) => `    <div class="div${idx + 1}">${idx + 1} (${item.name})</div>`)
-      .join('\n');
-    return `<div class="parent">\n${inner}\n</div>`;
-  }, [activeItems]);
-
-  const generatedCss = useMemo(() => {
-    const parent = `.parent {\n    display: grid;\n    grid-template-columns: repeat(${cols}, 1fr);\n    grid-template-rows: repeat(${rows}, 1fr);\n    gap: ${gap}px;\n}`;
-    const children = activeItems
-      .map((c, idx) => {
-        const lines: string[] = [];
-        if (c.colSpan > 1) lines.push(`    grid-column: span ${c.colSpan} / span ${c.colSpan};`);
-        if (c.rowSpan > 1) lines.push(`    grid-row: span ${c.rowSpan} / span ${c.rowSpan};`);
-        lines.push(`    grid-column-start: ${c.colStart};`);
-        lines.push(`    grid-row-start: ${c.rowStart};`);
-        return `.div${idx + 1} {\n${lines.join('\n')}\n}`;
-      })
-      .join('\n\n');
-    return `${parent}\n\n${children}`;
-  }, [cols, rows, gap, activeItems]);
-
   return (
     <div className="space-y-6 select-none">
       <input
@@ -798,25 +886,25 @@ export default function CategoryGridManager({
         <div className="flex flex-wrap items-center gap-4">
           {/* Columns */}
           <div className="flex items-center gap-2 bg-white px-3.5 py-2 rounded-xl border border-gray-300 shadow-2xs">
-            <label className="text-xs font-bold text-gray-700">Columns</label>
+            <label className="text-xs font-bold text-gray-700">Columnas</label>
             <input
               type="number"
               min={2}
               max={10}
               value={cols}
-              onChange={(e) => handleUpdateBoardDimensions( Number(e.target.value) || 4, rows )}
+              onChange={(e) => handleUpdateBoardDimensions(Number(e.target.value) || 4, effectiveRows)}
               className="w-14 text-center font-mono font-bold text-sm border border-gray-300 rounded-lg py-0.5 text-gray-900"
             />
           </div>
 
           {/* Rows */}
           <div className="flex items-center gap-2 bg-white px-3.5 py-2 rounded-xl border border-gray-300 shadow-2xs">
-            <label className="text-xs font-bold text-gray-700">Rows</label>
+            <label className="text-xs font-bold text-gray-700">Filas</label>
             <input
               type="number"
               min={2}
-              max={12}
-              value={rows}
+              max={14}
+              value={effectiveRows}
               onChange={(e) => handleUpdateBoardDimensions(cols, Number(e.target.value) || 6)}
               className="w-14 text-center font-mono font-bold text-sm border border-gray-300 rounded-lg py-0.5 text-gray-900"
             />
@@ -824,7 +912,7 @@ export default function CategoryGridManager({
 
           {/* Gap */}
           <div className="flex items-center gap-2 bg-white px-3.5 py-2 rounded-xl border border-gray-300 shadow-2xs">
-            <label className="text-xs font-bold text-gray-700">Gap (px)</label>
+            <label className="text-xs font-bold text-gray-700">Espacio (px)</label>
             <input
               type="number"
               min={0}
@@ -835,7 +923,7 @@ export default function CategoryGridManager({
             />
           </div>
 
-          {/* Toggle para ver modo esquema cssgridgenerator.io vs con fotos */}
+          {/* Toggle para ver fotos tipo preview */}
           <label className="flex items-center gap-2 bg-white px-3.5 py-2 rounded-xl border border-gray-300 text-xs font-bold text-gray-700 cursor-pointer">
             <input
               type="checkbox"
@@ -843,7 +931,7 @@ export default function CategoryGridManager({
               onChange={(e) => setShowPhotosInGrid(e.target.checked)}
               className="rounded text-black focus:ring-black"
             />
-            <span>Mostrar fotos de fondo</span>
+            <span>Vista Previa con Fotos</span>
           </label>
         </div>
 
@@ -862,7 +950,7 @@ export default function CategoryGridManager({
           <button
             type="button"
             onClick={() => {
-              const slot = findFirstAvailableSlot(activeItems, 1, 1, cols, rows);
+              const slot = findFirstAvailableSlot(activeItems, 1, 1, cols, effectiveRows);
               setPendingCellRect({ ...slot, colSpan: 1, rowSpan: 1 });
             }}
             className="px-4 py-2 rounded-xl bg-black hover:bg-gray-800 text-white text-xs font-bold shadow-sm transition-all"
@@ -872,14 +960,15 @@ export default function CategoryGridManager({
         </div>
       </div>
 
-      {/* Barra de categorías por colocar (cuando el usuario quita alguna con 'X' o da clic en Reset) */}
+      {/* Barra de categorías por colocar */}
       {unplacedItems.length > 0 && (
         <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-3">
           <div className="text-xs text-amber-950">
             <span className="font-bold">
               Tienes {unplacedItems.length} categoría(s) listas para colocar:
             </span>{' '}
-            Haz clic o arrastra sobre cualquier cuadro gris <kbd className="px-1.5 py-0.5 bg-[#b5b3ad] text-white rounded font-bold">+</kbd> del grid para colocar{' '}
+            Haz clic o arrastra sobre cualquier cuadro gris{' '}
+            <kbd className="px-1.5 py-0.5 bg-[#b5b3ad] text-white rounded font-bold">+</kbd> del grid para colocar{' '}
             <strong className="underline">{unplacedItems[0].name}</strong>.
           </div>
           <div className="flex flex-wrap gap-1.5">
@@ -900,22 +989,20 @@ export default function CategoryGridManager({
       )}
 
       {/* ==================================================================== */}
-      {/* LIENZO 2D IDÉNTICO A HTTPS://CSSGRIDGENERATOR.IO/                    */}
+      {/* LIENZO INTERACTIVO 2D CON MOVIMIENTO LIBRE Y AUTO-INTERCAMBIO        */}
       {/* ==================================================================== */}
-      <div className="bg-[#f7f4ee] p-6 sm:p-8 rounded-3xl border border-[#e2ddd3] shadow-inner space-y-4">
+      <div className="bg-[#f7f4ee] p-6 sm:p-8 rounded-3xl border border-[#e2ddd3] shadow-inner space-y-4 overflow-x-auto">
         <div
           ref={gridBoardRef}
-          className="relative grid w-full min-w-[600px]"
+          className="relative grid w-full min-w-[640px]"
           style={{
             gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`,
-            gridTemplateRows: `repeat(${rows}, 68px)`,
+            gridTemplateRows: `repeat(${effectiveRows}, 82px)`,
             gap: `${gap}px`,
           }}
         >
-          {/* ---------------------------------------------------------------- */}
-          {/* CELDAS GRISES CON '+' (IGUAL QUE EN CSSGRIDGENERATOR.IO)         */}
-          {/* ---------------------------------------------------------------- */}
-          {Array.from({ length: rows }).map((_, rIdx) =>
+          {/* CELDAS GRISES CON '+' */}
+          {Array.from({ length: effectiveRows }).map((_, rIdx) =>
             Array.from({ length: cols }).map((__, cIdx) => {
               const cellCol = cIdx + 1;
               const cellRow = rIdx + 1;
@@ -952,7 +1039,7 @@ export default function CategoryGridManager({
                       endRow: cellRow,
                     });
                   }}
-                  className={`rounded-lg flex items-center justify-center transition-colors select-none ${
+                  className={`rounded-xl flex items-center justify-center transition-colors select-none ${
                     isCovered
                       ? 'opacity-0 pointer-events-none'
                       : isInsideDraw
@@ -966,9 +1053,7 @@ export default function CategoryGridManager({
             })
           )}
 
-          {/* ---------------------------------------------------------------- */}
-          {/* CAJAS COLOCADAS (1, 2, 3...) CON BOTÓN ROSA 'X' Y ESQUINA '⌟'    */}
-          {/* ---------------------------------------------------------------- */}
+          {/* CAJAS COLOCADAS (ARRASTRABLES LIBREMENTE CON VISTA PREVIA DE FOTOS) */}
           {activeItems.map((cat, idx) => {
             const isBeingDragged = dragState?.id === cat.id;
             const isBeingResized = resizeState?.id === cat.id;
@@ -993,57 +1078,57 @@ export default function CategoryGridManager({
                     grabOffsetRow: Math.max(0, Math.min(row - cat.rowStart, cat.rowSpan - 1)),
                   });
                 }}
-                className={`group relative z-20 rounded-lg overflow-hidden flex flex-col items-center justify-between p-3 cursor-grab active:cursor-grabbing transition-shadow ${
+                className={`group relative z-20 rounded-2xl overflow-hidden flex flex-col items-center justify-between p-3 cursor-grab active:cursor-grabbing transition-all ${
                   showPhotosInGrid && cat.imageUrl
-                    ? 'bg-gray-900 text-white border-[1.5px] border-gray-900 shadow-md'
-                    : 'bg-[#faf7f2] text-gray-900 border-[1.5px] border-gray-800 shadow-md'
+                    ? 'bg-gray-900 text-white border-2 border-gray-900 shadow-md'
+                    : 'bg-[#faf7f2] text-gray-900 border-2 border-gray-800 shadow-md'
                 } ${
                   isBeingDragged || isBeingResized
-                    ? 'ring-2 ring-pink-500 shadow-xl z-30'
-                    : 'hover:shadow-lg'
+                    ? 'ring-4 ring-pink-500 shadow-2xl z-30 scale-[1.01]'
+                    : 'hover:shadow-xl'
                 }`}
               >
-                {/* Fondo opcional con foto de la categoría */}
+                {/* Fondo con foto en modo Preview */}
                 {showPhotosInGrid && cat.imageUrl && (
                   <>
                     <div
-                      className="absolute inset-0 bg-cover bg-center pointer-events-none"
+                      className="absolute inset-0 bg-cover bg-center pointer-events-none transition-transform duration-500 group-hover:scale-105"
                       style={{ backgroundImage: `url('${cat.imageUrl}')` }}
                     />
-                    <div className="absolute inset-0 bg-black/55 pointer-events-none" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/45 to-black/30 pointer-events-none" />
                   </>
                 )}
 
-                {/* BOTÓN ROSA 'X' EN LA ESQUINA SUPERIOR DERECHA (IDÉNTICO A CSSGRIDGENERATOR.IO) */}
+                {/* BOTÓN ROSA 'X' EN LA ESQUINA SUPERIOR DERECHA */}
                 <button
                   type="button"
                   data-no-drag="true"
                   onClick={() => handleRemoveFromGrid(cat.id)}
                   title="Quitar bloque del grid (liberar celdas +)"
-                  className="absolute top-0 right-0 z-30 w-5 h-5 bg-[#e84a8a] hover:bg-[#d13674] text-white text-[11px] font-normal leading-none flex items-center justify-center rounded-bl-sm transition-colors"
+                  className="absolute top-1.5 right-1.5 z-30 w-6 h-6 bg-[#e84a8a] hover:bg-[#d13674] text-white text-xs font-bold leading-none flex items-center justify-center rounded-lg shadow transition-colors"
                 >
-                  x
+                  ✕
                 </button>
 
-                {/* Número superior centrado (1, 2, 3...) igual que en cssgridgenerator.io */}
-                <div className="relative z-10 text-center w-full pt-0.5">
-                  <span className="text-sm font-medium tracking-tight">
-                    {idx + 1}
+                {/* Etiqueta superior de posición y arrastre */}
+                <div className="relative z-10 flex items-center gap-1.5 self-start">
+                  <span className="px-2 py-0.5 rounded-md bg-black/50 backdrop-blur-xs text-white text-[10px] font-mono font-bold">
+                    #{idx + 1} • {cat.colSpan}×{cat.rowSpan}
                   </span>
                 </div>
 
-                {/* Contenido central: Selector / Nombre de Categoría y Acciones rápidas */}
+                {/* Contenido central: Selector / Nombre de Categoría y Controles Directos */}
                 <div
                   data-no-drag="true"
-                  className="relative z-10 flex flex-col items-center justify-center gap-1.5 my-auto px-2 max-w-full"
+                  className="relative z-10 flex flex-col items-center justify-center gap-2 my-auto px-2 max-w-full"
                 >
                   <select
                     value={cat.id}
                     onChange={(e) => handleSwapCategoryInBox(cat.id, e.target.value)}
-                    className={`text-xs font-bold rounded-lg px-2 py-1 border text-center max-w-full truncate cursor-pointer ${
+                    className={`text-xs font-extrabold rounded-xl px-2.5 py-1.5 border text-center max-w-full truncate cursor-pointer shadow-xs ${
                       showPhotosInGrid && cat.imageUrl
-                        ? 'bg-black/75 text-white border-white/25'
-                        : 'bg-white/90 text-gray-900 border-gray-300 hover:border-gray-500'
+                        ? 'bg-black/75 text-white border-white/30'
+                        : 'bg-white text-gray-900 border-gray-300 hover:border-gray-500'
                     }`}
                   >
                     {items.map((opt) => (
@@ -1053,12 +1138,8 @@ export default function CategoryGridManager({
                     ))}
                   </select>
 
-                  <div className="flex items-center gap-1.5 opacity-80 group-hover:opacity-100 transition-opacity">
-                    <span className="text-[10px] font-mono opacity-75">
-                      {cat.colSpan}×{cat.rowSpan}
-                    </span>
-
-                    {/* Subir imagen */}
+                  {/* Botones de Acción Rápida: Foto, Editar y Tamaño */}
+                  <div className="flex flex-wrap items-center justify-center gap-1">
                     <button
                       type="button"
                       onClick={() => {
@@ -1066,12 +1147,11 @@ export default function CategoryGridManager({
                         fileInputRef.current?.click();
                       }}
                       title="Cambiar foto de portada"
-                      className="px-1.5 py-0.5 rounded bg-black/10 hover:bg-black/20 text-[10px] font-semibold"
+                      className="px-2 py-1 rounded-lg bg-white/90 hover:bg-white text-gray-900 text-[10px] font-bold shadow-2xs"
                     >
                       {isUploading === cat.id ? '...' : '📷 Foto'}
                     </button>
 
-                    {/* Editar nombre / slug */}
                     <button
                       type="button"
                       onClick={() => {
@@ -1079,19 +1159,63 @@ export default function CategoryGridManager({
                         setEditName(cat.name);
                         setEditSlug(cat.slug);
                         setEditImageUrl(cat.imageUrl || '');
+                        setEditColSpan(cat.colSpan);
+                        setEditRowSpan(cat.rowSpan);
                       }}
-                      title="Editar nombre o URL"
-                      className="px-1.5 py-0.5 rounded bg-black/10 hover:bg-black/20 text-[10px] font-semibold"
+                      title="Editar nombre, slug y dimensiones"
+                      className="px-2 py-1 rounded-lg bg-white/90 hover:bg-white text-gray-900 text-[10px] font-bold shadow-2xs"
                     >
-                      ✎
+                      ✎ Editar
+                    </button>
+                  </div>
+
+                  {/* Controles rápidos de Ancho (Col) y Alto (Fila) con 1 clic */}
+                  <div className="flex items-center gap-1.5 text-[10px] bg-black/65 backdrop-blur-xs text-white px-2 py-1 rounded-lg">
+                    <span className="opacity-80">Ancho:</span>
+                    <button
+                      type="button"
+                      onClick={() => handleQuickResizeBlock(cat.id, -1, 0)}
+                      className="w-4 h-4 rounded bg-white/20 hover:bg-white/40 flex items-center justify-center font-bold"
+                      title="Reducir columnas"
+                    >
+                      -
+                    </button>
+                    <span className="font-mono font-bold">{cat.colSpan}</span>
+                    <button
+                      type="button"
+                      onClick={() => handleQuickResizeBlock(cat.id, 1, 0)}
+                      className="w-4 h-4 rounded bg-white/20 hover:bg-white/40 flex items-center justify-center font-bold"
+                      title="Aumentar columnas"
+                    >
+                      +
+                    </button>
+
+                    <span className="mx-0.5 opacity-40">|</span>
+
+                    <span className="opacity-80">Alto:</span>
+                    <button
+                      type="button"
+                      onClick={() => handleQuickResizeBlock(cat.id, 0, -1)}
+                      className="w-4 h-4 rounded bg-white/20 hover:bg-white/40 flex items-center justify-center font-bold"
+                      title="Reducir filas"
+                    >
+                      -
+                    </button>
+                    <span className="font-mono font-bold">{cat.rowSpan}</span>
+                    <button
+                      type="button"
+                      onClick={() => handleQuickResizeBlock(cat.id, 0, 1)}
+                      className="w-4 h-4 rounded bg-white/20 hover:bg-white/40 flex items-center justify-center font-bold"
+                      title="Aumentar filas"
+                    >
+                      +
                     </button>
                   </div>
                 </div>
 
-                {/* Espaciador inferior */}
                 <div className="h-2" />
 
-                {/* MANIJA DE ESQUINA INFERIOR DERECHA '⌟' (IDÉNTICA A CSSGRIDGENERATOR.IO) */}
+                {/* MANIJA DE ESQUINA INFERIOR DERECHA '⌟' PARA ESTIRAR LIBREMENTE */}
                 <div
                   data-no-drag="true"
                   onPointerDown={(e) => {
@@ -1104,80 +1228,35 @@ export default function CategoryGridManager({
                     });
                   }}
                   title="Arrastra esta esquina para estirar columnas y filas en 2D"
-                  className="absolute bottom-1.5 right-1.5 z-30 w-5 h-5 cursor-nwse-resize flex items-end justify-end p-0.5 group/corner"
+                  className="absolute bottom-1.5 right-1.5 z-30 w-6 h-6 cursor-nwse-resize flex items-end justify-end p-1 group/corner bg-black/35 rounded-md"
                 >
-                  <span
-                    className={`w-2.5 h-2.5 border-r-[2.5px] border-b-[2.5px] transition-transform group-hover/corner:scale-125 ${
-                      showPhotosInGrid && cat.imageUrl ? 'border-white' : 'border-gray-900'
-                    }`}
-                  />
+                  <span className="w-3 h-3 border-r-[2.5px] border-b-[2.5px] border-white transition-transform group-hover/corner:scale-125" />
                 </div>
               </div>
             );
           })}
         </div>
 
-        {/* Botón Reset inferior derecho (idéntico a cssgridgenerator.io) */}
-        <div className="flex items-center justify-between pt-2">
-          <p className="text-xs text-gray-500">
-            Arrastra la esquina <strong>⌟</strong> de cualquier bloque para estirarlo en 2D, o haz clic en <strong>x</strong> para liberar celdas <strong>+</strong>.
+        {/* Barra inferior de ayuda y botones de guardado */}
+        <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
+          <p className="text-xs text-gray-600">
+            💡 <strong>Movimiento libre activado:</strong> Arrastra cualquier categoría a donde quieras (los demás bloques se intercambian o acomodan automáticamente), usa los botones <strong>Ancho/Alto (-/+)</strong> o estira la esquina <strong>⌟</strong>.
           </p>
           <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={handleResetGrid}
-              className="px-4 py-1 rounded-md border border-gray-900 bg-white hover:bg-gray-100 text-gray-900 text-xs font-semibold shadow-2xs transition-colors"
+              className="px-4 py-1.5 rounded-xl border border-gray-900 bg-white hover:bg-gray-100 text-gray-900 text-xs font-semibold shadow-2xs transition-colors"
             >
-              Reset
+              Limpiar Lienzo (Reset)
             </button>
             <button
               type="button"
               onClick={() => persistLayout(items)}
-              className="px-4 py-1 rounded-md border border-black bg-black hover:bg-gray-800 text-white text-xs font-semibold shadow-2xs transition-colors"
+              className="px-5 py-1.5 rounded-xl border border-black bg-black hover:bg-gray-800 text-white text-xs font-bold shadow-2xs transition-colors"
             >
               Guardar en Tienda
             </button>
-          </div>
-        </div>
-
-        {/* ================================================================== */}
-        {/* PANELES INFERIORES 'Copy HTML' Y 'Copy CSS' (COMO EN LA CAPTURA 3) */}
-        {/* ================================================================== */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4">
-          {/* Panel HTML */}
-          <div className="relative pt-3">
-            <button
-              type="button"
-              onClick={() => {
-                navigator.clipboard.writeText(generatedHtml);
-                setCopiedType('html');
-                setTimeout(() => setCopiedType(null), 1500);
-              }}
-              className="absolute top-0 right-4 px-3.5 py-1 rounded-md bg-[#2b2b2b] hover:bg-black text-white text-xs font-bold shadow"
-            >
-              {copiedType === 'html' ? 'Copied!' : 'Copy HTML'}
-            </button>
-            <pre className="bg-white rounded-xl border border-[#e5e0d5] p-5 text-xs font-mono text-gray-800 overflow-x-auto shadow-xs min-h-[140px]">
-              {generatedHtml}
-            </pre>
-          </div>
-
-          {/* Panel CSS */}
-          <div className="relative pt-3">
-            <button
-              type="button"
-              onClick={() => {
-                navigator.clipboard.writeText(generatedCss);
-                setCopiedType('css');
-                setTimeout(() => setCopiedType(null), 1500);
-              }}
-              className="absolute top-0 right-4 px-3.5 py-1 rounded-md bg-[#2b2b2b] hover:bg-black text-white text-xs font-bold shadow"
-            >
-              {copiedType === 'css' ? 'Copied!' : 'Copy CSS'}
-            </button>
-            <pre className="bg-white rounded-xl border border-[#e5e0d5] p-5 text-xs font-mono text-gray-800 overflow-x-auto shadow-xs min-h-[140px]">
-              {generatedCss}
-            </pre>
           </div>
         </div>
       </div>
@@ -1288,7 +1367,7 @@ export default function CategoryGridManager({
       )}
 
       {/* ==================================================================== */}
-      {/* MODAL PARA EDITAR NOMBRE / SLUG / FOTO O ELIMINAR CATEGORÍA          */}
+      {/* MODAL PARA EDITAR NOMBRE / SLUG / FOTO / DIMENSIONES O ELIMINAR      */}
       {/* ==================================================================== */}
       {editingCat && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
@@ -1298,7 +1377,7 @@ export default function CategoryGridManager({
           >
             <div className="flex items-center justify-between border-b border-gray-100 pb-3">
               <h3 className="text-base font-extrabold text-gray-900">
-                Editar Categoría
+                Editar Categoría: {editingCat.name}
               </h3>
               <button
                 type="button"
@@ -1329,6 +1408,35 @@ export default function CategoryGridManager({
                 onChange={(e) => setEditSlug(e.target.value)}
                 className="mt-1 block w-full rounded-xl border border-gray-300 px-3 py-2 text-xs font-mono"
               />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-bold text-gray-700">
+                  Ancho (Columnas: 1-{cols})
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  max={cols}
+                  value={editColSpan}
+                  onChange={(e) => setEditColSpan(Number(e.target.value) || 1)}
+                  className="mt-1 block w-full rounded-xl border border-gray-300 px-3 py-2 text-sm font-mono font-bold"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-700">
+                  Alto (Filas: 1-12)
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  max={12}
+                  value={editRowSpan}
+                  onChange={(e) => setEditRowSpan(Number(e.target.value) || 1)}
+                  className="mt-1 block w-full rounded-xl border border-gray-300 px-3 py-2 text-sm font-mono font-bold"
+                />
+              </div>
             </div>
 
             <div>
@@ -1380,7 +1488,7 @@ export default function CategoryGridManager({
                   disabled={isSavingEdit}
                   className="px-5 py-2 rounded-xl bg-black text-white text-xs font-bold hover:bg-gray-800"
                 >
-                  Guardar
+                  Guardar Cambios
                 </button>
               </div>
             </div>

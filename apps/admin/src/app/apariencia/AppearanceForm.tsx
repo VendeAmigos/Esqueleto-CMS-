@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { updateSiteSettings } from './actions';
 
 interface AppearanceFormProps {
@@ -8,6 +8,8 @@ interface AppearanceFormProps {
     siteName: string;
     logoSvg: string | null;
     logoColor: string;
+    headingFont?: string;
+    bodyFont?: string;
     heroTitle: string;
     heroSubtitle: string | null;
     heroImageUrl: string | null;
@@ -17,6 +19,7 @@ interface AppearanceFormProps {
 }
 
 const COLOR_PRESETS = [
+  { name: 'Rosa Estudio', hex: '#ec4899' },
   { name: 'Índigo Royal', hex: '#4f46e5' },
   { name: 'Violeta Neón', hex: '#7c3aed' },
   { name: 'Esmeralda Pro', hex: '#059669' },
@@ -24,29 +27,137 @@ const COLOR_PRESETS = [
   { name: 'Ámbar Cálido', hex: '#d97706' },
   { name: 'Rojo Carmesí', hex: '#dc2626' },
   { name: 'Azul Eléctrico', hex: '#2563eb' },
-  { name: 'Rosa Fucsia', hex: '#db2777' },
+];
+
+const FONT_OPTIONS = [
+  { name: 'Plus Jakarta Sans', label: 'Plus Jakarta Sans (Geométrica Moderna)' },
+  { name: 'Inter', label: 'Inter (Minimalista & Ultra Legible)' },
+  { name: 'Fraunces', label: 'Fraunces (Editorial & Estudio de Arte)' },
+  { name: 'Playfair Display', label: 'Playfair Display (Boutique & Lujo Serif)' },
+  { name: 'Cormorant Garamond', label: 'Cormorant Garamond (Clásica & Galería)' },
+  { name: 'Space Grotesk', label: 'Space Grotesk (Vanguardista & Streetwear)' },
+  { name: 'Montserrat', label: 'Montserrat (Comercial & Versátil)' },
+  { name: 'DM Sans', label: 'DM Sans (Amigable & Redondeada)' },
+  { name: 'Lora', label: 'Lora (Cálida & Literaria)' },
+  { name: 'Outfit', label: 'Outfit (Contemporánea & Limpia)' },
+];
+
+const TYPOGRAPHY_PRESETS = [
+  {
+    title: 'Estudio de Arte & Ilustración',
+    desc: 'Títulos con personalidad artística y cuerpo limpio',
+    heading: 'Fraunces',
+    body: 'Plus Jakarta Sans',
+  },
+  {
+    title: 'Boutique & Joyería Luxury',
+    desc: 'Elegancia editorial de alta gama',
+    heading: 'Playfair Display',
+    body: 'Lora',
+  },
+  {
+    title: 'Streetwear & Diseño Urbano',
+    desc: 'Contraste geométrico y moderno',
+    heading: 'Space Grotesk',
+    body: 'DM Sans',
+  },
+  {
+    title: 'Minimalista Contemporáneo',
+    desc: 'Claridad total estilo Apple / SaaS',
+    heading: 'Plus Jakarta Sans',
+    body: 'Inter',
+  },
 ];
 
 const DEFAULT_SVG_PRESET = `<svg viewBox="0 0 24 24" fill="currentColor" class="w-8 h-8"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>`;
 
 export default function AppearanceForm({ initialSettings }: AppearanceFormProps) {
-  const [siteName, setSiteName] = useState(initialSettings.siteName || 'ESQUELETO');
+  const [siteName, setSiteName] = useState(initialSettings.siteName || 'LUNA ART STUDIO');
   const [logoSvg, setLogoSvg] = useState(initialSettings.logoSvg || '');
-  const [logoColor, setLogoColor] = useState(initialSettings.logoColor || '#4f46e5');
-  const [heroTitle, setHeroTitle] = useState(initialSettings.heroTitle || 'Velocidad extrema. Control total en Docker.');
-  const [heroSubtitle, setHeroSubtitle] = useState(initialSettings.heroSubtitle || 'E-commerce Open Source Plug & Play de alto rendimiento.');
-  const [heroImageUrl, setHeroImageUrl] = useState(initialSettings.heroImageUrl || 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?auto=format&fit=crop&w=1600&q=80');
+  const [logoColor, setLogoColor] = useState(initialSettings.logoColor || '#ec4899');
+  const [headingFont, setHeadingFont] = useState(initialSettings.headingFont || 'Plus Jakarta Sans');
+  const [bodyFont, setBodyFont] = useState(initialSettings.bodyFont || 'Inter');
+  const [heroTitle, setHeroTitle] = useState(
+    initialSettings.heroTitle || 'Ilustración de Autor, Prints & Merch Exclusivo'
+  );
+  const [heroSubtitle, setHeroSubtitle] = useState(
+    initialSettings.heroSubtitle ||
+      'Láminas de arte fine art, stickers holográficos, pines esmaltados y papelería ilustrada.'
+  );
+  const [heroImageUrl, setHeroImageUrl] = useState(
+    initialSettings.heroImageUrl ||
+      'https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?w=1600&auto=format&fit=crop&q=80'
+  );
   const [heroCtaText, setHeroCtaText] = useState(initialSettings.heroCtaText || 'Explorar Catálogo');
   const [heroCtaLink, setHeroCtaLink] = useState(initialSettings.heroCtaLink || '/catalogo');
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [saveStatus, setSaveStatus] = useState<{ success: boolean; msg: string } | null>(null);
+  const [svgFileName, setSvgFileName] = useState<string | null>(null);
 
   // Estados para Drag & Drop y Compresión de Imagen del Hero
   const [isDragging, setIsDragging] = useState(false);
   const [isCompressing, setIsCompressing] = useState(false);
   const [stats, setStats] = useState<{ original: string; compressed: string; savings: number } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const svgFileInputRef = useRef<HTMLInputElement>(null);
+
+  // Cargar dinámicamente las fuentes de Google seleccionadas para la vista previa en vivo
+  useEffect(() => {
+    const fonts = Array.from(new Set([headingFont, bodyFont]));
+    const familyQuery = fonts
+      .map((f) => `family=${encodeURIComponent(f)}:wght@400;500;600;700;800`)
+      .join('&');
+    const href = `https://fonts.googleapis.com/css2?${familyQuery}&display=swap`;
+
+    let linkEl = document.getElementById('cms-dynamic-google-fonts') as HTMLLinkElement | null;
+    if (!linkEl) {
+      linkEl = document.createElement('link');
+      linkEl.id = 'cms-dynamic-google-fonts';
+      linkEl.rel = 'stylesheet';
+      document.head.appendChild(linkEl);
+    }
+    linkEl.href = href;
+  }, [headingFont, bodyFont]);
+
+  // Procesar archivo .SVG subido desde la computadora
+  const handleSvgFileSelect = (file: File) => {
+    if (!file.name.toLowerCase().endsWith('.svg') && file.type !== 'image/svg+xml') {
+      alert('Por favor selecciona un archivo con extensión .svg');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const raw = String(e.target?.result || '');
+      const svgMatch = raw.match(/<svg[\s\S]*?<\/svg>/i);
+      if (!svgMatch) {
+        alert('El archivo no contiene una etiqueta <svg> válida.');
+        return;
+      }
+
+      const cleaned = svgMatch[0]
+        .replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, '')
+        .replace(/\son\w+="[^"]*"/gi, '')
+        .replace(/\width="[^"]*"/gi, '')
+        .replace(/\height="[^"]*"/gi, '')
+        .trim();
+
+      setLogoSvg(cleaned);
+      setSvgFileName(file.name);
+    };
+    reader.readAsText(file, 'UTF-8');
+  };
+
+  // Botón para que el SVG subido adopte automáticamente el color de marca (currentColor)
+  const applyCurrentColorToSvg = () => {
+    if (!logoSvg.trim()) return;
+    let updated = logoSvg.replace(/fill="(?!none)[^"]*"/gi, 'fill="currentColor"');
+    if (!/fill=/i.test(updated)) {
+      updated = updated.replace(/<svg/i, '<svg fill="currentColor"');
+    }
+    setLogoSvg(updated);
+  };
 
   const compressImage = async (file: File): Promise<{ blob: Blob; origKb: number; compKb: number }> => {
     return new Promise((resolve, reject) => {
@@ -56,7 +167,7 @@ export default function AppearanceForm({ initialSettings }: AppearanceFormProps)
         img.onload = () => {
           const canvas = document.createElement('canvas');
           let { width, height } = img;
-          const maxDimension = 1920; // Resolución óptima para banner Hero
+          const maxDimension = 1920;
 
           if (width > maxDimension || height > maxDimension) {
             if (width > height) {
@@ -142,6 +253,8 @@ export default function AppearanceForm({ initialSettings }: AppearanceFormProps)
     formData.append('siteName', siteName);
     formData.append('logoSvg', logoSvg);
     formData.append('logoColor', logoColor);
+    formData.append('headingFont', headingFont);
+    formData.append('bodyFont', bodyFont);
     formData.append('heroTitle', heroTitle);
     formData.append('heroSubtitle', heroSubtitle || '');
     formData.append('heroImageUrl', heroImageUrl || '');
@@ -152,7 +265,7 @@ export default function AppearanceForm({ initialSettings }: AppearanceFormProps)
     setIsSubmitting(false);
 
     if (res.success) {
-      setSaveStatus({ success: true, msg: '¡Configuración de diseño guardada con éxito!' });
+      setSaveStatus({ success: true, msg: '¡Logotipo SVG, tipografías y diseño guardados en la tienda!' });
       setTimeout(() => setSaveStatus(null), 4000);
     } else {
       setSaveStatus({ success: false, msg: res.error || 'Error al guardar.' });
@@ -180,15 +293,15 @@ export default function AppearanceForm({ initialSettings }: AppearanceFormProps)
         </div>
       )}
 
-      {/* SECCIÓN 1: IDENTIDAD Y LOGO SVG */}
+      {/* SECCIÓN 1: IDENTIDAD Y ARCHIVO LOGO SVG */}
       <div className="bg-white rounded-2xl border border-gray-200 p-8 shadow-sm">
         <div className="border-b border-gray-100 pb-4 mb-6">
           <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21a4 4 0 01-4-4 4 4 0 014-4c.73 0 1.41.2 2 .55V5a2 2 0 012-2h6a2 2 0 012 2v6.55c.59-.35 1.27-.55 2-.55a4 4 0 014 4 4 4 0 01-4 4H7z" /></svg>
-            Logotipo SVG y Color de Marca
+            1. Logotipo (Archivo .SVG) y Color de Marca
           </h2>
           <p className="text-sm text-gray-500 mt-1">
-            Personaliza el logotipo SVG y la paleta de color que se mostrará en la barra de navegación de tu tienda.
+            Sube directamente un archivo <code className="bg-gray-100 px-1 rounded">.svg</code> desde tu computadora o pega su código vectorial.
           </p>
         </div>
 
@@ -200,39 +313,91 @@ export default function AppearanceForm({ initialSettings }: AppearanceFormProps)
                 type="text"
                 value={siteName}
                 onChange={(e) => setSiteName(e.target.value)}
-                placeholder="Ej. AFÓTICA SHOP"
+                placeholder="Ej. LUNA DE COCO"
                 className="mt-1 block w-full rounded-xl border border-gray-300 px-4 py-2.5 shadow-sm focus:border-black focus:ring-black sm:text-sm"
               />
             </div>
 
-            <div>
-              <div className="flex justify-between items-center mb-1">
+            {/* Subida directa de archivo .SVG */}
+            <div className="space-y-2">
+              <div className="flex flex-wrap items-center justify-between gap-2">
                 <label className="block text-sm font-semibold text-gray-700">
-                  Código SVG Personalizado
+                  Archivo de Logotipo (.SVG)
                 </label>
-                <button
-                  type="button"
-                  onClick={() => setLogoSvg(DEFAULT_SVG_PRESET)}
-                  className="text-xs text-indigo-600 hover:text-indigo-800 font-medium"
-                >
-                  Usar SVG de ejemplo
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={applyCurrentColorToSvg}
+                    className="text-xs text-emerald-700 hover:text-emerald-900 font-semibold bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200"
+                    title="Hace que el SVG tome el color seleccionado abajo"
+                  >
+                    🎨 Aplicar color de marca al SVG
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setLogoSvg(DEFAULT_SVG_PRESET);
+                      setSvgFileName('icono-ejemplo.svg');
+                    }}
+                    className="text-xs text-indigo-600 hover:text-indigo-800 font-medium"
+                  >
+                    Usar ejemplo
+                  </button>
+                </div>
               </div>
-              <textarea
-                rows={4}
-                value={logoSvg}
-                onChange={(e) => setLogoSvg(e.target.value)}
-                placeholder='<svg viewBox="0 0 24 24" fill="currentColor">...</svg>'
-                className="block w-full rounded-xl border border-gray-300 p-3 font-mono text-xs shadow-sm focus:border-black focus:ring-black text-gray-700"
-              />
-              <p className="text-xs text-gray-400 mt-1">
-                Pega aquí tu código SVG. Recuerda usar <code className="bg-gray-100 px-1 py-0.5 rounded font-mono">fill="currentColor"</code> para que tome automáticamente el color que elijas.
-              </p>
+
+              <div
+                onClick={() => svgFileInputRef.current?.click()}
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  if (e.dataTransfer.files?.[0]) {
+                    handleSvgFileSelect(e.dataTransfer.files[0]);
+                  }
+                }}
+                className="border-2 border-dashed border-indigo-300 hover:border-indigo-600 bg-indigo-50/40 rounded-2xl p-4 text-center cursor-pointer transition-all flex items-center justify-between gap-4"
+              >
+                <input
+                  ref={svgFileInputRef}
+                  type="file"
+                  accept=".svg,image/svg+xml"
+                  className="hidden"
+                  onChange={(e) => {
+                    if (e.target.files?.[0]) handleSvgFileSelect(e.target.files[0]);
+                  }}
+                />
+                <div className="text-left">
+                  <p className="text-xs font-bold text-indigo-950">
+                    📂 Haz clic aquí o arrastra tu archivo <code className="bg-white px-1 rounded">.svg</code>
+                  </p>
+                  <p className="text-[11px] text-indigo-700 mt-0.5">
+                    {svgFileName
+                      ? `Archivo cargado: ${svgFileName}`
+                      : 'Sube tu logotipo vectorial exportado desde Illustrator, Figma o Canva'}
+                  </p>
+                </div>
+                <span className="px-3 py-1.5 rounded-xl bg-indigo-600 text-white text-xs font-bold shrink-0">
+                  Subir .SVG
+                </span>
+              </div>
+
+              <details className="text-xs text-gray-500">
+                <summary className="cursor-pointer font-semibold text-gray-600 hover:text-black py-1">
+                  Ver / editar código fuente SVG manualmente
+                </summary>
+                <textarea
+                  rows={4}
+                  value={logoSvg}
+                  onChange={(e) => setLogoSvg(e.target.value)}
+                  placeholder='<svg viewBox="0 0 24 24" fill="currentColor">...</svg>'
+                  className="mt-1 block w-full rounded-xl border border-gray-300 p-3 font-mono text-xs shadow-sm focus:border-black focus:ring-black text-gray-700"
+                />
+              </details>
             </div>
 
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Color de Marca / Logo
+                Color Principal de Marca / Logo
               </label>
               <div className="flex items-center gap-3 mb-3">
                 <input
@@ -245,12 +410,11 @@ export default function AppearanceForm({ initialSettings }: AppearanceFormProps)
                   type="text"
                   value={logoColor}
                   onChange={(e) => setLogoColor(e.target.value)}
-                  placeholder="#4f46e5"
+                  placeholder="#ec4899"
                   className="w-32 rounded-lg border border-gray-300 px-3 py-2 font-mono text-sm uppercase"
                 />
               </div>
 
-              {/* Presets de Color */}
               <div className="flex flex-wrap gap-2">
                 {COLOR_PRESETS.map((preset) => (
                   <button
@@ -259,7 +423,8 @@ export default function AppearanceForm({ initialSettings }: AppearanceFormProps)
                     onClick={() => setLogoColor(preset.hex)}
                     className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-gray-200 text-xs font-medium hover:scale-105 transition-transform"
                     style={{
-                      backgroundColor: logoColor.toLowerCase() === preset.hex.toLowerCase() ? '#f3f4f6' : '#ffffff',
+                      backgroundColor:
+                        logoColor.toLowerCase() === preset.hex.toLowerCase() ? '#f3f4f6' : '#ffffff',
                     }}
                   >
                     <span
@@ -283,42 +448,147 @@ export default function AppearanceForm({ initialSettings }: AppearanceFormProps)
                 <div className="flex items-center gap-3">
                   {logoSvg.trim() ? (
                     <div
-                      className="w-8 h-8 flex items-center justify-center transition-colors"
+                      className="w-9 h-9 flex items-center justify-center transition-colors [&>svg]:w-full [&>svg]:h-full"
                       style={{ color: logoColor }}
                       dangerouslySetInnerHTML={{ __html: logoSvg }}
                     />
                   ) : (
                     <div
-                      className="w-8 h-8 rounded-lg flex items-center justify-center font-bold text-white text-sm shadow-sm"
+                      className="w-9 h-9 rounded-lg flex items-center justify-center font-bold text-white text-sm shadow-sm"
                       style={{ backgroundColor: logoColor }}
                     >
-                      {siteName.charAt(0) || 'E'}
+                      {siteName.charAt(0) || 'L'}
                     </div>
                   )}
-                  <span className="font-bold text-gray-900 tracking-tight text-lg">
+                  <span
+                    className="font-extrabold text-gray-900 tracking-tight text-lg"
+                    style={{ fontFamily: `'${headingFont}', sans-serif` }}
+                  >
                     {siteName}
                     <span style={{ color: logoColor }}>.</span>
                   </span>
                 </div>
-                <div className="flex gap-2">
-                  <span className="w-2 h-2 rounded-full bg-gray-200" />
-                  <span className="w-2 h-2 rounded-full bg-gray-200" />
-                </div>
+                {logoSvg.trim() && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setLogoSvg('');
+                      setSvgFileName(null);
+                    }}
+                    className="text-[11px] text-red-600 hover:underline font-semibold"
+                  >
+                    Quitar SVG
+                  </button>
+                )}
               </div>
               <p className="text-xs text-gray-400 mt-4 text-center">
-                Así se verá tu cabecera tanto en computadora como en teléfonos.
+                Así se verá tu logotipo SVG y fuente de marca en toda la tienda.
               </p>
             </div>
           </div>
         </div>
       </div>
 
-      {/* SECCIÓN 2: BANNER PRINCIPAL (HERO SECTION) */}
+      {/* SECCIÓN 2: TIPOGRAFÍAS DE LA TIENDA (GOOGLE FONTS) */}
+      <div className="bg-white rounded-2xl border border-gray-200 p-8 shadow-sm space-y-6">
+        <div className="border-b border-gray-100 pb-4">
+          <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+            <span>🔤 2. Tipografías de la Tienda (Títulos y Textos)</span>
+          </h2>
+          <p className="text-sm text-gray-500 mt-1">
+            Personaliza la personalidad visual para cada cliente cambiando las fuentes tipográficas sin tocar código.
+          </p>
+        </div>
+
+        {/* Presets de combinación con 1 clic */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          {TYPOGRAPHY_PRESETS.map((preset) => {
+            const isSelected = headingFont === preset.heading && bodyFont === preset.body;
+            return (
+              <button
+                key={preset.title}
+                type="button"
+                onClick={() => {
+                  setHeadingFont(preset.heading);
+                  setBodyFont(preset.body);
+                }}
+                className={`p-3.5 rounded-2xl border text-left transition-all ${
+                  isSelected
+                    ? 'border-black bg-gray-900 text-white shadow-md'
+                    : 'border-gray-200 hover:border-gray-400 bg-gray-50/60 text-gray-900'
+                }`}
+              >
+                <div className="text-xs font-extrabold">{preset.title}</div>
+                <div className={`text-[11px] mt-0.5 ${isSelected ? 'text-gray-300' : 'text-gray-500'}`}>
+                  {preset.heading} + {preset.body}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1">
+              Tipografía de Títulos y Encabezados (Headings)
+            </label>
+            <select
+              value={headingFont}
+              onChange={(e) => setHeadingFont(e.target.value)}
+              className="block w-full rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-900 focus:border-black focus:ring-black"
+            >
+              {FONT_OPTIONS.map((f) => (
+                <option key={f.name} value={f.name}>
+                  {f.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1">
+              Tipografía de Cuerpo, Descripciones y Precios (Body)
+            </label>
+            <select
+              value={bodyFont}
+              onChange={(e) => setBodyFont(e.target.value)}
+              className="block w-full rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-900 focus:border-black focus:ring-black"
+            >
+              {FONT_OPTIONS.map((f) => (
+                <option key={f.name} value={f.name}>
+                  {f.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {/* Muestra tipográfica en vivo */}
+        <div className="p-6 rounded-2xl bg-gray-50 border border-gray-200 space-y-2">
+          <span className="text-[10px] font-mono uppercase tracking-wider text-gray-400">
+            Vista Previa Tipográfica en Vivo ({headingFont} + {bodyFont})
+          </span>
+          <h3
+            className="text-2xl sm:text-3xl font-extrabold text-gray-900"
+            style={{ fontFamily: `'${headingFont}', sans-serif` }}
+          >
+            {heroTitle}
+          </h3>
+          <p
+            className="text-sm text-gray-600 max-w-2xl leading-relaxed"
+            style={{ fontFamily: `'${bodyFont}', sans-serif` }}
+          >
+            {heroSubtitle} — Cada producto de tu catálogo, carrito y pasarela de pago se mostrará con esta combinación tipográfica.
+          </p>
+        </div>
+      </div>
+
+      {/* SECCIÓN 3: BANNER PRINCIPAL (HERO SECTION) */}
       <div className="bg-white rounded-2xl border border-gray-200 p-8 shadow-sm">
         <div className="border-b border-gray-100 pb-4 mb-6">
           <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-            Banner Principal de Inicio (Hero)
+            3. Banner Principal de Inicio (Hero)
           </h2>
           <p className="text-sm text-gray-500 mt-1">
             Configura la imagen de fondo, los textos promocionales y el botón principal de la página de inicio.
@@ -424,7 +694,6 @@ export default function AppearanceForm({ initialSettings }: AppearanceFormProps)
               </div>
             </div>
 
-            {/* Estadísticas de compresión */}
             {stats && (
               <div className="mt-2 text-xs text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-200 inline-block font-mono">
                 ✓ Comprimido: {stats.original} ➔ {stats.compressed} ({stats.savings}% ahorro)
@@ -456,7 +725,6 @@ export default function AppearanceForm({ initialSettings }: AppearanceFormProps)
                 backgroundPosition: 'center',
               }}
             >
-              {/* Overlay oscuro para legibilidad */}
               <div className="absolute inset-0 bg-black/60 backdrop-blur-[2px]" />
 
               <div className="relative z-10 mx-auto max-w-2xl px-6">
@@ -470,16 +738,22 @@ export default function AppearanceForm({ initialSettings }: AppearanceFormProps)
                 >
                   {siteName} • Destacado
                 </span>
-                <h1 className="text-3xl font-extrabold tracking-tight text-white sm:text-5xl drop-shadow-md">
+                <h1
+                  className="text-3xl font-extrabold tracking-tight text-white sm:text-5xl drop-shadow-md"
+                  style={{ fontFamily: `'${headingFont}', sans-serif` }}
+                >
                   {heroTitle}
                 </h1>
-                <p className="mt-4 text-base leading-7 text-gray-200 drop-shadow">
+                <p
+                  className="mt-4 text-base leading-7 text-gray-200 drop-shadow"
+                  style={{ fontFamily: `'${bodyFont}', sans-serif` }}
+                >
                   {heroSubtitle}
                 </p>
                 <div className="mt-8 flex items-center justify-center gap-x-6">
                   <span
                     className="rounded-xl px-6 py-3 text-sm font-bold shadow-lg transition-transform hover:scale-105 cursor-pointer text-white"
-                    style={{ backgroundColor: logoColor }}
+                    style={{ backgroundColor: logoColor, fontFamily: `'${bodyFont}', sans-serif` }}
                   >
                     {heroCtaText} &rarr;
                   </span>
@@ -490,27 +764,14 @@ export default function AppearanceForm({ initialSettings }: AppearanceFormProps)
         </div>
       </div>
 
-      {/* BOTÓN FLOTANTE O INFERIOR DE GUARDAR */}
+      {/* BOTÓN FLOTANTE DE GUARDAR */}
       <div className="sticky bottom-6 flex justify-end">
         <button
           type="submit"
           disabled={isSubmitting}
           className="flex items-center gap-2 px-8 py-3.5 rounded-xl bg-black hover:bg-gray-800 text-white font-bold text-sm shadow-xl transition-all hover:scale-105 active:scale-95 disabled:opacity-50"
         >
-          {isSubmitting ? (
-            <>
-              <svg className="animate-spin h-4 w-4 text-white" viewBox="0 0 24 24" fill="none">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
-              </svg>
-              <span>Guardando cambios...</span>
-            </>
-          ) : (
-            <>
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" /></svg>
-              <span>Guardar Configuración de Diseño</span>
-            </>
-          )}
+          {isSubmitting ? 'Guardando cambios...' : 'Guardar Configuración de Diseño'}
         </button>
       </div>
     </form>

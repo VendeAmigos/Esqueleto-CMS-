@@ -131,13 +131,26 @@ import ShippingForm from '../components/ShippingForm.astro';
             />
           </div>
 
-          <div class="mt-5 space-y-3">
+          <!-- Estado en vivo de la Dirección de Envío Obligatoria -->
+          <div
+            id="shipping-readiness-box"
+            class="mt-4 rounded-xl border border-amber-200 bg-amber-50/80 p-3 text-xs text-amber-900 space-y-1"
+          >
+            <div class="font-bold flex items-center gap-1.5" id="shipping-readiness-title">
+              <span>📍 Dirección de envío obligatoria</span>
+            </div>
+            <p id="shipping-readiness-desc" class="text-[11px] text-amber-800">
+              Completa tu nombre, teléfono y domicilio en la sección izquierda para habilitar el pago.
+            </p>
+          </div>
+
+          <div class="mt-4 space-y-3">
             <button
               id="checkout-btn"
               type="button"
               class="w-full flex items-center justify-center gap-2 rounded-xl bg-gray-900 px-6 py-3.5 text-base font-semibold text-white shadow-sm transition-all duration-200 hover:bg-black active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-gray-900"
             >
-              <span>Proceder al Pago</span>
+              <span>Pagar Seguro con Mercado Pago</span>
               <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
               </svg>
@@ -491,25 +504,67 @@ import ShippingForm from '../components/ShippingForm.astro';
       });
     }
 
-    // 2. Checkout Click con Cupón
+    // 2. Sincronizar estado visual de la dirección de envío obligatoria
+    const readinessBox = document.getElementById('shipping-readiness-box');
+    const readinessTitle = document.getElementById('shipping-readiness-title');
+    const readinessDesc = document.getElementById('shipping-readiness-desc');
+
+    const updateShippingReadinessUI = () => {
+      if (!readinessBox || !readinessTitle || !readinessDesc) return;
+      const s = $shipping.get();
+      const errs = getShippingErrors(s);
+      if (errs.length === 0) {
+        readinessBox.className =
+          'mt-4 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-900 space-y-1';
+        readinessTitle.textContent = '✓ Dirección de envío lista';
+        readinessDesc.className = 'text-[11px] text-emerald-800';
+        readinessDesc.textContent = `${s.street} #${s.extNumber}, Col. ${s.neighborhood}, CP ${s.zip} (${s.municipality}, ${s.state})`;
+      } else {
+        readinessBox.className =
+          'mt-4 rounded-xl border border-amber-200 bg-amber-50/80 p-3 text-xs text-amber-900 space-y-1';
+        readinessTitle.textContent = `📍 Dirección obligatoria (${errs.length} pendiente${errs.length === 1 ? '' : 's'})`;
+        readinessDesc.className = 'text-[11px] text-amber-800';
+        readinessDesc.textContent = `Falta completar: ${errs.map((e) => e.message.toLowerCase()).join(', ')}.`;
+      }
+    };
+
+    updateShippingReadinessUI();
+    $shipping.subscribe(updateShippingReadinessUI);
+
+    // 3. Checkout Click con Validación Estricta de Dirección y Cupón
     const checkoutBtnEl = document.getElementById('checkout-btn') as HTMLButtonElement | null;
     if (checkoutBtnEl) {
       checkoutBtnEl.addEventListener('click', async () => {
         const cartItems = $cart.get();
         if (cartItems.length === 0) return;
 
-        // 1. Validar datos de envío obligatorios
+        // Validar datos de envío obligatorios y resaltar todos los campos faltantes
         const shippingData = $shipping.get();
         const errors = getShippingErrors(shippingData);
         if (errors.length > 0) {
+          errors.forEach((err) => {
+            const wrap = document.querySelector(`[data-field-wrap="${err.field}"]`);
+            wrap
+              ?.querySelectorAll('input, select')
+              .forEach((el) => el.classList.add('border-red-400', 'ring-2', 'ring-red-100'));
+            const errEl = wrap?.querySelector('.field-error');
+            if (errEl) {
+              errEl.textContent = err.message;
+              errEl.classList.remove('hidden');
+            }
+          });
+
           const first = errors[0];
-          alert(`⚠️ Datos de envío incompletos: ${first.message}`);
           const targetInput = document.getElementById(`ship-${first.field}`);
           if (targetInput) {
             targetInput.focus();
             targetInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            targetInput.classList.add('border-red-400', 'ring-2', 'ring-red-100');
           }
+          alert(
+            `⚠️ Para continuar al pago es obligatorio completar tu dirección de envío.\n\nPor favor revisa: ${errors
+              .map((e) => e.message)
+              .join(', ')}.`
+          );
           return;
         }
 

@@ -1,0 +1,20 @@
+{
+  "extends": "../../packages/config/tsconfig.base.json",
+  "compilerOptions": {
+    "jsx": "preserve",
+    "allowJs": true,
+    "baseUrl": ".",
+    "paths": {
+      "@esqueleto/core": [
+        "../../packages/core/src/index.ts"
+      ],
+      "@esqueleto/core/*": [
+        "../../packages/core/src/*"
+      ]
+    }
+  },
+  "include": [
+    "src/**/*",
+    "src/**/*.astro"
+  ]
+}

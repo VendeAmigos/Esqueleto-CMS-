@@ -3,30 +3,15 @@
 import Layout from '../layouts/Layout.astro';
 import ProductCard from '../components/ProductCard.astro';
 import {
-  db,
-  siteSettings,
-  eq,
-  isDatabaseAvailable,
-  markDatabaseOffline,
+  getStoredSiteSettings,
   getStoredCategories,
   getStoredProducts,
   getGridSpanClasses,
   parseGridSpan,
 } from '@esqueleto/core';
 
-// 0. Fallback inmediato con temática de Merch de Ilustradora
-const defaultSettings = {
-  siteName: 'LUNA ART STUDIO',
-  logoColor: '#ec4899',
-  heroTitle: 'Ilustración de Autor, Prints & Merch Exclusivo',
-  heroSubtitle: 'Láminas de arte fine art, stickers holográficos, pines esmaltados y papelería ilustrada para alegrar tu día a día.',
-  heroImageUrl: 'https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?w=1600&auto=format&fit=crop&q=80',
-  heroCtaText: 'Explorar Tienda de Arte',
-  heroCtaLink: '/catalogo',
-};
-
-let settings = { ...defaultSettings };
-const [rawCategories, allStoredProducts] = await Promise.all([
+const [settings, rawCategories, allStoredProducts] = await Promise.all([
+  getStoredSiteSettings(),
   getStoredCategories(),
   getStoredProducts(),
 ]);
@@ -38,30 +23,6 @@ const categoriesWithCount = rawCategories.map((cat) => ({
 
 const selectedFeatured = allStoredProducts.filter((p) => p.isFeatured);
 const featuredProducts = selectedFeatured.length > 0 ? selectedFeatured : allStoredProducts.slice(0, 4);
-
-// 1. Comprobación rápida del estado de PostgreSQL (Circuit Breaker)
-const isDbOnline = await isDatabaseAvailable();
-
-if (isDbOnline) {
-  try {
-    // Cargar apariencia en vivo desde la base de datos
-    const settingsList = await db.select().from(siteSettings).where(eq(siteSettings.id, 'default')).execute();
-    if (settingsList && settingsList[0]) {
-      settings = {
-        siteName: settingsList[0].siteName || settings.siteName,
-        logoColor: settingsList[0].logoColor || settings.logoColor,
-        heroTitle: settingsList[0].heroTitle || settings.heroTitle,
-        heroSubtitle: settingsList[0].heroSubtitle || settings.heroSubtitle,
-        heroImageUrl: settingsList[0].heroImageUrl || settings.heroImageUrl,
-        heroCtaText: settingsList[0].heroCtaText || settings.heroCtaText,
-        heroCtaLink: settingsList[0].heroCtaLink || settings.heroCtaLink,
-      };
-    }
-  } catch (err) {
-    markDatabaseOffline();
-    console.warn('Aviso al consultar PostgreSQL en vivo, usando datos precargados:', err);
-  }
-}
 
 // Helper de clases para cualquier tamaño de Bento Grid
 const getGridSpanClass = (span: string) => getGridSpanClasses(span);
@@ -81,7 +42,7 @@ const gridBoardRows = categoriesWithCount.reduce((acc, cat) => {
 const desktopRowHeightPx = gridBoardRows >= 6 ? 115 : gridBoardRows >= 5 ? 145 : 220;
 ---
 
-<Layout title="Inicio" description={settings.heroSubtitle}>
+<Layout title="Inicio" description={settings.heroSubtitle || undefined}>
   <div class="space-y-16">
     
     <!-- 1. BANNER HERO PRINCIPAL (EDITABLE DESDE EL CMS) -->

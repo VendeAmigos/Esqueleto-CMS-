@@ -2,6 +2,7 @@
 
 import { useState, useRef } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { createProduct, updateProduct } from '../actions/products';
 
 interface ModifierOption {
@@ -29,18 +30,21 @@ interface ProductFormProps {
     basePrice: number; // En centavos
     categoryId: string | null;
     isFeatured?: boolean;
+    isActive?: boolean;
     modifiers: ModifierGroup[];
   };
   isEdit?: boolean;
 }
 
 export default function ProductForm({ categories, initialData, isEdit = false }: ProductFormProps) {
+  const router = useRouter();
   const [title, setTitle] = useState(initialData?.title || '');
   const [description, setDescription] = useState(initialData?.description || '');
   const [price, setPrice] = useState(initialData ? (initialData.basePrice / 100).toFixed(2) : '');
   const [categoryId, setCategoryId] = useState(initialData?.categoryId || '');
   const [imageUrl, setImageUrl] = useState(initialData?.imageUrl || '');
   const [isFeatured, setIsFeatured] = useState(initialData?.isFeatured || false);
+  const [isActive, setIsActive] = useState(initialData?.isActive !== false);
   const [modifiers, setModifiers] = useState<ModifierGroup[]>(initialData?.modifiers || []);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -309,14 +313,23 @@ export default function ProductForm({ categories, initialData, isEdit = false }:
     formData.append('category', categoryId);
     formData.append('image', imageUrl);
     formData.append('isFeatured', isFeatured ? 'true' : 'false');
+    formData.append('isActive', isActive ? 'true' : 'false');
     formData.append('modifiers', JSON.stringify(modifiers));
 
     try {
-      if (isEdit && initialData?.id) {
-        await updateProduct(initialData.id, formData);
-      } else {
-        await createProduct(formData);
+      const res =
+        isEdit && initialData?.id
+          ? await updateProduct(initialData.id, formData)
+          : await createProduct(formData);
+
+      if (!res?.success) {
+        alert(res?.error || 'Error al guardar el producto');
+        setIsSubmitting(false);
+        return;
       }
+
+      router.push('/productos');
+      router.refresh();
     } catch (err: any) {
       alert(err.message || 'Error al guardar el producto');
       setIsSubmitting(false);
@@ -434,6 +447,30 @@ export default function ProductForm({ categories, initialData, isEdit = false }:
                 className="sr-only peer"
               />
               <div className="w-12 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-500 shadow-inner"></div>
+            </label>
+          </div>
+
+          {/* Toggle de Producto Activo / Visible en Tienda */}
+          <div className="md:col-span-2 bg-gray-50 border border-gray-200 rounded-2xl p-4 flex items-center justify-between">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className={`h-2.5 w-2.5 rounded-full ${isActive ? 'bg-emerald-500' : 'bg-gray-400'}`} />
+                <span className="text-sm font-bold text-gray-900">
+                  {isActive ? 'Producto Activo y Visible en Tienda' : 'Producto Pausado (Oculto en Tienda)'}
+                </span>
+              </div>
+              <p className="text-xs text-gray-500 mt-1">
+                Si lo desactivas, el producto se conservará en el CMS pero no aparecerá en el catálogo público ni podrá comprarse.
+              </p>
+            </div>
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                checked={isActive}
+                onChange={(e) => setIsActive(e.target.checked)}
+                className="sr-only peer"
+              />
+              <div className="w-12 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600 shadow-inner"></div>
             </label>
           </div>
         </div>

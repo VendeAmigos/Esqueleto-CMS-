@@ -1,27 +1,13 @@
 ---
 // apps/storefront/src/components/Navbar.astro
-import { db, siteSettings, eq, isDatabaseAvailable, markDatabaseOffline } from '@esqueleto/core';
+import { getStoredSiteSettings } from '@esqueleto/core';
 
-let settings = {
-  siteName: 'LUNA ART STUDIO',
-  logoSvg: '',
-  logoColor: '#ec4899',
+const storedSettings = await getStoredSiteSettings();
+const settings = {
+  siteName: storedSettings.siteName || 'LUNA ART STUDIO',
+  logoSvg: storedSettings.logoSvg || '',
+  logoColor: storedSettings.logoColor || '#ec4899',
 };
-
-if (await isDatabaseAvailable()) {
-  try {
-    const res = await db.select().from(siteSettings).where(eq(siteSettings.id, 'default')).execute();
-    if (res[0]) {
-      settings = {
-        siteName: res[0].siteName || 'LUNA ART STUDIO',
-        logoSvg: res[0].logoSvg || '',
-        logoColor: res[0].logoColor || '#ec4899',
-      };
-    }
-  } catch (e) {
-    markDatabaseOffline();
-  }
-}
 
 const pathname = Astro.url.pathname;
 ---

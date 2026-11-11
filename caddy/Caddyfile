@@ -12,11 +12,16 @@
     # Compresión automática de alto rendimiento con Gzip y Zstandard
     encode gzip zstd
 
-    # Servir archivos subidos directamente desde disco con caché inmutable
+    # Bloquear acceso público a archivos internos (.cms-data / .json) dentro de uploads
+    @blocked_uploads path /uploads/.* /uploads/*.json
+    respond @blocked_uploads 403
+
+    # Servir imágenes subidas directamente desde disco con caché inmutable
     handle /uploads/* {
         root * /var/www
         file_server
         header Cache-Control "public, max-age=2592000, immutable"
+        header X-Content-Type-Options "nosniff"
     }
 
     # Tráfico dinámico hacia Astro Storefront
@@ -36,11 +41,15 @@
 {$ADMIN_DOMAIN:admin.localhost}, adminshop.afotica.com, admshop.afotica.com, admin.shop.afotica.com, admin.tienda.local {
     encode gzip zstd
 
+    @blocked_uploads path /uploads/.* /uploads/*.json
+    respond @blocked_uploads 403
+
     # Servir imágenes subidas
     handle /uploads/* {
         root * /var/www
         file_server
         header Cache-Control "public, max-age=2592000, immutable"
+        header X-Content-Type-Options "nosniff"
     }
 
     # Tráfico hacia Next.js Admin con soporte nativo de WebSockets y Server Actions

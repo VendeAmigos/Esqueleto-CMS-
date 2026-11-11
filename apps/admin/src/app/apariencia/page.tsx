@@ -1,45 +1,24 @@
-import { db, siteSettings, isDatabaseAvailable, eq } from '@esqueleto/core';
+import { getStoredSiteSettings } from '@esqueleto/core';
 import AppearanceForm from './AppearanceForm';
 
 export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 export default async function AparienciaPage() {
-  let settingsList: any[] = [];
-  if (await isDatabaseAvailable()) {
-    try {
-      settingsList = await db
-        .select()
-        .from(siteSettings)
-        .where(eq(siteSettings.id, 'default'))
-        .execute();
-    } catch (err) {
-      console.error('Error al cargar configuración de apariencia:', err);
-    }
-  }
-
-  const currentSettings = settingsList[0] || {
-    siteName: 'ESQUELETO',
-    logoSvg: '',
-    logoColor: '#4f46e5',
-    heroTitle: 'Velocidad extrema. Control total en Docker.',
-    heroSubtitle: 'E-commerce Open Source Plug & Play de alto rendimiento con catálogo interactivo y checkout seguro.',
-    heroImageUrl: 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?auto=format&fit=crop&w=1600&q=80',
-    heroCtaText: 'Explorar Catálogo',
-    heroCtaLink: '/catalogo',
-  };
+  const currentSettings = await getStoredSiteSettings();
 
   return (
     <main className="min-h-screen p-8 max-w-6xl mx-auto">
       <div className="border-b border-gray-200 pb-5 mb-8 flex justify-between items-end">
         <div>
           <span className="text-xs font-bold uppercase tracking-wider text-indigo-600 bg-indigo-50 px-2.5 py-1 rounded-md">
-            Personalizador de Marca
+            Personalizador de Marca (Boilerplate Multi-Cliente)
           </span>
           <h1 className="text-3xl font-bold tracking-tight text-gray-900 mt-2">
-            Diseño, Banner y Logotipo
+            Diseño, Logotipo SVG, Tipografía y Banner
           </h1>
           <p className="mt-2 text-sm text-gray-500">
-            Controla visualmente la apariencia de tu tienda: cambia el banner principal, el logotipo SVG y los colores de la marca en tiempo real.
+            Sube tu archivo <code className="bg-gray-100 px-1.5 py-0.5 rounded">.svg</code> como logotipo, elige las tipografías de la tienda y personaliza el banner principal en tiempo real.
           </p>
         </div>
       </div>

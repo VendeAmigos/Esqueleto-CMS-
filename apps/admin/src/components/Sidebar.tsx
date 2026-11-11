@@ -114,6 +114,20 @@ export default function Sidebar() {
           </svg>
           Órdenes
         </Link>
+
+        <Link 
+          href="/pagos" 
+          className={`flex items-center gap-3 px-3 py-2.5 font-medium text-sm transition-colors border ${
+            pathname?.startsWith('/pagos')
+              ? 'bg-black text-white border-black'
+              : 'text-gray-900 hover:bg-black hover:text-white border-transparent hover:border-black'
+          }`}
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="square" strokeLinejoin="miter" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+          </svg>
+          Pasarela de Pagos
+        </Link>
       </nav>
 
       {/* Pie del Sidebar con Perfil y Botón de Cerrar Sesión */}

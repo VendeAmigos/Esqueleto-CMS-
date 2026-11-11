@@ -313,6 +313,7 @@ const cardId = `product-card-${id}`;
         });
 
         function getSelectedModifiers() {
+          if (!modal) return [];
           const inputs = modal.querySelectorAll<HTMLInputElement>('input[data-opt-id]:checked');
           const selected: any[] = [];
           inputs.forEach((input) => {

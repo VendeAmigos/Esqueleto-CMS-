@@ -1,6 +1,8 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { changeOrderStatusAction } from './actions';
 
 interface OrderItem {
   id: string;
@@ -30,7 +32,19 @@ interface OrderItem {
 }
 
 export default function OrdersTable({ orders }: { orders: OrderItem[] }) {
+  const router = useRouter();
   const [selectedOrder, setSelectedOrder] = useState<OrderItem | null>(null);
+  const [updatingId, setUpdatingId] = useState<string | null>(null);
+
+  const handleStatusChange = async (
+    orderId: string,
+    nextStatus: 'pending' | 'paid' | 'shipped' | 'cancelled'
+  ) => {
+    setUpdatingId(orderId);
+    await changeOrderStatusAction(orderId, nextStatus);
+    setUpdatingId(null);
+    router.refresh();
+  };
 
   const currencyFormatter = new Intl.NumberFormat('es-MX', {
     style: 'currency',
@@ -138,19 +152,30 @@ export default function OrdersTable({ orders }: { orders: OrderItem[] }) {
                   </td>
 
                   <td className="px-6 py-4 whitespace-nowrap">
-                    {order.status === 'paid' ? (
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800">
-                        Aprobado
-                      </span>
-                    ) : order.status === 'cancelled' ? (
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-800">
-                        Cancelado
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 capitalize">
-                        {order.status}
-                      </span>
-                    )}
+                    <select
+                      disabled={updatingId === order.id}
+                      value={order.status}
+                      onChange={(e) =>
+                        handleStatusChange(
+                          order.id,
+                          e.target.value as 'pending' | 'paid' | 'shipped' | 'cancelled'
+                        )
+                      }
+                      className={`rounded-full px-3 py-1 text-xs font-bold border cursor-pointer transition-colors ${
+                        order.status === 'paid'
+                          ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                          : order.status === 'shipped'
+                          ? 'bg-indigo-100 text-indigo-800 border-indigo-300'
+                          : order.status === 'cancelled'
+                          ? 'bg-red-100 text-red-800 border-red-300'
+                          : 'bg-amber-100 text-amber-800 border-amber-300'
+                      }`}
+                    >
+                      <option value="pending">⏳ Pendiente de Pago</option>
+                      <option value="paid">✓ Pagado (Aprobado)</option>
+                      <option value="shipped">🚚 Enviado al Cliente</option>
+                      <option value="cancelled">✕ Cancelado</option>
+                    </select>
                   </td>
 
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm">

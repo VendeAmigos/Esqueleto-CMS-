@@ -1,13 +1,14 @@
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: esqueleto-postgres
+    container_name: ${APP_SLUG:-esqueleto}-postgres
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-admin}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-admin123}
       POSTGRES_DB: ${POSTGRES_DB:-esqueleto}
     ports:
-      - "5434:5432"
+      # Ligado únicamente a 127.0.0.1 para impedir acceso externo desde Internet
+      - "127.0.0.1:${POSTGRES_HOST_PORT:-5434}:5432"
     volumes:
       - esqueleto_pgdata:/var/lib/postgresql/data
       - ./docker/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
@@ -24,21 +25,30 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.storefront
-    container_name: esqueleto-storefront
+    container_name: ${APP_SLUG:-esqueleto}-storefront
     depends_on:
       postgres:
         condition: service_healthy
     environment:
+      - DOCKER_CONTAINER=1
       - DATABASE_URL=postgres://${POSTGRES_USER:-admin}:${POSTGRES_PASSWORD:-admin123}@postgres:5432/${POSTGRES_DB:-esqueleto}
+      - UPLOADS_DIR=/app/uploads
       - HOST=0.0.0.0
       - PORT=4321
       - MP_ACCESS_TOKEN=${MP_ACCESS_TOKEN:-}
+      - PUBLIC_MP_PUBLIC_KEY=${PUBLIC_MP_PUBLIC_KEY:-}
+      - MP_WEBHOOK_SECRET=${MP_WEBHOOK_SECRET:-}
       - PUBLIC_STOREFRONT_URL=${PUBLIC_STOREFRONT_URL:-https://shop.afotica.com}
     env_file:
       - path: .env
         required: false
     volumes:
       - ./uploads:/app/uploads
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://127.0.0.1:4321/api/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
     networks:
       - esqueleto-internal
       - shared_caddy_net
@@ -48,21 +58,34 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.admin
-    container_name: esqueleto-admin
+    container_name: ${APP_SLUG:-esqueleto}-admin
     depends_on:
       postgres:
         condition: service_healthy
     environment:
+      - DOCKER_CONTAINER=1
       - DATABASE_URL=postgres://${POSTGRES_USER:-admin}:${POSTGRES_PASSWORD:-admin123}@postgres:5432/${POSTGRES_DB:-esqueleto}
       - UPLOADS_DIR=/app/uploads
       - HOSTNAME=0.0.0.0
       - PORT=3001
       - DOCKER_BUILD=1
+      - ADMIN_USER=${ADMIN_USER:-admin}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-esqueleto}
+      - ADMIN_SECRET=${ADMIN_SECRET:-esqueleto-super-secure-production-secret-key-2026}
+      - MP_ACCESS_TOKEN=${MP_ACCESS_TOKEN:-}
+      - PUBLIC_MP_PUBLIC_KEY=${PUBLIC_MP_PUBLIC_KEY:-}
+      - MP_WEBHOOK_SECRET=${MP_WEBHOOK_SECRET:-}
+      - PUBLIC_STOREFRONT_URL=${PUBLIC_STOREFRONT_URL:-https://shop.afotica.com}
     env_file:
       - path: .env
         required: false
     volumes:
       - ./uploads:/app/uploads
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://127.0.0.1:3001/api/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
     networks:
       - esqueleto-internal
       - shared_caddy_net
@@ -74,7 +97,8 @@ volumes:
 
 networks:
   esqueleto-internal:
+    name: ${APP_SLUG:-esqueleto}-internal
     driver: bridge
   shared_caddy_net:
     external: true
-    name: kws-mx-docker_kws_network
+    name: ${EXTERNAL_PROXY_NET:-kws-mx-docker_kws_network}

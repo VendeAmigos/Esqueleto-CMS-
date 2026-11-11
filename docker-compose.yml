@@ -1,13 +1,13 @@
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: esqueleto-postgres
+    container_name: ${APP_SLUG:-esqueleto}-postgres
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-admin}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-admin123}
       POSTGRES_DB: ${POSTGRES_DB:-esqueleto}
     ports:
-      - "5432:5432"
+      - "${POSTGRES_HOST_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./docker/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
@@ -24,23 +24,33 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.storefront
-    container_name: esqueleto-storefront
+    container_name: ${APP_SLUG:-esqueleto}-storefront
     depends_on:
       postgres:
         condition: service_healthy
     environment:
+      - DOCKER_CONTAINER=1
       - DATABASE_URL=postgres://${POSTGRES_USER:-admin}:${POSTGRES_PASSWORD:-admin123}@postgres:5432/${POSTGRES_DB:-esqueleto}
+      - UPLOADS_DIR=/app/uploads
       - HOST=0.0.0.0
       - PORT=4321
       - MP_ACCESS_TOKEN=${MP_ACCESS_TOKEN:-}
-      - PUBLIC_STOREFRONT_URL=${PUBLIC_STOREFRONT_URL:-https://shop.afotica.com}
+      - PUBLIC_MP_PUBLIC_KEY=${PUBLIC_MP_PUBLIC_KEY:-}
+      - MP_WEBHOOK_SECRET=${MP_WEBHOOK_SECRET:-}
+      - PUBLIC_STOREFRONT_URL=${PUBLIC_STOREFRONT_URL:-http://localhost:4321}
     env_file:
       - path: .env
         required: false
     ports:
-      - "4321:4321"
+      - "${STOREFRONT_PORT:-4321}:4321"
     volumes:
       - ./uploads:/app/uploads
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://127.0.0.1:4321/api/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
     networks:
       - esqueleto-network
     restart: unless-stopped
@@ -49,42 +59,58 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.admin
-    container_name: esqueleto-admin
+    container_name: ${APP_SLUG:-esqueleto}-admin
     depends_on:
       postgres:
         condition: service_healthy
     environment:
+      - DOCKER_CONTAINER=1
       - DATABASE_URL=postgres://${POSTGRES_USER:-admin}:${POSTGRES_PASSWORD:-admin123}@postgres:5432/${POSTGRES_DB:-esqueleto}
       - UPLOADS_DIR=/app/uploads
       - HOSTNAME=0.0.0.0
       - PORT=3001
+      - ADMIN_USER=${ADMIN_USER:-admin}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-esqueleto}
+      - ADMIN_SECRET=${ADMIN_SECRET:-esqueleto-super-secure-production-secret-key-2026}
+      - MP_ACCESS_TOKEN=${MP_ACCESS_TOKEN:-}
+      - PUBLIC_MP_PUBLIC_KEY=${PUBLIC_MP_PUBLIC_KEY:-}
+      - MP_WEBHOOK_SECRET=${MP_WEBHOOK_SECRET:-}
+      - PUBLIC_STOREFRONT_URL=${PUBLIC_STOREFRONT_URL:-http://localhost:4321}
     env_file:
       - path: .env
         required: false
     ports:
-      - "3001:3001"
+      - "${ADMIN_PORT:-3001}:3001"
     volumes:
       - ./uploads:/app/uploads
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://127.0.0.1:3001/api/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
     networks:
       - esqueleto-network
     restart: unless-stopped
 
   caddy:
     image: caddy:2-alpine
-    container_name: esqueleto-caddy
+    container_name: ${APP_SLUG:-esqueleto}-caddy
     restart: unless-stopped
     ports:
       - "80:80"
       - "443:443"
-      - "443:443/udp" # Soporte para HTTP/3 (QUIC)
+      - "443:443/udp"
     volumes:
       - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
       - ./uploads:/var/www/uploads:ro
       - caddy_data:/data
       - caddy_config:/config
     depends_on:
-      - storefront
-      - admin
+      storefront:
+        condition: service_healthy
+      admin:
+        condition: service_healthy
     networks:
       - esqueleto-network
 
@@ -98,5 +124,5 @@ volumes:
 
 networks:
   esqueleto-network:
-    name: esqueleto-network
+    name: ${APP_SLUG:-esqueleto}-network
     driver: bridge

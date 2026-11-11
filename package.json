@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "node scripts/clean-ports.mjs && pnpm --filter \"./apps/*\" --parallel --no-bail run dev",
+    "build": "pnpm --filter @esqueleto/storefront run build && pnpm --filter @esqueleto/admin run build",
     "db:seed": "pnpm --filter @esqueleto/core db:seed",
     "db:push": "pnpm --filter @esqueleto/core db:push"
   }

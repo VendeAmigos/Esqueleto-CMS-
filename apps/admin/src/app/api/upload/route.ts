@@ -2,11 +2,33 @@ import { NextRequest, NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
+import { verifySessionToken, SESSION_COOKIE_NAME } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 
+const MAX_UPLOAD_SIZE_BYTES = 10 * 1024 * 1024; // 10 MB
+
+const ALLOWED_MIME_TO_EXT: Record<string, string> = {
+  'image/webp': 'webp',
+  'image/jpeg': 'jpg',
+  'image/jpg': 'jpg',
+  'image/png': 'png',
+  'image/gif': 'gif',
+  'image/avif': 'avif',
+};
+
 export async function POST(req: NextRequest) {
   try {
+    // 1. Defensa en profundidad: Verificar sesión de administrador
+    const sessionCookie = req.cookies.get(SESSION_COOKIE_NAME)?.value;
+    const session = sessionCookie ? await verifySessionToken(sessionCookie) : null;
+    if (!session) {
+      return NextResponse.json(
+        { error: 'No autorizado. Inicia sesión como administrador.' },
+        { status: 401 }
+      );
+    }
+
     const formData = await req.formData();
     const file = formData.get('file') as File | null;
 
@@ -17,26 +39,41 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // 2. Validar tipo MIME permitido
+    const safeExt = ALLOWED_MIME_TO_EXT[file.type.toLowerCase()];
+    if (!safeExt) {
+      return NextResponse.json(
+        { error: 'Formato de archivo no permitido. Usa imágenes WebP, JPG, PNG, GIF o AVIF.' },
+        { status: 400 }
+      );
+    }
+
+    // 3. Validar tamaño máximo (10 MB)
+    if (file.size > MAX_UPLOAD_SIZE_BYTES) {
+      return NextResponse.json(
+        { error: 'La imagen excede el tamaño máximo permitido de 10 MB.' },
+        { status: 413 }
+      );
+    }
+
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
 
-    // Ruta de almacenamiento de uploads: compatible con Docker y desarrollo local
-    // Si estamos en monorepo local, se almacena en la carpeta uploads de la raíz
+    // 4. Ruta de almacenamiento compatible con Docker (UPLOADS_DIR) y monorepo local
     const rootUploads = path.resolve(process.cwd(), '..', '..', 'uploads');
     const localUploads = path.resolve(process.cwd(), 'uploads');
-    
-    // Si existe la carpeta raíz de monorepo la usamos; si no, la local de la app
-    const targetDir = fs.existsSync(path.resolve(process.cwd(), '..', '..'))
-      ? rootUploads
-      : localUploads;
+    const targetDir = process.env.UPLOADS_DIR
+      ? path.resolve(process.env.UPLOADS_DIR)
+      : fs.existsSync(path.resolve(process.cwd(), '..', '..'))
+        ? rootUploads
+        : localUploads;
 
     if (!fs.existsSync(targetDir)) {
       fs.mkdirSync(targetDir, { recursive: true });
     }
 
-    // Nombre seguro con timestamp y hash único
-    const ext = file.name.split('.').pop() || 'webp';
-    const filename = `${Date.now()}-${crypto.randomBytes(4).toString('hex')}.${ext}`;
+    // 5. Nombre seguro con timestamp, hash criptográfico y extensión estricta
+    const filename = `${Date.now()}-${crypto.randomBytes(6).toString('hex')}.${safeExt}`;
     const destination = path.join(targetDir, filename);
 
     await fs.promises.writeFile(destination, buffer);

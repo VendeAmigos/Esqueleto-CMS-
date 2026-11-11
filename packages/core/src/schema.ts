@@ -60,6 +60,8 @@ export const siteSettings = pgTable('site_settings', {
   heroImageUrl: text('hero_image_url').default('https://images.unsplash.com/photo-1441986300917-64674bd600d8?auto=format&fit=crop&w=1600&q=80'),
   heroCtaText: text('hero_cta_text').notNull().default('Explorar Catálogo'),
   heroCtaLink: text('hero_cta_link').notNull().default('/catalogo'),
+  headingFont: text('heading_font').notNull().default('Plus Jakarta Sans'),
+  bodyFont: text('body_font').notNull().default('Inter'),
   updatedAt: timestamp('updated_at').notNull().$defaultFn(() => new Date()),
 });
 
@@ -141,7 +143,27 @@ export const orders = pgTable('orders', {
   shippingLat: doublePrecision('shipping_lat'),
   shippingLng: doublePrecision('shipping_lng'),
   locationSource: text('location_source'), // 'gps' | 'map' | 'zip'
+  mpPreferenceId: text('mp_preference_id'), // ID de preferencia de Mercado Pago
+  mpPaymentId: text('mp_payment_id'), // ID del pago confirmado en Mercado Pago
   createdAt: timestamp('created_at').notNull().$defaultFn(() => new Date()),
+});
+
+// ==========================================
+// 7b. Tabla: payment_settings (Configuración de Pasarela de Pagos por Tienda / POS)
+// ==========================================
+export const paymentSettings = pgTable('payment_settings', {
+  id: text('id')
+    .primaryKey()
+    .$defaultFn(() => 'default'),
+  mpEnabled: boolean('mp_enabled').notNull().default(false),
+  mpMode: text('mp_mode').notNull().default('production'), // 'sandbox' | 'production'
+  mpPublicKey: text('mp_public_key'),
+  mpAccessToken: text('mp_access_token'),
+  mpWebhookSecret: text('mp_webhook_secret'),
+  storefrontUrl: text('storefront_url'),
+  statementDescriptor: text('statement_descriptor').notNull().default('TIENDA ONLINE'),
+  binaryMode: boolean('binary_mode').notNull().default(false),
+  updatedAt: timestamp('updated_at').notNull().$defaultFn(() => new Date()),
 });
 
 // ==========================================
@@ -242,3 +264,6 @@ export type NewSiteSettings = InferInsertModel<typeof siteSettings>;
 
 export type DiscountCode = InferSelectModel<typeof discountCodes>;
 export type NewDiscountCode = InferInsertModel<typeof discountCodes>;
+
+export type PaymentSettings = InferSelectModel<typeof paymentSettings>;
+export type NewPaymentSettings = InferInsertModel<typeof paymentSettings>;

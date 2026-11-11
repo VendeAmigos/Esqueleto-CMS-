@@ -46,8 +46,13 @@ CREATE TABLE IF NOT EXISTS site_settings (
   hero_image_url TEXT DEFAULT 'https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?w=1600&auto=format&fit=crop&q=80',
   hero_cta_text TEXT NOT NULL DEFAULT 'Explorar Tienda de Arte',
   hero_cta_link TEXT NOT NULL DEFAULT '/catalogo',
+  heading_font TEXT NOT NULL DEFAULT 'Plus Jakarta Sans',
+  body_font TEXT NOT NULL DEFAULT 'Inter',
   updated_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
+
+ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS heading_font TEXT NOT NULL DEFAULT 'Plus Jakarta Sans';
+ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS body_font TEXT NOT NULL DEFAULT 'Inter';
 
 INSERT INTO site_settings (id, site_name, logo_color, hero_title, hero_subtitle, hero_image_url, hero_cta_text, hero_cta_link)
 VALUES (
@@ -104,28 +109,57 @@ CREATE TABLE IF NOT EXISTS orders (
   customer_email TEXT,
   items_summary TEXT,
   items_json TEXT,
+  customer_name TEXT,
+  customer_phone TEXT,
+  shipping_street TEXT,
+  shipping_ext_number TEXT,
+  shipping_int_number TEXT,
+  shipping_neighborhood TEXT,
+  shipping_municipality TEXT,
+  shipping_city TEXT,
+  shipping_state TEXT,
+  shipping_zip TEXT,
+  shipping_references TEXT,
+  shipping_lat DOUBLE PRECISION,
+  shipping_lng DOUBLE PRECISION,
+  location_source TEXT,
+  mp_preference_id TEXT,
+  mp_payment_id TEXT,
   created_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS payment_settings (
+  id TEXT PRIMARY KEY DEFAULT 'default',
+  mp_enabled BOOLEAN NOT NULL DEFAULT false,
+  mp_mode TEXT NOT NULL DEFAULT 'production',
+  mp_public_key TEXT,
+  mp_access_token TEXT,
+  mp_webhook_secret TEXT,
+  storefront_url TEXT,
+  statement_descriptor TEXT NOT NULL DEFAULT 'TIENDA ONLINE',
+  binary_mode BOOLEAN NOT NULL DEFAULT false,
+  updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_products_category ON products(category_id);
+CREATE INDEX IF NOT EXISTS idx_products_active ON products(is_active);
+CREATE INDEX IF NOT EXISTS idx_discount_codes_code ON discount_codes(code);
+CREATE INDEX IF NOT EXISTS idx_orders_created_at ON orders(created_at DESC);
+
 -- ============================================================
--- Categorías de Ilustradora (Bento Grid)
+-- Categorías Iniciales (Bento Grid 2D)
 -- ============================================================
 INSERT INTO categories (id, name, slug, image_url, grid_span, display_order)
 VALUES 
-  ('cat-prints-01', 'Prints & Láminas de Arte', 'prints-arte', 'https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?w=900&auto=format&fit=crop&q=80', '2x2', 1),
-  ('cat-stickers-02', 'Stickers & Papelería', 'stickers-papeleria', 'https://images.unsplash.com/photo-1589998059171-988d887df646?w=900&auto=format&fit=crop&q=80', '2x1', 2),
-  ('cat-acc-03', 'Pines & Llaveros Acrílicos', 'pines-llaveros', 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=900&auto=format&fit=crop&q=80', '1x2', 3),
-  ('cat-textil-04', 'Merch Textil & Totebags', 'merch-textil', 'https://images.unsplash.com/photo-1544816155-12df9643f363?w=900&auto=format&fit=crop&q=80', '2x1', 4),
-  ('cat-orig-05', 'Obras Originales & Libretas', 'obras-originales', 'https://images.unsplash.com/photo-1513364776144-60967b0f800f?w=900&auto=format&fit=crop&q=80', '1x1', 5)
-ON CONFLICT (id) DO UPDATE SET 
-  name = EXCLUDED.name, 
-  slug = EXCLUDED.slug,
-  image_url = EXCLUDED.image_url,
-  grid_span = EXCLUDED.grid_span,
-  display_order = EXCLUDED.display_order;
+  ('cat-prints-01', 'Prints & Láminas de Arte', 'prints-arte', 'https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?w=900&auto=format&fit=crop&q=80', '1x5@1,1|5x6', 1),
+  ('cat-stickers-02', 'Stickers & Papelería', 'stickers-papeleria', 'https://images.unsplash.com/photo-1589998059171-988d887df646?w=900&auto=format&fit=crop&q=80', '2x3@2,1|5x6', 2),
+  ('cat-acc-03', 'Pines & Llaveros Acrílicos', 'pines-llaveros', 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=900&auto=format&fit=crop&q=80', '1x4@5,1|5x6', 3),
+  ('cat-textil-04', 'Merch Textil & Totebags', 'merch-textil', 'https://images.unsplash.com/photo-1544816155-12df9643f363?w=900&auto=format&fit=crop&q=80', '2x2@2,4|5x6', 4),
+  ('cat-orig-05', 'Obras Originales & Libretas', 'obras-originales', 'https://images.unsplash.com/photo-1513364776144-60967b0f800f?w=900&auto=format&fit=crop&q=80', '2x2@4,5|5x6', 5)
+ON CONFLICT (id) DO NOTHING;
 
 -- ============================================================
--- Productos de Merch Ilustradora
+-- Productos Iniciales
 -- ============================================================
 INSERT INTO products (id, title, description, image_url, base_price, is_active, is_featured, category_id)
 VALUES
@@ -137,14 +171,7 @@ VALUES
   ('prod-totebag-lectura', 'Totebag Ilustrada "Lectura Nocturna" (100% Algodón Pesado)', 'Bolsa de lona resistente de 320g con serigrafía artesanal duradera. Perfecta para libros, libretas y compras.', 'https://images.unsplash.com/photo-1544816155-12df9643f363?w=800&auto=format&fit=crop&q=80', 28000, true, false, 'cat-textil-04'),
   ('prod-hoodie-eclipse', 'Hoodie Oversize Bordada "Eclipse Floral"', 'Sudadera con capucha en felpa perchada de 340g con bordado de alta densidad en el pecho y print dorsal.', 'https://images.unsplash.com/photo-1556905055-8f358a7a47b2?w=800&auto=format&fit=crop&q=80', 65000, true, false, 'cat-textil-04'),
   ('prod-sketchbook-autor', 'Sketchbook Tapa Dura "Pinceladas del Alma" (200g)', 'Cuaderno cosido a mano con 160 páginas en papel mix media libre de ácido. Ideal para gouache, tinta y acuarela.', 'https://images.unsplash.com/photo-1513364776144-60967b0f800f?w=800&auto=format&fit=crop&q=80', 24000, true, false, 'cat-orig-05')
-ON CONFLICT (id) DO UPDATE SET
-  title = EXCLUDED.title,
-  description = EXCLUDED.description,
-  image_url = EXCLUDED.image_url,
-  base_price = EXCLUDED.base_price,
-  is_active = EXCLUDED.is_active,
-  is_featured = EXCLUDED.is_featured,
-  category_id = EXCLUDED.category_id;
+ON CONFLICT (id) DO NOTHING;
 
 -- Modificadores Print Jardín
 INSERT INTO product_modifiers (id, product_id, name, type, required)

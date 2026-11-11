@@ -1,6 +1,16 @@
 import type { APIRoute } from 'astro';
 import { MercadoPagoConfig, Preference } from 'mercadopago';
-import { db, products, orders, modifierOptions, discountCodes, inArray, eq, sql, ensureSchema } from '@esqueleto/core';
+import {
+  db,
+  discountCodes,
+  eq,
+  sql,
+  isDatabaseAvailable,
+  markDatabaseOffline,
+  getStoredProducts,
+  getStoredPaymentSettings,
+  saveStoredOrder,
+} from '@esqueleto/core';
 
 interface CheckoutItemPayload {
   id: string; // Product ID
@@ -90,8 +100,6 @@ class ValidationError extends Error {}
 
 export const POST: APIRoute = async ({ request, url }) => {
   try {
-    await ensureSchema().catch(() => {});
-
     const { items, customerEmail, discountCode, shipping: shippingRaw } = (await request.json()) as {
       items: CheckoutItemPayload[];
       customerEmail?: string;
@@ -113,19 +121,14 @@ export const POST: APIRoute = async ({ request, url }) => {
       throw new ValidationError(e.message);
     }
 
-    const itemIds = Array.from(new Set(items.map((item) => item.id)));
+    // 1. Obtener productos auténticos desde el store híbrido (PostgreSQL o store local sin ECONNRESET)
+    const allStoredProducts = await getStoredProducts();
+    const dbProducts = allStoredProducts.filter((p) => items.some((i) => i.id === p.id));
 
-    // 1. Obtener productos auténticos desde PostgreSQL
-    const dbProducts = await db.select().from(products).where(inArray(products.id, itemIds));
-
-    // 2. Obtener todas las opciones de modificadores seleccionadas
-    const allOptionIds = items
-      .flatMap((i) => (i.selectedModifiers || []).map((m) => m.optionId))
-      .filter(Boolean);
-
-    const dbOptions = allOptionIds.length > 0
-      ? await db.select().from(modifierOptions).where(inArray(modifierOptions.id, allOptionIds))
-      : [];
+    // 2. Mapa de todas las opciones de modificadores
+    const dbOptions = allStoredProducts.flatMap((p) =>
+      (p.modifiers || []).flatMap((m) => m.options || [])
+    );
 
     let subtotalCents = 0;
     const itemsSummaryList: string[] = [];
@@ -143,7 +146,7 @@ export const POST: APIRoute = async ({ request, url }) => {
 
       (item.selectedModifiers || []).forEach((mod) => {
         const authenticOpt = dbOptions.find((o) => o.id === mod.optionId);
-        const delta = authenticOpt ? authenticOpt.priceDelta : 0;
+        const delta = authenticOpt ? authenticOpt.priceDelta : (mod.priceDelta || 0);
         modifiersDelta += delta;
         modifierLabels.push(`${mod.modifierName}: ${mod.optionName}`);
       });
@@ -173,15 +176,33 @@ export const POST: APIRoute = async ({ request, url }) => {
 
     if (discountCode) {
       const cleanCode = discountCode.trim().toUpperCase();
-      const coupons = await db
-        .select()
-        .from(discountCodes)
-        .where(eq(discountCodes.code, cleanCode))
-        .limit(1)
-        .execute();
+      let coupon: any = null;
 
-      if (coupons && coupons.length > 0) {
-        const coupon = coupons[0];
+      if (await isDatabaseAvailable()) {
+        try {
+          const coupons = await db
+            .select()
+            .from(discountCodes)
+            .where(eq(discountCodes.code, cleanCode))
+            .limit(1)
+            .execute();
+          if (coupons && coupons.length > 0) coupon = coupons[0];
+        } catch {
+          markDatabaseOffline();
+        }
+      }
+
+      // Fallback de cupones predeterminados si PostgreSQL no está disponible
+      if (!coupon) {
+        const defaultCoupons: Record<string, any> = {
+          ARTE10: { id: 'disc-01', code: 'ARTE10', discountType: 'percentage', discountValue: 10, minPurchase: 0, maxDiscount: null, usageLimit: 500, usedCount: 0, isActive: true, expiresAt: null },
+          PRINTS20: { id: 'disc-02', code: 'PRINTS20', discountType: 'percentage', discountValue: 20, minPurchase: 30000, maxDiscount: 15000, usageLimit: 200, usedCount: 0, isActive: true, expiresAt: null },
+          REGALO50: { id: 'disc-03', code: 'REGALO50', discountType: 'fixed', discountValue: 5000, minPurchase: 25000, maxDiscount: null, usageLimit: 100, usedCount: 0, isActive: true, expiresAt: null },
+        };
+        coupon = defaultCoupons[cleanCode] || null;
+      }
+
+      if (coupon) {
         const isNotExpired = !coupon.expiresAt || new Date(coupon.expiresAt) >= new Date();
         const hasRemainingUsage = coupon.usageLimit === null || coupon.usedCount < coupon.usageLimit;
         const meetsMinPurchase = coupon.minPurchase <= 0 || subtotalCents >= coupon.minPurchase;
@@ -197,12 +218,17 @@ export const POST: APIRoute = async ({ request, url }) => {
             discountAmountCents = Math.min(coupon.discountValue, subtotalCents);
           }
 
-          // Incrementar contador de usos en segundo plano
-          await db
-            .update(discountCodes)
-            .set({ usedCount: sql`${discountCodes.usedCount} + 1` })
-            .where(eq(discountCodes.id, coupon.id))
-            .execute();
+          if (await isDatabaseAvailable()) {
+            try {
+              await db
+                .update(discountCodes)
+                .set({ usedCount: sql`${discountCodes.usedCount} + 1` })
+                .where(eq(discountCodes.id, coupon.id))
+                .execute();
+            } catch {
+              markDatabaseOffline();
+            }
+          }
         }
       }
     }
@@ -213,36 +239,18 @@ export const POST: APIRoute = async ({ request, url }) => {
       itemsSummaryList.push(`[Cupón: ${appliedDiscountCode} (-$${(discountAmountCents / 100).toFixed(2)})]`);
     }
 
-    // 5. Generar ID único para la orden y persistir en PostgreSQL
+    // 5. Generar ID único para la orden y obtener configuración activa de pagos (CMS o .env)
     const orderId = crypto.randomUUID();
+    const paymentConfig = await getStoredPaymentSettings(url.origin);
 
-    const rawMpToken = process.env.MP_ACCESS_TOKEN?.trim() || '';
-    const hasValidMpToken =
-      rawMpToken.length > 20 &&
-      !rawMpToken.includes('tu-access-token') &&
-      !rawMpToken.includes('TEST_TOKEN_AQUI');
-
-    if (hasValidMpToken) {
-      // Modo Mercado Pago Real
-      await db.insert(orders).values({
-        id: orderId,
-        subtotal: subtotalCents,
-        discountCode: appliedDiscountCode,
-        discountAmount: discountAmountCents,
-        total: finalTotalCents,
-        status: 'pending',
-        customerEmail: customerEmail || null,
-        itemsSummary: itemsSummaryList.join(' | '),
-        itemsJson: JSON.stringify(items),
-        ...shipping,
-      });
-
+    if (paymentConfig.isLiveReady) {
+      const rawMpToken = paymentConfig.mpAccessToken;
       const client = new MercadoPagoConfig({ accessToken: rawMpToken });
       const preference = new Preference(client);
 
-      const notificationUrl = process.env.PUBLIC_STOREFRONT_URL
-        ? `${process.env.PUBLIC_STOREFRONT_URL}/api/webhook`
-        : `${url.origin}/api/webhook`;
+      const baseStoreUrl = (paymentConfig.storefrontUrl || url.origin).replace(/\/+$/, '');
+      const isHttpsStore = baseStoreUrl.startsWith('https://');
+      const notificationUrl = `${baseStoreUrl}/api/webhook`;
 
       // Si hay descuento, ajustar proporcionalmente los ítems para Mercado Pago
       const discountRatio = subtotalCents > 0 ? (subtotalCents - discountAmountCents) / subtotalCents : 1;
@@ -258,6 +266,8 @@ export const POST: APIRoute = async ({ request, url }) => {
         body: {
           items: mpItems,
           external_reference: orderId,
+          statement_descriptor: paymentConfig.statementDescriptor || 'TIENDA ONLINE',
+          binary_mode: paymentConfig.binaryMode,
           payer: {
             ...(customerEmail ? { email: customerEmail } : {}),
             name: shipping.customerName,
@@ -269,16 +279,31 @@ export const POST: APIRoute = async ({ request, url }) => {
             },
           },
           back_urls: {
-            success: `${url.origin}/orden-confirmada?order_id=${orderId}&status=approved`,
-            failure: `${url.origin}/carrito?status=failure`,
-            pending: `${url.origin}/orden-confirmada?order_id=${orderId}&status=pending`,
+            success: `${baseStoreUrl}/orden-confirmada?order_id=${orderId}&status=approved`,
+            failure: `${baseStoreUrl}/carrito?status=failure`,
+            pending: `${baseStoreUrl}/orden-confirmada?order_id=${orderId}&status=pending`,
           },
-          auto_return: 'approved',
-          notification_url: notificationUrl,
+          ...(isHttpsStore ? { auto_return: 'approved' } : {}),
+          ...(isHttpsStore ? { notification_url: notificationUrl } : {}),
         },
       });
 
-      const checkoutUrl = (rawMpToken.startsWith('TEST-') && response.sandbox_init_point)
+      await saveStoredOrder({
+        id: orderId,
+        subtotal: subtotalCents,
+        discountCode: appliedDiscountCode,
+        discountAmount: discountAmountCents,
+        total: finalTotalCents,
+        status: 'pending',
+        customerEmail: customerEmail || null,
+        itemsSummary: itemsSummaryList.join(' | '),
+        itemsJson: JSON.stringify(items),
+        mpPreferenceId: response.id || null,
+        ...shipping,
+      });
+
+      const isSandbox = paymentConfig.mpMode === 'sandbox' || rawMpToken.startsWith('TEST-');
+      const checkoutUrl = (isSandbox && response.sandbox_init_point)
         ? response.sandbox_init_point
         : (response.init_point || response.sandbox_init_point);
 
@@ -287,6 +312,7 @@ export const POST: APIRoute = async ({ request, url }) => {
           url: checkoutUrl,
           orderId,
           isDemo: false,
+          mode: isSandbox ? 'sandbox' : 'production',
         }),
         {
           status: 200,
@@ -295,7 +321,7 @@ export const POST: APIRoute = async ({ request, url }) => {
       );
     } else {
       // Modo Prueba / Simulación Automática
-      await db.insert(orders).values({
+      await saveStoredOrder({
         id: orderId,
         subtotal: subtotalCents,
         discountCode: appliedDiscountCode,
@@ -310,7 +336,7 @@ export const POST: APIRoute = async ({ request, url }) => {
 
       return new Response(
         JSON.stringify({
-          url: `${url.origin}/orden-confirmada?order_id=${orderId}&status=approved&mode=demo`,
+          url: `${url.origin}/orden-confirmada?order_id=${orderId}&status=approved&mode=demo&total=${finalTotalCents}`,
           orderId,
           isDemo: true,
         }),

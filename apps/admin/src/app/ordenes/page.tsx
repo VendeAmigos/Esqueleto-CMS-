@@ -1,34 +1,86 @@
-import { db, orders, desc, isDatabaseAvailable } from '@esqueleto/core';
+import { getStoredOrders } from '@esqueleto/core';
 import Link from 'next/link';
 import OrdersTable from './OrdersTable';
+import { seedSampleOrdersAction } from './actions';
 
 export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 export default async function OrdenesPage() {
-  let allOrders: any[] = [];
-  if (await isDatabaseAvailable()) {
-    try {
-      allOrders = await db.select().from(orders).orderBy(desc(orders.createdAt));
-    } catch (e) {
-      console.error('Error cargando órdenes:', e);
-    }
-  }
+  const allOrders = await getStoredOrders();
+
+  const paidOrShipped = allOrders.filter((o) => o.status === 'paid' || o.status === 'shipped');
+  const totalRevenueMxn = paidOrShipped.reduce((acc, o) => acc + (Number(o.total) || 0), 0) / 100;
+  const pendingCount = allOrders.filter((o) => o.status === 'pending').length;
+  const shippedCount = allOrders.filter((o) => o.status === 'shipped').length;
 
   return (
-    <main className="min-h-screen p-8 max-w-7xl mx-auto">
-      <div className="flex flex-col md:flex-row md:items-end justify-between border-b border-gray-200 pb-5 mb-8">
+    <main className="min-h-screen p-8 max-w-7xl mx-auto space-y-8">
+      <div className="flex flex-col md:flex-row md:items-end justify-between border-b border-gray-200 pb-5 gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-gray-900">
-            Registro de Órdenes & Envíos
+            Registro de Órdenes & Envíos ({allOrders.length})
           </h1>
           <p className="mt-2 text-sm text-gray-500">
-            Visualiza las órdenes con sus datos de envío, teléfono/WhatsApp, coordenadas exactas y cobro procesado por Mercado Pago.
+            Visualiza las órdenes con dirección obligatoria, WhatsApp, mapa GPS y estado sincronizado con el Webhook de Mercado Pago.
           </p>
         </div>
-        <div className="mt-4 md:mt-0 flex items-center gap-4 text-sm">
-          <Link href="/" className="text-gray-600 hover:text-black font-semibold">
-            &larr; Volver al Dashboard
+        <div className="flex flex-wrap items-center gap-3 text-sm">
+          <form
+            action={async () => {
+              'use server';
+              await seedSampleOrdersAction();
+            }}
+          >
+            <button
+              type="submit"
+              className="px-4 py-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-800 border border-indigo-200 text-xs font-bold transition-colors"
+            >
+              + Generar 3 Pedidos Demo para Gráficas
+            </button>
+          </form>
+          <Link href="/" className="text-gray-700 hover:text-black font-semibold text-xs bg-white border border-gray-300 px-4 py-2 rounded-xl">
+            &larr; Ver Dashboard Gráfico
           </Link>
+        </div>
+      </div>
+
+      {/* KPIs rápidos de Órdenes */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="bg-white rounded-2xl border border-gray-200 p-5 shadow-2xs">
+          <span className="text-xs font-bold uppercase tracking-wider text-gray-400">
+            Ingresos Confirmados
+          </span>
+          <p className="text-2xl font-extrabold text-emerald-700 mt-1">
+            ${totalRevenueMxn.toLocaleString('es-MX', { minimumFractionDigits: 2 })} MXN
+          </p>
+          <span className="text-[11px] text-gray-500">
+            {paidOrShipped.length} pedido(s) pagados / enviados
+          </span>
+        </div>
+
+        <div className="bg-white rounded-2xl border border-gray-200 p-5 shadow-2xs">
+          <span className="text-xs font-bold uppercase tracking-wider text-gray-400">
+            Por Cobrar / Pendientes
+          </span>
+          <p className="text-2xl font-extrabold text-amber-600 mt-1">{pendingCount}</p>
+          <span className="text-[11px] text-gray-500">Esperando confirmación de pago</span>
+        </div>
+
+        <div className="bg-white rounded-2xl border border-gray-200 p-5 shadow-2xs">
+          <span className="text-xs font-bold uppercase tracking-wider text-gray-400">
+            Enviados / Entregados
+          </span>
+          <p className="text-2xl font-extrabold text-indigo-600 mt-1">{shippedCount}</p>
+          <span className="text-[11px] text-gray-500">Con dirección verificada</span>
+        </div>
+
+        <div className="bg-white rounded-2xl border border-gray-200 p-5 shadow-2xs">
+          <span className="text-xs font-bold uppercase tracking-wider text-gray-400">
+            Total Histórico
+          </span>
+          <p className="text-2xl font-extrabold text-gray-900 mt-1">{allOrders.length}</p>
+          <span className="text-[11px] text-gray-500">Órdenes registradas en sistema</span>
         </div>
       </div>
 
@@ -41,8 +93,8 @@ export default async function OrdenesPage() {
               </svg>
             </div>
             <h3 className="text-lg font-bold text-gray-900">Aún no hay órdenes registradas</h3>
-            <p className="mt-1 text-sm text-gray-500">
-              Las órdenes se guardan automáticamente con la dirección del cliente en cuanto se inicie el pago.
+            <p className="mt-1 text-sm text-gray-500 max-w-md">
+              Las órdenes se guardan automáticamente con la dirección del cliente al iniciar el Checkout, o puedes hacer clic arriba en <strong>"+ Generar 3 Pedidos Demo"</strong> para probar las gráficas.
             </p>
           </div>
         ) : (

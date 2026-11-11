@@ -8,6 +8,7 @@
 **/.astro
 **/.turbo
 **/.cache
+**/tsconfig.tsbuildinfo
 
 # Ignorar logs y debug
 **/npm-debug.log*
@@ -22,6 +23,10 @@
 .env.local
 .env.*.local
 *.pem
+
+# Datos locales de runtime (no deben hornearse en la imagen)
+uploads
+**/.cms-data
 
 # Archivos del sistema
 .DS_Store

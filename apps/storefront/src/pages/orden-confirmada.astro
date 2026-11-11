@@ -1,26 +1,23 @@
 ---
 // apps/storefront/src/pages/orden-confirmada.astro
 import Layout from '../layouts/Layout.astro';
-import { db, orders, eq, ensureSchema } from '@esqueleto/core';
-
-try {
-  await ensureSchema();
-} catch (e) {}
+import { db, orders, eq, isDatabaseAvailable, markDatabaseOffline } from '@esqueleto/core';
 
 const orderId = Astro.url.searchParams.get('order_id');
 const statusParam = Astro.url.searchParams.get('status') || Astro.url.searchParams.get('collection_status');
 const paymentId = Astro.url.searchParams.get('payment_id');
 const isDemoMode = Astro.url.searchParams.get('mode') === 'demo';
+const totalParam = Number(Astro.url.searchParams.get('total') || '0');
 
-let orderData: any = null;
-if (orderId) {
+let orderData: any = totalParam > 0 ? { total: totalParam, status: 'paid' } : null;
+if (orderId && (await isDatabaseAvailable())) {
   try {
     const results = await db.select().from(orders).where(eq(orders.id, orderId));
     if (results.length > 0) {
       orderData = results[0];
     }
   } catch (err) {
-    console.error('Error consultando orden:', err);
+    markDatabaseOffline();
   }
 }
 
