@@ -37,7 +37,7 @@ services:
       - MP_ACCESS_TOKEN=${MP_ACCESS_TOKEN:-}
       - PUBLIC_MP_PUBLIC_KEY=${PUBLIC_MP_PUBLIC_KEY:-}
       - MP_WEBHOOK_SECRET=${MP_WEBHOOK_SECRET:-}
-      - PUBLIC_STOREFRONT_URL=${PUBLIC_STOREFRONT_URL:-http://localhost:4321}
+      - PUBLIC_STOREFRONT_URL=${PUBLIC_STOREFRONT_URL:-https://lunnadecoco.com}
     env_file:
       - path: .env
         required: false
@@ -75,7 +75,7 @@ services:
       - MP_ACCESS_TOKEN=${MP_ACCESS_TOKEN:-}
       - PUBLIC_MP_PUBLIC_KEY=${PUBLIC_MP_PUBLIC_KEY:-}
       - MP_WEBHOOK_SECRET=${MP_WEBHOOK_SECRET:-}
-      - PUBLIC_STOREFRONT_URL=${PUBLIC_STOREFRONT_URL:-http://localhost:4321}
+      - PUBLIC_STOREFRONT_URL=${PUBLIC_STOREFRONT_URL:-https://lunnadecoco.com}
     env_file:
       - path: .env
         required: false
@@ -97,6 +97,11 @@ services:
     image: caddy:2-alpine
     container_name: ${APP_SLUG:-esqueleto}-caddy
     restart: unless-stopped
+    environment:
+      - STOREFRONT_DOMAIN=${STOREFRONT_DOMAIN:-lunnadecoco.com}
+      - WWW_STOREFRONT_DOMAIN=${WWW_STOREFRONT_DOMAIN:-www.lunnadecoco.com}
+      - ADMIN_DOMAIN=${ADMIN_DOMAIN:-admin.lunnadecoco.com}
+      - CADDY_EMAIL=${CADDY_EMAIL:-admin@lunnadecoco.com}
     ports:
       - "80:80"
       - "443:443"

@@ -395,7 +395,7 @@ export const POST: APIRoute = async ({ request, url }) => {
         discountAmount: discountAmountCents,
         total: finalTotalCents,
         status: 'paid',
-        customerEmail: customerEmail || 'cliente-prueba@afotica.com',
+        customerEmail: customerEmail || 'cliente-prueba@lunnadecoco.com',
         itemsSummary: itemsSummaryList.join(' | '),
         itemsJson: JSON.stringify(items),
         ...shippingRecord,

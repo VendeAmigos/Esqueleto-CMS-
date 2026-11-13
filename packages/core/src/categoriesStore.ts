@@ -941,7 +941,7 @@ export interface StoredSiteAppearance {
 
 export const DEFAULT_APPEARANCE: StoredSiteAppearance = {
   id: 'default',
-  siteName: 'LUNA ART STUDIO',
+  siteName: 'LUNNA DE COCO',
   logoSvg: null,
   logoColor: '#ec4899',
   heroTitle: 'Ilustración de Autor, Prints & Merch Exclusivo',
@@ -968,7 +968,7 @@ export const DEFAULT_APPEARANCE: StoredSiteAppearance = {
   announcementBg: '#111827',
   contactTitle: 'Contáctanos',
   contactSubtitle: 'Estamos aquí para ayudarte. Envíanos tus dudas o comentarios.',
-  contactEmail: 'soporte@tutienda.com',
+  contactEmail: 'contacto@lunnadecoco.com',
   contactPhone: '+52 55 1234 5678',
   contactAddress: 'Av. Principal 123, Ciudad de México',
   contactHours: 'Lunes a Viernes de 9:00 AM a 6:00 PM',

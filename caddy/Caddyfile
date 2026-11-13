@@ -2,16 +2,19 @@
     # Desactivar API interna de Caddy para máxima seguridad
     admin off
     # Correo para emisión de certificados SSL gratuitos automáticos con Let's Encrypt / ZeroSSL
-    email {$CADDY_EMAIL:admin@afotica.com}
+    email {$CADDY_EMAIL:admin@lunnadecoco.com}
 }
 
-# ==============================================================================
-# 1. Astro Storefront (Tienda Pública)
-# ==============================================================================
-{$STOREFRONT_DOMAIN:localhost}, {$PUBLIC_STOREFRONT_URL:shop.afotica.com}, tienda.local {
-    # Compresión automática de alto rendimiento con Gzip y Zstandard
-    encode gzip zstd
+(security_headers) {
+    header {
+        -Server
+        X-Content-Type-Options "nosniff"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        Permissions-Policy "camera=(), microphone=(), geolocation=()"
+    }
+}
 
+(uploads_handler) {
     # Bloquear acceso público a archivos internos (.cms-data / .json) dentro de uploads
     @blocked_uploads path /uploads/.* /uploads/*.json
     respond @blocked_uploads 403
@@ -23,6 +26,23 @@
         header Cache-Control "public, max-age=2592000, immutable"
         header X-Content-Type-Options "nosniff"
     }
+}
+
+# ==============================================================================
+# 0. Redirección Canónica WWW -> Apex (evita carrito dividido en localStorage)
+# ==============================================================================
+{$WWW_STOREFRONT_DOMAIN:www.lunnadecoco.com} {
+    redir https://{$STOREFRONT_DOMAIN:lunnadecoco.com}{uri} permanent
+}
+
+# ==============================================================================
+# 1. Astro Storefront (Tienda Pública - lunnadecoco.com)
+# ==============================================================================
+{$STOREFRONT_DOMAIN:lunnadecoco.com} {
+    # Compresión automática de alto rendimiento con Gzip y Zstandard
+    encode gzip zstd
+    import security_headers
+    import uploads_handler
 
     # Tráfico dinámico hacia Astro Storefront
     handle {
@@ -31,26 +51,18 @@
             header_up X-Real-IP {remote_host}
             header_up X-Forwarded-For {remote_host}
             header_up X-Forwarded-Proto {scheme}
+            header_up X-Forwarded-Host {host}
         }
     }
 }
 
 # ==============================================================================
-# 2. Next.js CMS Admin (Panel de Administración)
+# 2. Next.js CMS Admin (Panel de Administración - admin.lunnadecoco.com)
 # ==============================================================================
-{$ADMIN_DOMAIN:admin.localhost}, adminshop.afotica.com, admshop.afotica.com, admin.shop.afotica.com, admin.tienda.local {
+{$ADMIN_DOMAIN:admin.lunnadecoco.com} {
     encode gzip zstd
-
-    @blocked_uploads path /uploads/.* /uploads/*.json
-    respond @blocked_uploads 403
-
-    # Servir imágenes subidas
-    handle /uploads/* {
-        root * /var/www
-        file_server
-        header Cache-Control "public, max-age=2592000, immutable"
-        header X-Content-Type-Options "nosniff"
-    }
+    import security_headers
+    import uploads_handler
 
     # Tráfico hacia Next.js Admin con soporte nativo de WebSockets y Server Actions
     handle {
@@ -59,6 +71,7 @@
             header_up X-Real-IP {remote_host}
             header_up X-Forwarded-For {remote_host}
             header_up X-Forwarded-Proto {scheme}
+            header_up X-Forwarded-Host {host}
         }
     }
 }

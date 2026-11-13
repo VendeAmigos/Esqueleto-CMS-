@@ -122,7 +122,7 @@ export async function ensureSchema(): Promise<void> {
         `ALTER TABLE products ADD COLUMN IF NOT EXISTS is_featured BOOLEAN NOT NULL DEFAULT false;`,
         `CREATE TABLE IF NOT EXISTS site_settings (
           id TEXT PRIMARY KEY,
-          site_name TEXT NOT NULL DEFAULT 'LUNA ART STUDIO',
+          site_name TEXT NOT NULL DEFAULT 'LUNNA DE COCO',
           logo_svg TEXT,
           logo_color TEXT NOT NULL DEFAULT '#ec4899',
           hero_title TEXT NOT NULL DEFAULT 'Ilustración de Autor, Prints & Merch Exclusivo',
@@ -141,7 +141,7 @@ export async function ensureSchema(): Promise<void> {
         `INSERT INTO site_settings (id, site_name, logo_color, hero_title, hero_subtitle, hero_image_url, hero_cta_text, hero_cta_link)
          VALUES (
            'default',
-           'LUNA ART STUDIO',
+           'LUNNA DE COCO',
            '#ec4899',
            'Ilustración de Autor, Prints & Merch Exclusivo',
            'Láminas de arte fine art, stickers holográficos, pines esmaltados y papelería ilustrada para alegrar tu día a día.',

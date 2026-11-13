@@ -83,7 +83,7 @@ export async function updateSiteSettings(formData: FormData) {
 
     const str = (key: string, fallback = '') => formData.get(key)?.toString()?.trim() ?? fallback;
 
-    const siteName = str('siteName') || 'LUNA ART STUDIO';
+    const siteName = str('siteName') || 'LUNNA DE COCO';
     const rawSvg = formData.get('logoSvg')?.toString() || '';
     const logoSvg = sanitizeSvgMarkup(rawSvg);
     const logoColor = normalizeHexColor(str('logoColor'), '#ec4899');

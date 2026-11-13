@@ -4,6 +4,7 @@ import node from '@astrojs/node';
 
 // https://astro.build/config
 export default defineConfig({
+  site: process.env.PUBLIC_STOREFRONT_URL || 'https://lunnadecoco.com',
   integrations: [tailwind()],
   output: 'server',
   adapter: node({

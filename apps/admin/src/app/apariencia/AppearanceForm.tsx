@@ -107,7 +107,7 @@ export default function AppearanceForm({ initialSettings }: AppearanceFormProps)
   const [activeTab, setActiveTab] = useState<TabId>('brand');
 
   // 1. Marca, Colores & Tema
-  const [siteName, setSiteName] = useState(initialSettings.siteName || 'LUNA ART STUDIO');
+  const [siteName, setSiteName] = useState(initialSettings.siteName || 'LUNNA DE COCO');
   const [logoSvg, setLogoSvg] = useState(initialSettings.logoSvg || '');
   const [logoColor, setLogoColor] = useState(initialSettings.logoColor || '#ec4899');
   const [accentColor, setAccentColor] = useState(initialSettings.accentColor || '#6366f1');

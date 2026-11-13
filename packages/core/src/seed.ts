@@ -91,7 +91,7 @@ async function initSchema() {
   await sql`
     CREATE TABLE IF NOT EXISTS site_settings (
       id TEXT PRIMARY KEY,
-      site_name TEXT NOT NULL DEFAULT 'LUNA ART STUDIO',
+      site_name TEXT NOT NULL DEFAULT 'LUNNA DE COCO',
       logo_svg TEXT,
       logo_color TEXT NOT NULL DEFAULT '#ec4899',
       hero_title TEXT NOT NULL DEFAULT 'Ilustración de Autor, Prints & Merch Exclusivo',
@@ -462,7 +462,7 @@ export async function seed() {
     INSERT INTO site_settings (id, site_name, logo_color, hero_title, hero_subtitle, hero_image_url, hero_cta_text, hero_cta_link)
     VALUES (
       'default',
-      'LUNA ART STUDIO',
+      'LUNNA DE COCO',
       '#ec4899',
       'Ilustración de Autor, Prints & Merch Exclusivo',
       'Láminas de arte fine art, stickers holográficos, pines esmaltados y papelería ilustrada para alegrar tu día a día.',
@@ -505,7 +505,7 @@ seed().catch(async (err: any) => {
     console.warn('Si deseas usar base de datos persistente, inicia Docker Desktop y ejecuta:');
     console.warn('   docker compose up -d postgres\n');
     console.warn('No te preocupes: puedes ejecutar "pnpm run dev" ahora mismo y la tienda');
-    console.warn('   funcionará automáticamente con el catálogo precargado de LUNA ART STUDIO.\n');
+    console.warn('   funcionará automáticamente con el catálogo precargado de LUNNA DE COCO.\n');
     try {
       await sql.end({ timeout: 1 });
     } catch {}

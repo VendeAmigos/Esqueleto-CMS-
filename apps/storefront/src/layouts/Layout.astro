@@ -48,7 +48,27 @@ const btnRadiusMap: Record<string, string> = {
 const cardRadiusCss = cardRadiusMap[settings.cardRadius] || '1rem';
 const btnRadiusCss = btnRadiusMap[settings.cardRadius] || '0.75rem';
 
-const cleanSiteName = settings.siteName || 'ESQUELETO CMS';
+const cleanSiteName = settings.siteName || 'LUNNA DE COCO';
+const safeCanonicalUrl = (() => {
+  try {
+    const base = Astro.site || new URL(process.env.PUBLIC_STOREFRONT_URL || Astro.url.origin);
+    return new URL(Astro.url.pathname, base).toString();
+  } catch {
+    return Astro.url.href;
+  }
+})();
+const resolvedOgImage = (() => {
+  if (!ogImage) return '';
+  if (ogImage.startsWith('http://') || ogImage.startsWith('https://') || ogImage.startsWith('data:')) {
+    return ogImage;
+  }
+  try {
+    const base = Astro.site || new URL(process.env.PUBLIC_STOREFRONT_URL || Astro.url.origin);
+    return new URL(ogImage, base).toString();
+  } catch {
+    return ogImage;
+  }
+})();
 const pageTitle = isHome
   ? settings.seoTitleSuffix
     ? `${cleanSiteName} ${settings.seoTitleSuffix}`
@@ -105,10 +125,12 @@ const rootCssVars = [
     <link rel="expect" href="#main-content" {...({ blocking: 'render' } as any)} />
     <meta name="generator" content={Astro.generator} />
     <title>{pageTitle}</title>
+    <link rel="canonical" href={safeCanonicalUrl} />
     <meta name="description" content={description} />
     <meta property="og:title" content={pageTitle} />
     <meta property="og:description" content={description} />
-    {ogImage && <meta property="og:image" content={ogImage} />}
+    <meta property="og:url" content={safeCanonicalUrl} />
+    {resolvedOgImage && <meta property="og:image" content={resolvedOgImage} />}
     <meta property="og:type" content="website" />
 
     <!-- View Transitions suaves entre páginas, productos y categorías -->

@@ -35,7 +35,7 @@ export default function PaymentSettingsManager({
     initialConfig.hasWebhookSecret ? '••••••••' : ''
   );
   const [storefrontUrl, setStorefrontUrl] = useState(
-    initialConfig.storefrontUrl || 'https://mitienda.com'
+    initialConfig.storefrontUrl || 'https://lunnadecoco.com'
   );
   const [statementDescriptor, setStatementDescriptor] = useState(
     initialConfig.statementDescriptor || 'TIENDA ONLINE'
@@ -65,7 +65,7 @@ export default function PaymentSettingsManager({
     mode: 'sandbox' | 'production';
   } | null>(null);
 
-  const cleanStoreUrl = (storefrontUrl || 'https://mitienda.com').trim().replace(/\/+$/, '');
+  const cleanStoreUrl = (storefrontUrl || 'https://lunnadecoco.com').trim().replace(/\/+$/, '');
   const webhookUrl = `${cleanStoreUrl}/api/webhook`;
 
   const handleCopyWebhook = async () => {
@@ -426,7 +426,7 @@ export default function PaymentSettingsManager({
               type="url"
               value={storefrontUrl}
               onChange={(e) => setStorefrontUrl(e.target.value)}
-              placeholder="https://mitienda.com"
+              placeholder="https://lunnadecoco.com"
               className="w-full px-4 py-2.5 rounded-xl border border-gray-300 text-sm focus:outline-none focus:border-black"
             />
             <p className="text-xs text-gray-500 mt-1">
@@ -540,7 +540,7 @@ export default function PaymentSettingsManager({
               maxLength={13}
               value={statementDescriptor}
               onChange={(e) => setStatementDescriptor(e.target.value.toUpperCase())}
-              placeholder="MITIENDA"
+              placeholder="LUNNA DE COCO"
               className="w-full px-4 py-2.5 rounded-xl border border-gray-300 text-sm font-mono uppercase focus:outline-none focus:border-black"
             />
             <p className="text-xs text-gray-500 mt-1">

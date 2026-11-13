@@ -54,7 +54,11 @@ export async function savePaymentGatewaySettings(formData: FormData) {
       mpPublicKey,
       mpAccessToken: finalAccessToken,
       mpWebhookSecret: finalWebhookSecret,
-      storefrontUrl: storefrontUrl || current.storefrontUrl || 'http://localhost:4321',
+      storefrontUrl:
+        storefrontUrl ||
+        current.storefrontUrl ||
+        process.env.PUBLIC_STOREFRONT_URL ||
+        'https://lunnadecoco.com',
       statementDescriptor,
       binaryMode,
     });
