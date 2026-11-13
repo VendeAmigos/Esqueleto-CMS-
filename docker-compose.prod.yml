@@ -101,4 +101,4 @@ networks:
     driver: bridge
   shared_caddy_net:
     external: true
-    name: ${EXTERNAL_PROXY_NET:-kws-mx-docker_kws_network}
+    name: ${EXTERNAL_PROXY_NET:-afotica_caddy_net}

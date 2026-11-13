@@ -21,38 +21,40 @@ Este repositorio está parametrizado mediante `APP_SLUG` y puertos dinámicos en
 
 ### Paso A: Clonar y configurar `.env`
 ```bash
-git clone <URL_DEL_REPOSITORIO> /var/www/tienda-cliente-1
-cd /var/www/tienda-cliente-1
+git clone https://github.com/VendeAmigos/Tienda-Lunna-de-coco.git /var/www/afotica/clientes/lunnadecoco
+cd /var/www/afotica/clientes/lunnadecoco
 cp .env.example .env
 ```
 
-Edita `.env` con los datos únicos del cliente:
+Edita `.env` con los datos únicos del cliente (ejemplo para Lunna de Coco, o cambia `APP_SLUG` y puertos para `cliente_futuro`):
 ```env
-APP_SLUG=cliente1
+APP_SLUG=lunnadecoco
 STOREFRONT_PORT=4321
 ADMIN_PORT=3001
 POSTGRES_HOST_PORT=5434
 
 POSTGRES_USER=admin
-POSTGRES_PASSWORD=ContrasenaSeguraCliente1_2026
-POSTGRES_DB=cliente1_db
+POSTGRES_PASSWORD=ContrasenaSeguraLunna_2026
+POSTGRES_DB=lunnadecoco
 
-PUBLIC_STOREFRONT_URL=https://tienda-cliente1.com
-PUBLIC_ADMIN_URL=https://admin.tienda-cliente1.com
-STOREFRONT_DOMAIN=tienda-cliente1.com
-ADMIN_DOMAIN=admin.tienda-cliente1.com
+PUBLIC_STOREFRONT_URL=https://lunnadecoco.com
+PUBLIC_ADMIN_URL=https://admin.lunnadecoco.com
+STOREFRONT_DOMAIN=lunnadecoco.com
+WWW_STOREFRONT_DOMAIN=www.lunnadecoco.com
+ADMIN_DOMAIN=admin.lunnadecoco.com
+CADDY_EMAIL=admin@lunnadecoco.com
 
 ADMIN_USER=admin
-ADMIN_PASSWORD=PasswordAdminCliente1
-ADMIN_SECRET=llave-secreta-unica-64-caracteres-cliente1
+ADMIN_PASSWORD=PasswordAdminLunna
+ADMIN_SECRET=llave-secreta-unica-64-caracteres
 ```
 
 ### Paso B: Levantar en Producción
-- **Si el servidor usa el Caddy incluido en este proyecto**:
+- **Si el servidor usa el Caddy incluido en este proyecto** (un solo cliente en el VPS):
   ```bash
   docker compose up -d --build
   ```
-- **Si el servidor ya tiene una red Caddy compartida (`docker-compose.prod.yml`)**:
+- **Si el servidor ya tiene una red Caddy centralizada (`afotica_caddy_net`) para múltiples clientes (`docker-compose.prod.yml`)**:
   ```bash
   docker compose -f docker-compose.prod.yml up -d --build
   ```
@@ -103,13 +105,15 @@ Para que cuando un comprador pague con tarjeta, SPEI u OXXO la orden cambie auto
 ## 🛡️ 4. Respaldos y Mantenimiento en el Servidor
 
 ### Ejecutar Backup Manual o por Cron (`docker/backup.sh`)
+`docker/backup.sh` carga automáticamente el `.env` de cada cliente y guarda las bases en `/var/www/afotica/backups/bases_de_datos` y la multimedia en `/var/www/afotica/backups/media`.
+
 ```bash
 chmod +x docker/backup.sh
 ./docker/backup.sh
 ```
 Para programarlo todos los días a las 3:00 AM en el servidor (`crontab -e`):
 ```cron
-0 3 * * * cd /var/www/app && ./docker/backup.sh >> /var/log/esqueleto-backup.log 2>&1
+0 3 * * * /var/www/afotica/clientes/lunnadecoco/docker/backup.sh >> /var/log/lunnadecoco-backup.log 2>&1
 ```
 
 ### Verificar Salud de los Servicios (`Healthchecks`)
