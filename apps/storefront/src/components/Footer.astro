@@ -1,0 +1,282 @@
+---
+import fs from 'node:fs';
+import path from 'node:path';
+import type { StoredSiteAppearance } from '@esqueleto/core';
+
+export interface Props {
+  settings: StoredSiteAppearance;
+}
+
+const { settings } = Astro.props;
+
+function loadAfoticaSvg(): string | null {
+  const candidates = [
+    path.resolve(process.cwd(), 'Logo Afótica.svg'),
+    path.resolve(process.cwd(), '../Logo Afótica.svg'),
+    path.resolve(process.cwd(), '../../Logo Afótica.svg'),
+    path.resolve(process.cwd(), 'apps/storefront/public/afotica-logo.svg'),
+    path.resolve(process.cwd(), 'public/afotica-logo.svg'),
+  ];
+
+  for (const candidate of candidates) {
+    try {
+      if (!fs.existsSync(candidate)) continue;
+      const raw = fs.readFileSync(candidate, 'utf8');
+      const match = raw.match(/<svg[\s\S]*?<\/svg>/i);
+      if (!match) continue;
+      let svg = match[0]
+        .replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, '')
+        .replace(/\son[a-z]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, '')
+        .replace(/\s(width|height)="[^"]*"/gi, '');
+      if (!/\sfill=/i.test(svg)) {
+        svg = svg.replace(/<svg/i, '<svg fill="currentColor" aria-hidden="true" class="w-full h-full"');
+      } else {
+        svg = svg.replace(/<svg/i, '<svg aria-hidden="true" class="w-full h-full"');
+      }
+      return svg;
+    } catch {
+      // probar siguiente ruta
+    }
+  }
+  return null;
+}
+
+const afoticaSvg = loadAfoticaSvg();
+const currentYear = new Date().getFullYear();
+
+const socialLinks = [
+  { name: 'Instagram', href: settings.instagramUrl, label: 'IG' },
+  { name: 'TikTok', href: settings.tiktokUrl, label: 'TT' },
+  { name: 'Facebook', href: settings.facebookUrl, label: 'FB' },
+].filter((item) => Boolean(item.href && item.href.trim()));
+
+const policyItems = [
+  {
+    id: 'policy-shipping-dialog',
+    title: 'Política de Envíos',
+    body: settings.shippingPolicyText,
+  },
+  {
+    id: 'policy-returns-dialog',
+    title: 'Devoluciones y Cambios',
+    body: settings.returnsPolicyText,
+  },
+  {
+    id: 'policy-privacy-dialog',
+    title: 'Aviso de Privacidad',
+    body: settings.privacyPolicyText,
+  },
+].filter((p) => Boolean(p.body && p.body.trim()));
+---
+
+<footer
+  class="mt-16 border-t transition-colors pb-24 md:pb-10"
+  style="background-color: var(--bg-surface); border-color: var(--border-subtle); color: var(--text-main);"
+>
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-12 pb-8">
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 lg:gap-10">
+      <!-- Marca & Resumen -->
+      <div class="space-y-4 sm:col-span-2 lg:col-span-1">
+        <a href="/" class="inline-flex items-center gap-2.5 group">
+          {settings.logoSvg ? (
+            <div
+              class="w-7 h-7 shrink-0 flex items-center justify-center [&>svg]:w-full [&>svg]:h-full"
+              style={`color: ${settings.logoColor};`}
+              set:html={settings.logoSvg}
+            />
+          ) : (
+            <span
+              class="w-7 h-7 rounded-lg flex items-center justify-center font-bold text-xs shrink-0"
+              style={`background-color: var(--brand-primary); color: var(--brand-primary-contrast);`}
+            >
+              {settings.siteName.charAt(0).toUpperCase()}
+            </span>
+          )}
+          <span
+            class="text-lg font-extrabold tracking-tight"
+            style="font-family: var(--font-heading);"
+          >
+            {settings.siteName}<span style={`color: ${settings.logoColor};`}>.</span>
+          </span>
+        </a>
+        <p class="text-xs sm:text-sm leading-relaxed opacity-75 max-w-xs">
+          {settings.seoDescription || settings.heroSubtitle || 'Tienda en línea con envíos seguros y atención personalizada.'}
+        </p>
+
+        {socialLinks.length > 0 && (
+          <div class="flex flex-wrap items-center gap-2 pt-1">
+            {socialLinks.map((social) => (
+              <a
+                href={social.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                class="px-3 py-1.5 text-xs font-bold rounded-full border transition-all hover:scale-105"
+                style="border-color: var(--border-subtle); color: var(--text-main);"
+                aria-label={`${social.name} de ${settings.siteName}`}
+              >
+                {social.name}
+              </a>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <!-- Enlaces Rápidos -->
+      <div class="space-y-3">
+        <h3 class="text-xs font-bold uppercase tracking-wider opacity-60">Tienda</h3>
+        <ul class="space-y-2 text-sm">
+          <li><a href="/" class="hover:underline opacity-85 hover:opacity-100">Inicio</a></li>
+          <li><a href="/catalogo" class="hover:underline opacity-85 hover:opacity-100">Catálogo Completo</a></li>
+          <li><a href="/categorias" class="hover:underline opacity-85 hover:opacity-100">Categorías</a></li>
+          <li><a href="/carrito" class="hover:underline opacity-85 hover:opacity-100">Mi Carrito</a></li>
+          <li><a href="/contacto" class="hover:underline opacity-85 hover:opacity-100">Contacto</a></li>
+        </ul>
+      </div>
+
+      <!-- Atención y Ubicación -->
+      <div class="space-y-3">
+        <h3 class="text-xs font-bold uppercase tracking-wider opacity-60">Atención al Cliente</h3>
+        <ul class="space-y-2 text-xs sm:text-sm opacity-80">
+          {settings.contactEmail && (
+            <li class="break-words">
+              <a href={`mailto:${settings.contactEmail}`} class="hover:underline">
+                {settings.contactEmail}
+              </a>
+            </li>
+          )}
+          {settings.contactPhone && <li>{settings.contactPhone}</li>}
+          {settings.contactAddress && <li>{settings.contactAddress}</li>}
+          {settings.contactHours && <li class="opacity-75 text-xs">{settings.contactHours}</li>}
+        </ul>
+      </div>
+
+      <!-- Información Legal -->
+      <div class="space-y-3">
+        <h3 class="text-xs font-bold uppercase tracking-wider opacity-60">Información Legal</h3>
+        {policyItems.length > 0 ? (
+          <ul class="space-y-2 text-xs sm:text-sm">
+            {policyItems.map((policy) => (
+              <li>
+                <button
+                  type="button"
+                  data-open-policy={policy.id}
+                  class="text-left hover:underline opacity-80 hover:opacity-100 cursor-pointer"
+                >
+                  {policy.title}
+                </button>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p class="text-xs opacity-60">Pagos procesados de forma cifrada.</p>
+        )}
+      </div>
+    </div>
+
+    <!-- Barra inferior: Copyright + Marca de agua Afótica -->
+    <div
+      class="mt-10 pt-6 border-t flex flex-col sm:flex-row items-center justify-between gap-4 text-xs"
+      style="border-color: var(--border-subtle);"
+    >
+      <p class="opacity-65 text-center sm:text-left">
+        &copy; {currentYear} {settings.siteName}. Todos los derechos reservados.
+      </p>
+
+      <!-- Marca de agua obligatoria con Logo Afótica.svg y enlace a afotica.com -->
+      <a
+        href="https://afotica.com"
+        target="_blank"
+        rel="noopener noreferrer"
+        aria-label="Diseñado por Afótica — Ir a afotica.com"
+        class="group inline-flex items-center gap-2.5 px-3.5 py-2 rounded-xl border transition-all duration-200 hover:scale-[1.03] active:scale-95"
+        style="border-color: var(--border-subtle); background-color: var(--bg-page); color: var(--text-main);"
+      >
+        <span class="text-[11px] font-semibold tracking-wide opacity-75 group-hover:opacity-100 transition-opacity">
+          Diseñado por <strong class="font-extrabold">Afótica</strong>
+        </span>
+        <span
+          class="w-7 h-7 shrink-0 flex items-center justify-center opacity-85 group-hover:opacity-100 transition-all group-hover:rotate-3"
+          style={`color: ${settings.logoColor};`}
+        >
+          {afoticaSvg ? (
+            <span class="w-full h-full flex items-center justify-center [&>svg]:w-full [&>svg]:h-full" set:html={afoticaSvg} />
+          ) : (
+            <img src="/afotica-logo.svg" alt="Afótica" width="28" height="28" class="w-full h-full object-contain" />
+          )}
+        </span>
+      </a>
+    </div>
+  </div>
+
+  <!-- Modales modernos (<dialog closedby="any">) para políticas -->
+  {policyItems.map((policy) => (
+    <dialog
+      id={policy.id}
+      data-policy-dialog
+      {...({ closedby: 'any' } as Record<string, string>)}
+      aria-labelledby={`${policy.id}-title`}
+      class="w-[calc(100%-2rem)] max-w-lg rounded-2xl p-6 shadow-2xl border backdrop:bg-black/60 backdrop:backdrop-blur-sm"
+      style="background-color: var(--bg-surface); color: var(--text-main); border-color: var(--border-subtle);"
+    >
+      <div class="flex items-start justify-between gap-4 border-b pb-3 mb-4" style="border-color: var(--border-subtle);">
+        <h2
+          id={`${policy.id}-title`}
+          class="text-lg font-extrabold"
+          style="font-family: var(--font-heading);"
+        >
+          {policy.title}
+        </h2>
+        <button
+          type="button"
+          data-close-policy
+          aria-label="Cerrar ventana"
+          class="w-8 h-8 rounded-full flex items-center justify-center border text-sm font-bold opacity-70 hover:opacity-100 cursor-pointer"
+          style="border-color: var(--border-subtle);"
+        >
+          &times;
+        </button>
+      </div>
+      <p class="text-sm leading-relaxed opacity-85 whitespace-pre-line">{policy.body}</p>
+    </dialog>
+  ))}
+</footer>
+
+<script>
+  function bindFooterPolicyDialogs() {
+    document.querySelectorAll<HTMLButtonElement>('[data-open-policy]').forEach((btn) => {
+      if (btn.dataset.bound === 'true') return;
+      btn.dataset.bound = 'true';
+      btn.addEventListener('click', () => {
+        const targetId = btn.dataset.openPolicy;
+        const dialog = targetId ? document.getElementById(targetId) : null;
+        if (dialog instanceof HTMLDialogElement) {
+          dialog.showModal();
+        }
+      });
+    });
+
+    document.querySelectorAll<HTMLDialogElement>('dialog[data-policy-dialog]').forEach((dialog) => {
+      if (dialog.dataset.bound === 'true') return;
+      dialog.dataset.bound = 'true';
+
+      dialog.querySelectorAll('[data-close-policy]').forEach((closeBtn) => {
+        closeBtn.addEventListener('click', () => dialog.close());
+      });
+
+      if (!('closedBy' in HTMLDialogElement.prototype)) {
+        dialog.addEventListener('click', (e) => {
+          if (e.target !== dialog) return;
+          const rect = dialog.getBoundingClientRect();
+          const isDialogContent =
+            rect.top <= e.clientY &&
+            e.clientY <= rect.top + rect.height &&
+            rect.left <= e.clientX &&
+            e.clientX <= rect.left + rect.width;
+          if (!isDialogContent) dialog.close();
+        });
+      }
+    });
+  }
+
+  document.addEventListener('astro:page-load', bindFooterPolicyDialogs);
+</script>

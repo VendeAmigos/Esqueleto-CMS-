@@ -8,6 +8,7 @@ import {
   getStoredProducts,
   getGridSpanClasses,
   parseGridSpan,
+  getContrastTextColor,
 } from '@esqueleto/core';
 
 const [settings, rawCategories, allStoredProducts] = await Promise.all([
@@ -22,9 +23,9 @@ const categoriesWithCount = rawCategories.map((cat) => ({
 }));
 
 const selectedFeatured = allStoredProducts.filter((p) => p.isFeatured);
-const featuredProducts = selectedFeatured.length > 0 ? selectedFeatured : allStoredProducts.slice(0, 4);
+const rawFeatured = selectedFeatured.length > 0 ? selectedFeatured : allStoredProducts.slice(0, 4);
+const featuredProducts = Array.from(new Map(rawFeatured.map((p) => [p.id, p])).values());
 
-// Helper de clases para cualquier tamaño de Bento Grid
 const getGridSpanClass = (span: string) => getGridSpanClasses(span);
 
 const gridBoardCols = categoriesWithCount.reduce((acc, cat) => {
@@ -40,51 +41,60 @@ const gridBoardRows = categoriesWithCount.reduce((acc, cat) => {
 }, 3);
 
 const desktopRowHeightPx = gridBoardRows >= 6 ? 115 : gridBoardRows >= 5 ? 145 : 220;
+const ctaTextContrast = getContrastTextColor(settings.logoColor);
+const safeSlugId = (slug: string) => String(slug || '').replace(/[^a-zA-Z0-9_-]/g, '-');
 ---
 
-<Layout title="Inicio" description={settings.heroSubtitle || undefined}>
-  <div class="space-y-16">
-    
-    <!-- 1. BANNER HERO PRINCIPAL (EDITABLE DESDE EL CMS) -->
-    <section class="relative isolate overflow-hidden rounded-3xl bg-gray-950 py-20 sm:py-32 shadow-2xl text-center">
+<Layout title={settings.siteName || 'Tienda'} isHome description={settings.seoDescription || settings.heroSubtitle || undefined}>
+  <div class="space-y-14 sm:space-y-16">
+    <!-- 1. BANNER HERO PRINCIPAL -->
+    <section class="relative isolate overflow-hidden rounded-3xl bg-gray-950 py-16 sm:py-28 shadow-2xl text-center">
       {settings.heroImageUrl && (
         <img
           src={settings.heroImageUrl}
           alt={settings.heroTitle}
+          width="1600"
+          height="900"
+          loading="eager"
+          fetchpriority="high"
+          decoding="async"
           class="absolute inset-0 -z-10 h-full w-full object-cover object-center brightness-75 scale-100 transition-transform duration-1000"
         />
       )}
-      <!-- Gradiente oscuro y viñeta para legibilidad óptima -->
       <div class="absolute inset-0 -z-10 bg-gradient-to-t from-gray-950 via-gray-950/60 to-gray-950/30 backdrop-blur-[1px]" />
 
-      <div class="mx-auto max-w-3xl px-6 lg:px-8">
+      <div class="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8">
         <span
-          class="inline-flex items-center gap-1.5 rounded-full px-3.5 py-1 text-xs font-semibold ring-1 ring-inset mb-6 backdrop-blur-md"
-          style={`background-color: ${settings.logoColor}25; color: ${settings.logoColor}; border-color: ${settings.logoColor}55;`}
+          class="inline-flex items-center gap-1.5 rounded-full px-3.5 py-1 text-xs font-semibold ring-1 ring-inset mb-5 backdrop-blur-md"
+          style={`background-color: ${settings.logoColor}25; color: #ffffff; border-color: ${settings.logoColor}88;`}
         >
           <span class="w-1.5 h-1.5 rounded-full animate-pulse" style={`background-color: ${settings.logoColor};`} />
-          {settings.siteName} • Catálogo Oficial
+          {settings.siteName} &bull; Catálogo Oficial
         </span>
 
-        <h1 class="text-4xl font-extrabold tracking-tight text-white sm:text-6xl drop-shadow-md">
+        <h1 class="text-3xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-white drop-shadow-md">
           {settings.heroTitle}
         </h1>
 
-        <p class="mt-6 text-lg sm:text-xl leading-8 text-gray-200 drop-shadow max-w-2xl mx-auto font-light">
+        <p class="mt-5 text-base sm:text-xl leading-7 sm:leading-8 text-gray-200 drop-shadow max-w-2xl mx-auto font-light">
           {settings.heroSubtitle}
         </p>
 
-        <div class="mt-10 flex items-center justify-center gap-x-4">
+        <div class="mt-8 sm:mt-10 flex flex-wrap items-center justify-center gap-3 sm:gap-4">
           <a
             href={settings.heroCtaLink}
-            class="rounded-xl px-8 py-4 text-base font-bold text-white shadow-xl transition-all duration-200 hover:scale-105 active:scale-95"
-            style={`background-color: ${settings.logoColor};`}
+            class="theme-radius-btn px-7 sm:px-8 py-3.5 sm:py-4 text-sm sm:text-base font-bold shadow-xl transition-all duration-200 hover:scale-105 active:scale-95"
+            style={
+              settings.buttonStyle === 'outline'
+                ? `border: 2px solid ${settings.logoColor}; color: #ffffff; background-color: rgba(0,0,0,0.45);`
+                : `background-color: ${settings.logoColor}; color: ${ctaTextContrast};`
+            }
           >
             {settings.heroCtaText} &rarr;
           </a>
           <a
             href="/categorias"
-            class="rounded-xl px-6 py-4 text-base font-semibold text-white/90 bg-white/10 hover:bg-white/20 backdrop-blur-md border border-white/20 transition-all hover:scale-105"
+            class="theme-radius-btn px-6 py-3.5 sm:py-4 text-sm sm:text-base font-semibold text-white/95 bg-white/10 hover:bg-white/20 backdrop-blur-md border border-white/25 transition-all hover:scale-105"
           >
             Ver Categorías
           </a>
@@ -92,29 +102,35 @@ const desktopRowHeightPx = gridBoardRows >= 6 ? 115 : gridBoardRows >= 5 ? 145 :
       </div>
     </section>
 
-    <!-- 2. BENTO GRID DE CATEGORÍAS (LAYOUT DINÁMICO EDITABLE DESDE EL CMS) -->
+    <!-- 2. BENTO GRID DE CATEGORÍAS -->
     <section class="space-y-6">
       <div class="flex flex-col sm:flex-row sm:items-end justify-between border-b border-gray-200 pb-4 gap-2">
         <div>
-          <span class="text-xs font-bold uppercase tracking-wider text-indigo-600 bg-indigo-50 px-2.5 py-0.5 rounded-md">
-            Colecciones
-          </span>
+          {settings.categoriesBadge && (
+            <span
+              class="text-xs font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-md inline-block"
+              style={`background-color: ${settings.accentColor}18; color: ${settings.accentColor};`}
+            >
+              {settings.categoriesBadge}
+            </span>
+          )}
           <h2 class="text-2xl sm:text-3xl font-extrabold tracking-tight text-gray-900 mt-1">
-            Explora por Categorías
+            {settings.categoriesTitle}
           </h2>
-          <p class="text-sm text-gray-500">
-            Descubre nuestra variedad de productos clasificados para ti.
-          </p>
+          {settings.categoriesSubtitle && (
+            <p class="text-sm text-gray-500">
+              {settings.categoriesSubtitle}
+            </p>
+          )}
         </div>
         <a
           href="/categorias"
-          class="text-sm font-bold text-gray-900 hover:text-indigo-600 transition-colors inline-flex items-center gap-1 group"
+          class="text-sm font-bold text-gray-900 hover:opacity-80 transition-colors inline-flex items-center gap-1 group"
         >
           Ver todas las categorías <span class="transition-transform group-hover:translate-x-1">&rarr;</span>
         </a>
       </div>
 
-      <!-- Bento Grid Container -->
       <style>
         @media (min-width: 1024px) {
           .bento-grid-container {
@@ -129,7 +145,7 @@ const desktopRowHeightPx = gridBoardRows >= 6 ? 115 : gridBoardRows >= 5 ? 145 :
         }
       </style>
       <div
-        class="bento-grid-container grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5 auto-rows-[240px]"
+        class="bento-grid-container grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5 auto-rows-[220px] sm:auto-rows-[240px]"
         style={`--grid-cols: ${gridBoardCols}; --grid-row-h: ${desktopRowHeightPx}px;`}
       >
         {categoriesWithCount.map((cat) => {
@@ -140,130 +156,139 @@ const desktopRowHeightPx = gridBoardRows >= 6 ? 115 : gridBoardRows >= 5 ? 145 :
           const lgRow = parsedSpan.rowStart
             ? `${parsedSpan.rowStart} / span ${parsedSpan.rowSpan}`
             : `span ${parsedSpan.rowSpan}`;
+          const vtSlug = safeSlugId(cat.slug);
           return (
             <a
               href={`/categorias/${cat.slug}`}
-              style={`min-height: 220px; --lg-col: ${lgCol}; --lg-row: ${lgRow};`}
-              class={`bento-grid-card group relative rounded-3xl overflow-hidden shadow-sm hover:shadow-2xl transition-all duration-500 flex flex-col justify-end p-6 border border-gray-200/80 ${getGridSpanClass(
+              style={`min-height: 210px; --lg-col: ${lgCol}; --lg-row: ${lgRow};`}
+              class={`bento-grid-card group relative theme-radius-card overflow-hidden shadow-sm hover:shadow-2xl transition-all duration-500 flex flex-col justify-end p-5 sm:p-6 border border-gray-200/80 ${getGridSpanClass(
                 cat.gridSpan
               )}`}
             >
-            <!-- Imagen con efecto hover zoom -->
-            {cat.imageUrl ? (
-              <img
-                src={cat.imageUrl}
-                alt={cat.name}
-                class="absolute inset-0 h-full w-full object-cover object-center transition-transform duration-700 ease-out group-hover:scale-110"
-              />
-            ) : (
-              <div class="absolute inset-0 bg-gradient-to-br from-gray-800 to-gray-950" />
-            )}
+              {cat.imageUrl ? (
+                <img
+                  src={cat.imageUrl}
+                  alt={cat.name}
+                  width="800"
+                  height="600"
+                  loading="lazy"
+                  decoding="async"
+                  transition:name={`cat-img-${vtSlug}`}
+                  style="view-transition-class: vt-cat-img;"
+                  class="absolute inset-0 h-full w-full object-cover object-center transition-transform duration-700 ease-out group-hover:scale-105"
+                />
+              ) : (
+                <div
+                  transition:name={`cat-img-${vtSlug}`}
+                  style="view-transition-class: vt-cat-img;"
+                  class="absolute inset-0 bg-gradient-to-br from-gray-800 to-gray-950"
+                />
+              )}
 
-            <!-- Gradiente oscuro para texto -->
-            <div class="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent transition-opacity group-hover:via-black/50" />
+              <div class="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent transition-opacity group-hover:via-black/50" />
 
-            <!-- Badge Superior: Contador de Productos -->
-            <div class="relative z-10 self-start mb-auto">
-              <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-black/60 text-white/90 backdrop-blur-md border border-white/20">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 text-white/80" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>
-                {cat.productCount} {cat.productCount === 1 ? 'producto' : 'productos'}
-              </span>
-            </div>
+              <div class="relative z-10 self-start mb-auto">
+                <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-black/60 text-white/95 backdrop-blur-md border border-white/20">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 text-white/80" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>
+                  {cat.productCount} {cat.productCount === 1 ? 'producto' : 'productos'}
+                </span>
+              </div>
 
-            <!-- Título y Enlace -->
-            <div class="relative z-10 space-y-1">
-              <h3 class="text-xl sm:text-2xl font-extrabold text-white tracking-tight drop-shadow-md">
-                {cat.name}
-              </h3>
-              <p class="text-xs text-white/80 font-medium inline-flex items-center gap-1 transition-transform group-hover:translate-x-1">
-                Explorar productos &rarr;
-              </p>
-            </div>
-          </a>
-        );
-      })}
+              <div class="relative z-10 space-y-1">
+                <h3
+                  transition:name={`cat-title-${vtSlug}`}
+                  style="view-transition-class: vt-cat-title;"
+                  class="w-fit max-w-full text-xl sm:text-2xl font-extrabold text-white tracking-tight drop-shadow-md"
+                >
+                  {cat.name}
+                </h3>
+                <p class="text-xs text-white/80 font-medium inline-flex items-center gap-1 transition-transform group-hover:translate-x-1">
+                  Explorar productos &rarr;
+                </p>
+              </div>
+            </a>
+          );
+        })}
       </div>
     </section>
 
-    <!-- 3. SECCIÓN DE PRODUCTOS DESTACADOS (CMS MANAGED) -->
-    <section class="space-y-6 pt-4">
+    <!-- 3. SECCIÓN DE PRODUCTOS DESTACADOS -->
+    <section class="space-y-6 pt-2">
       <div class="flex flex-col sm:flex-row sm:items-end justify-between border-b border-gray-200 pb-4 gap-2">
         <div>
-          <span class="text-xs font-bold uppercase tracking-wider text-amber-800 bg-amber-100 px-2.5 py-0.5 rounded-full inline-flex items-center gap-1.5">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 text-amber-700" fill="currentColor" viewBox="0 0 24 24"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>
-            Lo más destacado
-          </span>
+          {settings.featuredBadge && (
+            <span class="text-xs font-bold uppercase tracking-wider text-amber-800 bg-amber-100 px-2.5 py-0.5 rounded-full inline-flex items-center gap-1.5">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 text-amber-700" fill="currentColor" viewBox="0 0 24 24"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>
+              {settings.featuredBadge}
+            </span>
+          )}
           <h2 class="text-2xl sm:text-3xl font-extrabold tracking-tight text-gray-900 mt-1">
-            Productos Destacados
+            {settings.featuredTitle}
           </h2>
-          <p class="text-sm text-gray-500">
-            Nuestros artículos más populares con opciones personalizables y entrega rápida.
-          </p>
+          {settings.featuredSubtitle && (
+            <p class="text-sm text-gray-500">
+              {settings.featuredSubtitle}
+            </p>
+          )}
         </div>
         <a
           href="/catalogo"
-          class="text-sm font-bold text-gray-900 hover:text-indigo-600 transition-colors inline-flex items-center gap-1 group"
+          class="text-sm font-bold text-gray-900 hover:opacity-80 transition-colors inline-flex items-center gap-1 group"
         >
           Ver catálogo completo <span class="transition-transform group-hover:translate-x-1">&rarr;</span>
         </a>
       </div>
 
-      <!-- Grid de Productos Destacados -->
-      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 sm:gap-6">
         {featuredProducts.map((product) => (
           <ProductCard
             id={product.id}
             name={product.title}
             price={product.basePrice}
-            image={product.imageUrl || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=800&auto=format&fit=crop&q=80'}
+            image={product.imageUrl || '/seed/prod-print-jardin.jpg'}
             category={product.categoryName || 'Destacado'}
             description={product.description || ''}
             modifiers={product.modifiers}
+            currencyCode={settings.currencyCode}
+            currencyLocale={settings.currencyLocale}
           />
         ))}
       </div>
     </section>
 
     <!-- 4. BENEFICIOS Y CONFIANZA -->
-    <section class="border-t border-gray-200/80 pt-12 pb-6">
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-8 text-center sm:text-left">
-        <div class="flex items-start gap-4 p-4 rounded-2xl bg-white border border-gray-100 shadow-sm">
-          <div class="w-12 h-12 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+    <section class="border-t border-gray-200/80 pt-10 pb-4">
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6 sm:gap-8 text-left">
+        <div class="flex items-start gap-4 p-4 sm:p-5 theme-radius-card bg-white border border-gray-100 shadow-sm">
+          <div class="w-11 h-11 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>
           </div>
           <div>
-            <h4 class="font-bold text-gray-900 text-base">Pagos 100% Protegidos</h4>
-            <p class="text-xs text-gray-500 mt-1">
-              Checkout Pro con Mercado Pago, tarjetas de crédito/débito y transferencias seguras.
-            </p>
+            <h4 class="font-bold text-gray-900 text-base">{settings.trust1Title}</h4>
+            <p class="text-xs text-gray-500 mt-1">{settings.trust1Desc}</p>
           </div>
         </div>
 
-        <div class="flex items-start gap-4 p-4 rounded-2xl bg-white border border-gray-100 shadow-sm">
-          <div class="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+        <div class="flex items-start gap-4 p-4 sm:p-5 theme-radius-card bg-white border border-gray-100 shadow-sm">
+          <div class="w-11 h-11 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
           </div>
           <div>
-            <h4 class="font-bold text-gray-900 text-base">Entrega y Seguimiento</h4>
-            <p class="text-xs text-gray-500 mt-1">
-              Envíos rápidos con confirmación inmediata de compra y número de seguimiento.
-            </p>
+            <h4 class="font-bold text-gray-900 text-base">{settings.trust2Title}</h4>
+            <p class="text-xs text-gray-500 mt-1">{settings.trust2Desc}</p>
           </div>
         </div>
 
-        <div class="flex items-start gap-4 p-4 rounded-2xl bg-white border border-gray-100 shadow-sm">
-          <div class="w-12 h-12 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
+        <div class="flex items-start gap-4 p-4 sm:p-5 theme-radius-card bg-white border border-gray-100 shadow-sm">
+          <div class="w-11 h-11 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
           </div>
           <div>
-            <h4 class="font-bold text-gray-900 text-base">Personalización Total</h4>
-            <p class="text-xs text-gray-500 mt-1">
-              Elige tallas, colores y extras con cálculo de precio automático en tiempo real.
-            </p>
+            <h4 class="font-bold text-gray-900 text-base">{settings.trust3Title}</h4>
+            <p class="text-xs text-gray-500 mt-1">{settings.trust3Desc}</p>
           </div>
         </div>
       </div>
     </section>
-
   </div>
 </Layout>

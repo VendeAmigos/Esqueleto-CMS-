@@ -3,7 +3,14 @@
 // Formulario de datos de envío con:
 //  - Ubicación actual del dispositivo (GPS) + mapa de Google con pin arrastrable
 //  - Autollenado por Código Postal (SEPOMEX vía /api/postal-code/[cp])
-// La API key de Google Maps se lee en tiempo de ejecución (no se hornea en el build).
+//  - Opción configurable de "Recoger en tienda / Estudio"
+export interface Props {
+  pickupEnabled?: boolean;
+  pickupAddress?: string;
+}
+
+const { pickupEnabled = false, pickupAddress = '' } = Astro.props;
+
 const mapsKey = process.env.GOOGLE_MAPS_API_KEY?.trim() || '';
 const mapId = process.env.GOOGLE_MAPS_MAP_ID?.trim() || 'DEMO_MAP_ID';
 
@@ -14,43 +21,100 @@ const labelCls = 'block text-xs font-semibold text-gray-700 mb-1.5';
 
 <section
   id="shipping-section"
-  class="rounded-2xl border border-gray-200/90 bg-white p-5 sm:p-6 shadow-sm"
+  class="theme-radius-card border border-gray-200/90 bg-white p-4 sm:p-6 shadow-sm"
   data-maps-key={mapsKey}
   data-map-id={mapId}
+  data-pickup-enabled={pickupEnabled ? 'true' : 'false'}
 >
-  <div class="flex flex-wrap items-start justify-between gap-4 border-b border-gray-100 pb-4">
+  <form id="shipping-form" novalidate data-astro-reload="false">
+  <div class="flex flex-wrap items-start justify-between gap-3 sm:gap-4 border-b border-gray-100 pb-4">
     <div>
       <h2 class="text-lg font-bold text-gray-900 flex items-center gap-2">
-        <span class="inline-flex h-7 w-7 items-center justify-center rounded-full bg-gray-900 text-xs font-bold text-white">2</span>
-        Dirección de Envío Obligatoria
+        <span class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gray-900 text-xs font-bold text-white">2</span>
+        <span>{pickupEnabled ? 'Contacto y Método de Entrega' : 'Dirección de Envío Obligatoria'}</span>
       </h2>
-      <p class="mt-1 text-xs text-gray-500">Para proteger tu entrega es obligatorio completar tus datos de contacto y domicilio antes de pasar a Mercado Pago.</p>
+      <p class="mt-1 text-xs text-gray-500">
+        {pickupEnabled
+          ? 'Elige si prefieres envío a domicilio o recoger en persona antes de pasar a pagar.'
+          : 'Para proteger tu entrega es obligatorio completar tus datos de contacto y domicilio antes de pasar a Mercado Pago.'}
+      </p>
     </div>
     <span
       id="ship-completion-badge"
       class="inline-flex items-center gap-1.5 rounded-full bg-amber-50 border border-amber-200 px-3 py-1 text-xs font-bold text-amber-800"
     >
-      ⚠️ Requerido para pagar
+      Requerido para pagar
     </span>
   </div>
+
+  {pickupEnabled && (
+    <div id="ship-delivery-method-wrap" class="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <button
+        type="button"
+        id="ship-mode-delivery"
+        class="rounded-2xl border-2 border-gray-900 bg-gray-50 p-3.5 text-left transition-all"
+      >
+        <span class="block text-sm font-bold text-gray-900">Envío a Domicilio</span>
+        <span class="block text-xs text-gray-500 mt-0.5">Entrega en la dirección que nos indiques.</span>
+      </button>
+      <button
+        type="button"
+        id="ship-mode-pickup"
+        class="rounded-2xl border-2 border-gray-200 bg-white p-3.5 text-left transition-all hover:border-gray-900"
+      >
+        <span class="block text-sm font-bold text-gray-900">Recoger en Tienda / Estudio</span>
+        <span class="block text-xs text-emerald-700 font-semibold mt-0.5">Sin costo de envío</span>
+      </button>
+    </div>
+  )}
+
+  {pickupEnabled && (
+    <div id="ship-pickup-box" class="hidden mt-4 rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4 text-xs text-emerald-950 space-y-1">
+      <p class="font-bold text-sm">Punto de entrega presencial</p>
+      <p>{pickupAddress || 'Te compartiremos ubicación y horario exacto por WhatsApp en cuanto quede confirmado tu pedido.'}</p>
+    </div>
+  )}
 
   <!-- Contacto -->
   <div class="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
     <div data-field-wrap="fullName">
       <label for="ship-fullName" class={labelCls}>Nombre completo de quien recibe *</label>
-      <input id="ship-fullName" data-ship-field="fullName" type="text" autocomplete="name" placeholder="Ej. María López Hernández" class={inputCls} />
+      <input
+        id="ship-fullName"
+        name="fullName"
+        data-ship-field="fullName"
+        type="text"
+        autocomplete="shipping name"
+        enterkeyhint="next"
+        aria-invalid="false"
+        placeholder="Ej. María López Hernández"
+        class={inputCls}
+      />
       <p class="field-error hidden mt-1 text-[11px] font-medium text-red-600"></p>
     </div>
     <div data-field-wrap="phone">
       <label for="ship-phone" class={labelCls}>Teléfono / WhatsApp *</label>
       <div class="flex">
         <span class="inline-flex items-center rounded-l-xl border border-r-0 border-gray-200 bg-gray-50 px-3 text-sm font-medium text-gray-500">+52</span>
-        <input id="ship-phone" data-ship-field="phone" type="tel" inputmode="numeric" autocomplete="tel-national" maxlength="14" placeholder="10 dígitos" class={`${inputCls} rounded-l-none`} />
+        <input
+          id="ship-phone"
+          name="phone"
+          data-ship-field="phone"
+          type="tel"
+          inputmode="numeric"
+          autocomplete="shipping tel-national"
+          enterkeyhint="next"
+          aria-invalid="false"
+          maxlength="14"
+          placeholder="10 dígitos"
+          class={`${inputCls} rounded-l-none`}
+        />
       </div>
       <p class="field-error hidden mt-1 text-[11px] font-medium text-red-600"></p>
     </div>
   </div>
 
+  <div id="ship-delivery-only-wrap">
   <!-- Selector de método -->
   <div class="mt-6">
     <p class={labelCls}>¿Cómo quieres capturar tu dirección?</p>
@@ -88,9 +152,9 @@ const labelCls = 'block text-xs font-semibold text-gray-700 mb-1.5';
   <!-- Mapa -->
   <div id="ship-map-wrap" class="hidden mt-5">
     <div class="relative overflow-hidden rounded-2xl border border-gray-200 bg-gray-100">
-      <div id="ship-map" class="h-72 w-full"></div>
+      <div id="ship-map" class="h-64 sm:h-72 w-full"></div>
       <div class="pointer-events-none absolute left-3 top-3 rounded-full bg-white/95 px-3 py-1.5 text-[11px] font-semibold text-gray-800 shadow-sm backdrop-blur-sm">
-        ✋ Arrastra el pin hasta la puerta de tu casa
+        Arrastra el pin hasta la puerta de tu casa
       </div>
     </div>
     <div class="mt-2 flex flex-wrap items-center justify-between gap-2 text-[11px] text-gray-500">
@@ -104,51 +168,51 @@ const labelCls = 'block text-xs font-semibold text-gray-700 mb-1.5';
     <div class="sm:col-span-2" data-field-wrap="zip">
       <label for="ship-zip" class={labelCls}>Código postal *</label>
       <div class="relative">
-        <input id="ship-zip" data-ship-field="zip" type="text" inputmode="numeric" autocomplete="postal-code" maxlength="5" placeholder="Ej. 64000" class={`${inputCls} font-mono tracking-widest`} />
+        <input id="ship-zip" name="zip" data-ship-field="zip" type="text" inputmode="numeric" autocomplete="shipping postal-code" enterkeyhint="next" aria-invalid="false" maxlength="5" placeholder="Ej. 64000" class={`${inputCls} font-mono tracking-widest`} />
         <svg id="ship-zip-spinner" class="hidden absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg>
       </div>
       <p id="ship-zip-msg" class="field-error hidden mt-1 text-[11px] font-medium text-red-600"></p>
     </div>
     <div class="sm:col-span-2" data-field-wrap="state">
       <label for="ship-state" class={labelCls}>Estado *</label>
-      <input id="ship-state" data-ship-field="state" type="text" autocomplete="address-level1" class={inputCls} />
+      <input id="ship-state" name="state" data-ship-field="state" type="text" autocomplete="shipping address-level1" enterkeyhint="next" aria-invalid="false" class={inputCls} />
       <p class="field-error hidden mt-1 text-[11px] font-medium text-red-600"></p>
     </div>
     <div class="sm:col-span-2" data-field-wrap="municipality">
       <label for="ship-municipality" class={labelCls}>Municipio / Alcaldía *</label>
-      <input id="ship-municipality" data-ship-field="municipality" type="text" autocomplete="address-level2" class={inputCls} />
+      <input id="ship-municipality" name="municipality" data-ship-field="municipality" type="text" autocomplete="shipping address-level2" enterkeyhint="next" aria-invalid="false" class={inputCls} />
       <p class="field-error hidden mt-1 text-[11px] font-medium text-red-600"></p>
     </div>
 
     <div class="sm:col-span-3" data-field-wrap="neighborhood">
       <label for="ship-neighborhood-select" class={labelCls}>Colonia *</label>
-      <select id="ship-neighborhood-select" class={`${inputCls} hidden`}></select>
-      <input id="ship-neighborhood" data-ship-field="neighborhood" type="text" autocomplete="address-level3" placeholder="Escribe tu colonia" class={`${inputCls} mt-0`} />
+      <select id="ship-neighborhood-select" name="neighborhoodSelect" class={`${inputCls} hidden`}></select>
+      <input id="ship-neighborhood" name="neighborhood" data-ship-field="neighborhood" type="text" autocomplete="shipping address-level3" enterkeyhint="next" aria-invalid="false" placeholder="Escribe tu colonia" class={`${inputCls} mt-0`} />
       <p class="field-error hidden mt-1 text-[11px] font-medium text-red-600"></p>
     </div>
     <div class="sm:col-span-3">
       <label for="ship-city" class={labelCls}>Ciudad</label>
-      <input id="ship-city" data-ship-field="city" type="text" autocomplete="address-level2" class={inputCls} />
+      <input id="ship-city" name="city" data-ship-field="city" type="text" autocomplete="shipping address-level2" enterkeyhint="next" class={inputCls} />
     </div>
 
     <div class="sm:col-span-4" data-field-wrap="street">
       <label for="ship-street" class={labelCls}>Calle *</label>
-      <input id="ship-street" data-ship-field="street" type="text" autocomplete="address-line1" placeholder="Ej. Av. Constitución" class={inputCls} />
+      <input id="ship-street" name="street" data-ship-field="street" type="text" autocomplete="shipping address-line1" enterkeyhint="next" aria-invalid="false" placeholder="Ej. Av. Constitución" class={inputCls} />
       <p class="field-error hidden mt-1 text-[11px] font-medium text-red-600"></p>
     </div>
     <div class="sm:col-span-1" data-field-wrap="extNumber">
       <label for="ship-extNumber" class={labelCls}>No. ext *</label>
-      <input id="ship-extNumber" data-ship-field="extNumber" type="text" placeholder="123" class={inputCls} />
+      <input id="ship-extNumber" name="extNumber" data-ship-field="extNumber" type="text" enterkeyhint="next" aria-invalid="false" placeholder="123" class={inputCls} />
       <p class="field-error hidden mt-1 text-[11px] font-medium text-red-600"></p>
     </div>
     <div class="sm:col-span-1">
       <label for="ship-intNumber" class={labelCls}>No. int</label>
-      <input id="ship-intNumber" data-ship-field="intNumber" type="text" placeholder="4B" class={inputCls} />
+      <input id="ship-intNumber" name="intNumber" data-ship-field="intNumber" type="text" enterkeyhint="next" placeholder="4B" class={inputCls} />
     </div>
 
     <div class="sm:col-span-6">
       <label for="ship-references" class={labelCls}>Referencias para encontrar tu casa</label>
-      <textarea id="ship-references" data-ship-field="references" rows="2" maxlength="500" placeholder="Ej. Casa blanca con portón negro, entre calle Juárez y Morelos, frente a la tienda" class={`${inputCls} resize-none`}></textarea>
+      <textarea id="ship-references" name="references" data-ship-field="references" rows="2" maxlength="500" enterkeyhint="done" placeholder="Ej. Casa blanca con portón negro, entre calle Juárez y Morelos, frente a la tienda" class={`${inputCls} resize-y`}></textarea>
     </div>
   </div>
 
@@ -160,6 +224,8 @@ const labelCls = 'block text-xs font-semibold text-gray-700 mb-1.5';
     <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" /></svg>
     Marcar mi casa en el mapa (opcional)
   </button>
+  </div>
+  </form>
 </section>
 
 <script>
@@ -184,8 +250,12 @@ const labelCls = 'block text-xs font-semibold text-gray-700 mb-1.5';
     if (!section || section.dataset.initialized === 'true') return;
     section.dataset.initialized = 'true';
 
+    const formEl = document.getElementById('shipping-form') as HTMLFormElement | null;
+    formEl?.addEventListener('submit', (e) => e.preventDefault());
+
     const mapsKey = section.dataset.mapsKey || '';
     const mapId = section.dataset.mapId || 'DEMO_MAP_ID';
+    const pickupAllowed = section.dataset.pickupEnabled === 'true';
 
     const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T | null;
     const statusEl = $('ship-location-status');
@@ -199,6 +269,39 @@ const labelCls = 'block text-xs font-semibold text-gray-700 mb-1.5';
     const locateAddressBtn = $('ship-locate-address');
     const useLocationBtn = $('ship-use-location');
     const useZipBtn = $('ship-use-zip');
+    const modeDeliveryBtn = $('ship-mode-delivery');
+    const modePickupBtn = $('ship-mode-pickup');
+    const pickupBox = $('ship-pickup-box');
+    const deliveryOnlyWrap = $('ship-delivery-only-wrap');
+
+    const applyDeliveryMethodUI = (method: 'delivery' | 'pickup') => {
+      const effective: 'delivery' | 'pickup' = pickupAllowed && method === 'pickup' ? 'pickup' : 'delivery';
+      updateShipping({ deliveryMethod: effective });
+      if (effective === 'pickup') {
+        deliveryOnlyWrap?.classList.add('hidden');
+        pickupBox?.classList.remove('hidden');
+        modePickupBtn?.classList.add('border-gray-900', 'bg-gray-50');
+        modePickupBtn?.classList.remove('border-gray-200', 'bg-white');
+        modeDeliveryBtn?.classList.remove('border-gray-900', 'bg-gray-50');
+        modeDeliveryBtn?.classList.add('border-gray-200', 'bg-white');
+      } else {
+        deliveryOnlyWrap?.classList.remove('hidden');
+        pickupBox?.classList.add('hidden');
+        modeDeliveryBtn?.classList.add('border-gray-900', 'bg-gray-50');
+        modeDeliveryBtn?.classList.remove('border-gray-200', 'bg-white');
+        modePickupBtn?.classList.remove('border-gray-900', 'bg-gray-50');
+        modePickupBtn?.classList.add('border-gray-200', 'bg-white');
+      }
+    };
+
+    modeDeliveryBtn?.addEventListener('click', () => applyDeliveryMethodUI('delivery'));
+    modePickupBtn?.addEventListener('click', () => applyDeliveryMethodUI('pickup'));
+
+    if (!pickupAllowed && $shipping.get().deliveryMethod === 'pickup') {
+      updateShipping({ deliveryMethod: 'delivery' });
+    } else if (pickupAllowed) {
+      applyDeliveryMethodUI($shipping.get().deliveryMethod);
+    }
 
     // ---------- Utilidades UI ----------
     const setStatus = (msg: string, kind: 'info' | 'ok' | 'error' = 'info') => {
@@ -230,7 +333,10 @@ const labelCls = 'block text-xs font-semibold text-gray-700 mb-1.5';
 
     const clearFieldError = (f: Field) => {
       const wrap = section.querySelector(`[data-field-wrap="${f}"]`);
-      wrap?.querySelectorAll('input, select').forEach((i) => i.classList.remove('border-red-400', 'ring-2', 'ring-red-100'));
+      wrap?.querySelectorAll('input, select').forEach((i) => {
+        i.classList.remove('border-red-400', 'ring-2', 'ring-red-100');
+        i.setAttribute('aria-invalid', 'false');
+      });
       const err = wrap?.querySelector('.field-error');
       if (err && f !== 'zip') err.classList.add('hidden');
     };
@@ -334,7 +440,7 @@ const labelCls = 'block text-xs font-semibold text-gray-700 mb-1.5';
         renderColonias(data.colonias || [], preferredColonia);
         if (zipMsg) {
           zipMsg.className = 'mt-1 text-[11px] font-medium text-emerald-600';
-          zipMsg.textContent = `✓ ${data.municipio}, ${data.estado}`;
+          zipMsg.textContent = `${data.municipio}, ${data.estado}`;
         }
       } catch (e: any) {
         lastZipLooked = '';
@@ -395,7 +501,7 @@ const labelCls = 'block text-xs font-semibold text-gray-700 mb-1.5';
             const nlat = typeof p.lat === 'function' ? p.lat() : p.lat;
             const nlng = typeof p.lng === 'function' ? p.lng() : p.lng;
             setCoords(nlat, nlng, 'map');
-            setStatus('📍 Ubicación ajustada. ¡Gracias! Así el repartidor llega directo.', 'ok');
+            setStatus('Ubicación ajustada. ¡Gracias! Así el repartidor llega directo.', 'ok');
           });
           map.addListener('click', (ev: any) => {
             if (!ev.latLng) return;
@@ -420,7 +526,7 @@ const labelCls = 'block text-xs font-semibold text-gray-700 mb-1.5';
 
     function setCoords(lat: number, lng: number, source: 'gps' | 'map') {
       updateShipping({ lat: Number(lat.toFixed(7)), lng: Number(lng.toFixed(7)), locationSource: source });
-      if (coordsLabel) coordsLabel.textContent = `📌 ${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+      if (coordsLabel) coordsLabel.textContent = `GPS: ${lat.toFixed(6)}, ${lng.toFixed(6)}`;
       refreshLocateBtn();
     }
 
@@ -520,11 +626,11 @@ const labelCls = 'block text-xs font-semibold text-gray-700 mb-1.5';
       if (errs.length === 0) {
         completionBadge.className =
           'inline-flex items-center gap-1.5 rounded-full bg-emerald-50 border border-emerald-200 px-3 py-1 text-xs font-bold text-emerald-800';
-        completionBadge.textContent = '✓ Dirección completa y verificada';
+        completionBadge.textContent = 'Dirección completa y verificada';
       } else {
         completionBadge.className =
           'inline-flex items-center gap-1.5 rounded-full bg-amber-50 border border-amber-200 px-3 py-1 text-xs font-bold text-amber-800';
-        completionBadge.textContent = `⚠️ Faltan ${errs.length} dato(s) obligatorios`;
+        completionBadge.textContent = `Faltan ${errs.length} dato(s) obligatorios`;
       }
     };
 
@@ -564,13 +670,12 @@ const labelCls = 'block text-xs font-semibold text-gray-700 mb-1.5';
     // ---------- Restaurar estado previo ----------
     if (saved.zip && /^\d{5}$/.test(saved.zip)) lookupZip(saved.zip, saved.neighborhood);
     if (saved.lat != null && saved.lng != null && mapsKey) {
-      if (coordsLabel) coordsLabel.textContent = `📌 ${saved.lat.toFixed(6)}, ${saved.lng.toFixed(6)}`;
+      if (coordsLabel) coordsLabel.textContent = `GPS: ${saved.lat.toFixed(6)}, ${saved.lng.toFixed(6)}`;
       setActiveMode('gps');
       showMap(saved.lat, saved.lng);
     }
     refreshLocateBtn();
   }
 
-  initShippingForm();
   document.addEventListener('astro:page-load', initShippingForm);
 </script>

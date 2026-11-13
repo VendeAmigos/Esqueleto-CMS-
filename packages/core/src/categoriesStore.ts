@@ -51,7 +51,7 @@ export const DEFAULT_INITIAL_CATEGORIES: Category[] = [
     id: 'cat-prints-01',
     name: 'Prints & Láminas de Arte',
     slug: 'prints-arte',
-    imageUrl: 'https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?w=900&auto=format&fit=crop&q=80',
+    imageUrl: '/seed/cat-prints.jpg',
     gridSpan: '1x5@1,1|5x6',
     displayOrder: 1,
   },
@@ -59,7 +59,7 @@ export const DEFAULT_INITIAL_CATEGORIES: Category[] = [
     id: 'cat-stickers-02',
     name: 'Stickers & Papelería',
     slug: 'stickers-papeleria',
-    imageUrl: 'https://images.unsplash.com/photo-1589998059171-988d887df646?w=900&auto=format&fit=crop&q=80',
+    imageUrl: '/seed/cat-stickers.jpg',
     gridSpan: '2x3@2,1|5x6',
     displayOrder: 2,
   },
@@ -67,7 +67,7 @@ export const DEFAULT_INITIAL_CATEGORIES: Category[] = [
     id: 'cat-acc-03',
     name: 'Pines & Llaveros Acrílicos',
     slug: 'pines-llaveros',
-    imageUrl: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=900&auto=format&fit=crop&q=80',
+    imageUrl: '/seed/cat-pines.jpg',
     gridSpan: '1x4@5,1|5x6',
     displayOrder: 3,
   },
@@ -95,8 +95,7 @@ export const DEFAULT_INITIAL_PRODUCTS: StoredProduct[] = [
     title: 'Print Fine Art "El Jardín de los Recuerdos"',
     description:
       'Lámina de ilustración impresa en papel algodón de 310g con tintas pigmentadas de archivo. Colores vibrantes de larga duración.',
-    imageUrl:
-      'https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?w=800&auto=format&fit=crop&q=80',
+    imageUrl: '/seed/prod-print-jardin.jpg',
     basePrice: 18000,
     isActive: true,
     isFeatured: true,
@@ -133,8 +132,7 @@ export const DEFAULT_INITIAL_PRODUCTS: StoredProduct[] = [
     title: 'Pack de Stickers Holográficos "Pequeñas Brujas"',
     description:
       'Set de 5 stickers resistentes al agua y al sol con acabado holográfico brillante arcoíris. Ideales para laptop, termo o libreta.',
-    imageUrl:
-      'https://images.unsplash.com/photo-1589998059171-988d887df646?w=800&auto=format&fit=crop&q=80',
+    imageUrl: '/seed/prod-stickers-brujas.jpg',
     basePrice: 12000,
     isActive: true,
     isFeatured: true,
@@ -146,8 +144,7 @@ export const DEFAULT_INITIAL_PRODUCTS: StoredProduct[] = [
     title: 'Pack de 6 Stickers Holográficos "Criaturas Mágicas"',
     description:
       'Set de 6 adhesivos de vinilo grueso ultra-resistente al agua, raspaduras y sol UV. Brillo holográfico premium.',
-    imageUrl:
-      'https://images.unsplash.com/photo-1589998059171-988d887df646?w=800&auto=format&fit=crop&q=80',
+    imageUrl: '/seed/prod-stickers-criaturas.jpg',
     basePrice: 9500,
     isActive: true,
     isFeatured: false,
@@ -159,8 +156,7 @@ export const DEFAULT_INITIAL_PRODUCTS: StoredProduct[] = [
     title: 'Pin Metálico Esmaltado "Gato Cósmico"',
     description:
       'Pin de metal dorado con esmalte duro pulido (hard enamel) y cierre de goma doble para mayor seguridad.',
-    imageUrl:
-      'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800&auto=format&fit=crop&q=80',
+    imageUrl: '/seed/prod-pin-gato.jpg',
     basePrice: 15000,
     isActive: true,
     isFeatured: true,
@@ -172,8 +168,7 @@ export const DEFAULT_INITIAL_PRODUCTS: StoredProduct[] = [
     title: 'Pin Metálico Esmaltado "Corazón Florecido" (Hard Enamel)',
     description:
       'Broche metálico coleccionable de 3.5cm en esmalte duro pulido con baño en oro y tarjeta ilustrada de respaldo.',
-    imageUrl:
-      'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800&auto=format&fit=crop&q=80',
+    imageUrl: '/seed/prod-pin-corazon.jpg',
     basePrice: 14000,
     isActive: true,
     isFeatured: false,
@@ -185,8 +180,7 @@ export const DEFAULT_INITIAL_PRODUCTS: StoredProduct[] = [
     title: 'Llavero Acrílico Translúcido Glitter "Zorro Astral"',
     description:
       'Llavero de doble cara de acrílico resistente de 6.5cm con destellos glitter suspendidos y capa epóxica anti-rayas.',
-    imageUrl:
-      'https://images.unsplash.com/photo-1588850561407-ed78c282e89b?w=800&auto=format&fit=crop&q=80',
+    imageUrl: '/seed/prod-llavero-zorro.jpg',
     basePrice: 12500,
     isActive: true,
     isFeatured: false,
@@ -198,8 +192,7 @@ export const DEFAULT_INITIAL_PRODUCTS: StoredProduct[] = [
     title: 'Totebag 100% Algodón Pesado "Flora & Fauna"',
     description:
       'Bolsa de tela resistente de 280g/m² serigrafiada a 3 tintas con asas reforzadas para libros o compras.',
-    imageUrl:
-      'https://images.unsplash.com/photo-1544816155-12df9643f363?w=800&auto=format&fit=crop&q=80',
+    imageUrl: '/seed/prod-totebag-flora.jpg',
     basePrice: 28000,
     isActive: true,
     isFeatured: true,
@@ -211,8 +204,7 @@ export const DEFAULT_INITIAL_PRODUCTS: StoredProduct[] = [
     title: 'Totebag Ilustrada "Lectura Nocturna" (100% Algodón Pesado)',
     description:
       'Bolsa de lona resistente de 320g con serigrafía artesanal duradera. Perfecta para libros, libretas y compras.',
-    imageUrl:
-      'https://images.unsplash.com/photo-1544816155-12df9643f363?w=800&auto=format&fit=crop&q=80',
+    imageUrl: '/seed/prod-totebag-lectura.jpg',
     basePrice: 28000,
     isActive: true,
     isFeatured: false,
@@ -237,8 +229,7 @@ export const DEFAULT_INITIAL_PRODUCTS: StoredProduct[] = [
     title: 'Sketchbook Tapa Dura "Pinceladas del Alma" (200g)',
     description:
       'Cuaderno cosido a mano con 160 páginas en papel mix media libre de ácido. Ideal para gouache, tinta y acuarela.',
-    imageUrl:
-      'https://images.unsplash.com/photo-1513364776144-60967b0f800f?w=800&auto=format&fit=crop&q=80',
+    imageUrl: '/seed/prod-sketchbook.jpg',
     basePrice: 24000,
     isActive: true,
     isFeatured: false,
@@ -389,13 +380,13 @@ export async function getStoredCategories(): Promise<Category[]> {
               const loc = localMap.get(dbCat.id);
               return loc
                 ? {
-                    ...dbCat,
-                    name: loc.name || dbCat.name,
-                    slug: loc.slug || dbCat.slug,
-                    imageUrl: loc.imageUrl ?? dbCat.imageUrl,
-                    gridSpan: loc.gridSpan || dbCat.gridSpan,
-                    displayOrder: loc.displayOrder ?? dbCat.displayOrder,
-                  }
+                  ...dbCat,
+                  name: loc.name || dbCat.name,
+                  slug: loc.slug || dbCat.slug,
+                  imageUrl: loc.imageUrl ?? dbCat.imageUrl,
+                  gridSpan: loc.gridSpan || dbCat.gridSpan,
+                  displayOrder: loc.displayOrder ?? dbCat.displayOrder,
+                }
                 : dbCat;
             })
             .sort((a, b) => (a.displayOrder || 0) - (b.displayOrder || 0));
@@ -634,13 +625,13 @@ export async function updateStoredCategory(input: {
   const nextLocal = currentLocal.map((cat) =>
     cat.id === input.id
       ? {
-          ...cat,
-          name: input.name.trim(),
-          slug: input.slug ? input.slug.toLowerCase().trim().replace(/\s+/g, '-') : cat.slug,
-          imageUrl: input.imageUrl?.trim() || null,
-          gridSpan: input.gridSpan || cat.gridSpan,
-          displayOrder: input.displayOrder ?? cat.displayOrder,
-        }
+        ...cat,
+        name: input.name.trim(),
+        slug: input.slug ? input.slug.toLowerCase().trim().replace(/\s+/g, '-') : cat.slug,
+        imageUrl: input.imageUrl?.trim() || null,
+        gridSpan: input.gridSpan || cat.gridSpan,
+        displayOrder: input.displayOrder ?? cat.displayOrder,
+      }
       : cat
   );
   writeLocalCategories(nextLocal);
@@ -739,6 +730,28 @@ export async function updateStoredProduct(input: {
 
   writeLocalProducts(nextLocal);
   return updatedProd;
+}
+
+export async function setStoredProductActive(
+  id: string,
+  isActive: boolean
+): Promise<StoredProduct | null> {
+  const existing = await getStoredProductById(id, true);
+  if (!existing) return null;
+
+  const updated: StoredProduct = {
+    ...existing,
+    isActive,
+  };
+
+  const currentLocal = readLocalProducts();
+  const existsInLocal = currentLocal.some((p) => p.id === id);
+  const nextLocal = existsInLocal
+    ? currentLocal.map((p) => (p.id === id ? { ...p, isActive } : p))
+    : [updated, ...currentLocal];
+
+  writeLocalProducts(nextLocal);
+  return updated;
 }
 
 export async function deleteStoredProduct(id: string): Promise<void> {
@@ -846,8 +859,13 @@ export async function bulkUpsertStoredProducts(
 }
 
 // ============================================================================
-// Persistencia Híbrida de Apariencia, Logo SVG y Tipografías (site_settings)
+// Persistencia Híbrida de Apariencia, Logo SVG, Tokens y Reglas de Tienda
 // ============================================================================
+export type ColorThemeMode = 'light' | 'dark' | 'auto';
+export type CardRadiusPreset = 'none' | 'soft' | 'rounded' | 'pill';
+export type ButtonStylePreset = 'solid' | 'outline';
+export type FontScalePreset = 'compact' | 'normal' | 'editorial';
+
 export interface StoredSiteAppearance {
   id: string;
   siteName: string;
@@ -860,9 +878,68 @@ export interface StoredSiteAppearance {
   heroCtaLink: string;
   headingFont: string;
   bodyFont: string;
+  // Tokens de color, tema y geometría
+  accentColor: string;
+  backgroundColor: string;
+  surfaceColor: string;
+  textColor: string;
+  colorTheme: ColorThemeMode;
+  cardRadius: CardRadiusPreset;
+  buttonStyle: ButtonStylePreset;
+  fontScale: FontScalePreset;
+  fontWeights: string;
+  // Barra de anuncios
+  announcementEnabled: boolean;
+  announcementText: string;
+  announcementLink: string;
+  announcementBg: string;
+  // Contacto, redes y WhatsApp
+  contactTitle: string;
+  contactSubtitle: string;
+  contactEmail: string;
+  contactPhone: string;
+  contactAddress: string;
+  contactHours: string;
+  instagramUrl: string;
+  tiktokUrl: string;
+  facebookUrl: string;
+  whatsappEnabled: boolean;
+  whatsappNumber: string;
+  whatsappMessage: string;
+  // Políticas del footer
+  shippingPolicyText: string;
+  returnsPolicyText: string;
+  privacyPolicyText: string;
+  // Textos configurables de portada
+  categoriesBadge: string;
+  categoriesTitle: string;
+  categoriesSubtitle: string;
+  featuredBadge: string;
+  featuredTitle: string;
+  featuredSubtitle: string;
+  trust1Title: string;
+  trust1Desc: string;
+  trust2Title: string;
+  trust2Desc: string;
+  trust3Title: string;
+  trust3Desc: string;
+  // Moneda y reglas de envío / pickup
+  currencyCode: string;
+  currencyLocale: string;
+  shippingFeeCents: number;
+  freeShippingThresholdCents: number | null;
+  pickupEnabled: boolean;
+  pickupAddress: string;
+  // SEO y analítica
+  faviconUrl: string;
+  ogImageUrl: string;
+  seoDescription: string;
+  seoTitleSuffix: string;
+  ga4MeasurementId: string;
+  metaPixelId: string;
 }
 
-const DEFAULT_APPEARANCE: StoredSiteAppearance = {
+export const DEFAULT_APPEARANCE: StoredSiteAppearance = {
   id: 'default',
   siteName: 'LUNA ART STUDIO',
   logoSvg: null,
@@ -876,7 +953,128 @@ const DEFAULT_APPEARANCE: StoredSiteAppearance = {
   heroCtaLink: '/catalogo',
   headingFont: 'Plus Jakarta Sans',
   bodyFont: 'Inter',
+  accentColor: '#6366f1',
+  backgroundColor: '#f9fafb',
+  surfaceColor: '#ffffff',
+  textColor: '#111827',
+  colorTheme: 'light',
+  cardRadius: 'rounded',
+  buttonStyle: 'solid',
+  fontScale: 'normal',
+  fontWeights: '400;500;600;700;800',
+  announcementEnabled: false,
+  announcementText: '',
+  announcementLink: '/catalogo',
+  announcementBg: '#111827',
+  contactTitle: 'Contáctanos',
+  contactSubtitle: 'Estamos aquí para ayudarte. Envíanos tus dudas o comentarios.',
+  contactEmail: 'soporte@tutienda.com',
+  contactPhone: '+52 55 1234 5678',
+  contactAddress: 'Av. Principal 123, Ciudad de México',
+  contactHours: 'Lunes a Viernes de 9:00 AM a 6:00 PM',
+  instagramUrl: '',
+  tiktokUrl: '',
+  facebookUrl: '',
+  whatsappEnabled: false,
+  whatsappNumber: '',
+  whatsappMessage: 'Hola, me interesa información sobre sus productos.',
+  shippingPolicyText:
+    'Preparamos y empacamos cada pedido en 1 a 3 días hábiles. Recibirás tu número de guía en cuanto tu paquete salga a ruta.',
+  returnsPolicyText:
+    'Si tu producto llega dañado en tránsito o presenta un defecto de fabricación, contáctanos dentro de los 7 días posteriores a la entrega.',
+  privacyPolicyText:
+    'Utilizamos tu nombre, teléfono, correo y dirección únicamente para procesar pagos, facturación y coordinar el envío seguro de tu pedido.',
+  categoriesBadge: 'Colecciones',
+  categoriesTitle: 'Explora por Categorías',
+  categoriesSubtitle: 'Descubre nuestra variedad de productos clasificados para ti.',
+  featuredBadge: 'Lo más destacado',
+  featuredTitle: 'Productos Destacados',
+  featuredSubtitle: 'Nuestros artículos más populares con opciones personalizables y entrega rápida.',
+  trust1Title: 'Pagos 100% Protegidos',
+  trust1Desc: 'Checkout Pro con Mercado Pago, tarjetas de crédito/débito y transferencias seguras.',
+  trust2Title: 'Entrega y Seguimiento',
+  trust2Desc: 'Envíos rápidos con confirmación inmediata de compra y número de seguimiento.',
+  trust3Title: 'Personalización Total',
+  trust3Desc: 'Elige tallas, colores y extras con cálculo de precio automático en tiempo real.',
+  currencyCode: 'MXN',
+  currencyLocale: 'es-MX',
+  shippingFeeCents: 0,
+  freeShippingThresholdCents: null,
+  pickupEnabled: false,
+  pickupAddress: '',
+  faviconUrl: '',
+  ogImageUrl: '',
+  seoDescription: '',
+  seoTitleSuffix: '',
+  ga4MeasurementId: '',
+  metaPixelId: '',
 };
+
+function safeParseExtendedConfig(raw: unknown): Partial<StoredSiteAppearance> {
+  if (!raw || typeof raw !== 'string') return {};
+  try {
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function buildExtendedPayload(s: StoredSiteAppearance): Record<string, unknown> {
+  const {
+    id: _id,
+    siteName: _siteName,
+    logoSvg: _logoSvg,
+    logoColor: _logoColor,
+    heroTitle: _heroTitle,
+    heroSubtitle: _heroSubtitle,
+    heroImageUrl: _heroImageUrl,
+    heroCtaText: _heroCtaText,
+    heroCtaLink: _heroCtaLink,
+    headingFont: _headingFont,
+    bodyFont: _bodyFont,
+    ...extended
+  } = s;
+  return extended;
+}
+
+function normalizeAppearance(merged: Partial<StoredSiteAppearance>): StoredSiteAppearance {
+  const theme = merged.colorTheme;
+  const radius = merged.cardRadius;
+  const btnStyle = merged.buttonStyle;
+  const fScale = merged.fontScale;
+
+  return {
+    ...DEFAULT_APPEARANCE,
+    ...merged,
+    id: 'default',
+    siteName: merged.siteName?.trim() || DEFAULT_APPEARANCE.siteName,
+    logoSvg: merged.logoSvg?.trim() || null,
+    logoColor: merged.logoColor?.trim() || DEFAULT_APPEARANCE.logoColor,
+    heroTitle: merged.heroTitle?.trim() || DEFAULT_APPEARANCE.heroTitle,
+    heroSubtitle:
+      merged.heroSubtitle !== undefined ? merged.heroSubtitle : DEFAULT_APPEARANCE.heroSubtitle,
+    heroImageUrl:
+      merged.heroImageUrl !== undefined ? merged.heroImageUrl : DEFAULT_APPEARANCE.heroImageUrl,
+    heroCtaText: merged.heroCtaText?.trim() || DEFAULT_APPEARANCE.heroCtaText,
+    heroCtaLink: merged.heroCtaLink?.trim() || DEFAULT_APPEARANCE.heroCtaLink,
+    headingFont: merged.headingFont?.trim() || DEFAULT_APPEARANCE.headingFont,
+    bodyFont: merged.bodyFont?.trim() || DEFAULT_APPEARANCE.bodyFont,
+    colorTheme: theme === 'dark' || theme === 'auto' ? theme : 'light',
+    cardRadius:
+      radius === 'none' || radius === 'soft' || radius === 'pill' ? radius : 'rounded',
+    buttonStyle: btnStyle === 'outline' ? 'outline' : 'solid',
+    fontScale: fScale === 'compact' || fScale === 'editorial' ? fScale : 'normal',
+    shippingFeeCents: Math.max(0, Math.round(Number(merged.shippingFeeCents || 0))),
+    freeShippingThresholdCents:
+      merged.freeShippingThresholdCents != null && Number(merged.freeShippingThresholdCents) > 0
+        ? Math.round(Number(merged.freeShippingThresholdCents))
+        : null,
+    announcementEnabled: Boolean(merged.announcementEnabled),
+    whatsappEnabled: Boolean(merged.whatsappEnabled),
+    pickupEnabled: Boolean(merged.pickupEnabled),
+  };
+}
 
 function getSiteSettingsPath(): string {
   return path.join(getCmsDataDir(), 'site-settings.json');
@@ -903,51 +1101,40 @@ export async function getStoredSiteSettings(): Promise<StoredSiteAppearance> {
         .limit(1)
         .execute();
       if (rows && rows.length > 0) {
-        const dbRow = rows[0];
-        return {
-          id: 'default',
-          siteName: localData?.siteName || dbRow.siteName || DEFAULT_APPEARANCE.siteName,
-          logoSvg: localData?.logoSvg !== undefined ? localData.logoSvg : dbRow.logoSvg,
-          logoColor: localData?.logoColor || dbRow.logoColor || DEFAULT_APPEARANCE.logoColor,
-          heroTitle: localData?.heroTitle || dbRow.heroTitle || DEFAULT_APPEARANCE.heroTitle,
-          heroSubtitle:
-            localData?.heroSubtitle !== undefined ? localData.heroSubtitle : dbRow.heroSubtitle,
-          heroImageUrl:
-            localData?.heroImageUrl !== undefined ? localData.heroImageUrl : dbRow.heroImageUrl,
-          heroCtaText: localData?.heroCtaText || dbRow.heroCtaText || DEFAULT_APPEARANCE.heroCtaText,
-          heroCtaLink: localData?.heroCtaLink || dbRow.heroCtaLink || DEFAULT_APPEARANCE.heroCtaLink,
-          headingFont:
-            localData?.headingFont || (dbRow as any).headingFont || DEFAULT_APPEARANCE.headingFont,
-          bodyFont: localData?.bodyFont || (dbRow as any).bodyFont || DEFAULT_APPEARANCE.bodyFont,
-        };
+        const dbRow = rows[0] as any;
+        const dbExtended = safeParseExtendedConfig(dbRow.extendedConfig);
+        return normalizeAppearance({
+          ...dbExtended,
+          siteName: dbRow.siteName,
+          logoSvg: dbRow.logoSvg,
+          logoColor: dbRow.logoColor,
+          heroTitle: dbRow.heroTitle,
+          heroSubtitle: dbRow.heroSubtitle,
+          heroImageUrl: dbRow.heroImageUrl,
+          heroCtaText: dbRow.heroCtaText,
+          heroCtaLink: dbRow.heroCtaLink,
+          headingFont: dbRow.headingFont,
+          bodyFont: dbRow.bodyFont,
+          ...(localData || {}),
+        });
       }
     } catch {
       markDatabaseOffline();
     }
   }
 
-  return {
-    ...DEFAULT_APPEARANCE,
-    ...(localData || {}),
-  };
+  return normalizeAppearance(localData || {});
 }
 
 export async function saveStoredSiteSettings(
-  input: Omit<StoredSiteAppearance, 'id'>
+  input: Partial<Omit<StoredSiteAppearance, 'id'>>
 ): Promise<StoredSiteAppearance> {
-  const toSave: StoredSiteAppearance = {
-    id: 'default',
-    siteName: input.siteName.trim() || DEFAULT_APPEARANCE.siteName,
-    logoSvg: input.logoSvg?.trim() || null,
-    logoColor: input.logoColor.trim() || DEFAULT_APPEARANCE.logoColor,
-    heroTitle: input.heroTitle.trim() || DEFAULT_APPEARANCE.heroTitle,
-    heroSubtitle: input.heroSubtitle ?? '',
-    heroImageUrl: input.heroImageUrl ?? '',
-    heroCtaText: input.heroCtaText.trim() || DEFAULT_APPEARANCE.heroCtaText,
-    heroCtaLink: input.heroCtaLink.trim() || DEFAULT_APPEARANCE.heroCtaLink,
-    headingFont: input.headingFont?.trim() || DEFAULT_APPEARANCE.headingFont,
-    bodyFont: input.bodyFont?.trim() || DEFAULT_APPEARANCE.bodyFont,
-  };
+  const existingCurrent = await getStoredSiteSettings();
+  const toSave = normalizeAppearance({
+    ...existingCurrent,
+    ...input,
+  });
+  const extendedJson = JSON.stringify(buildExtendedPayload(toSave));
 
   try {
     fs.writeFileSync(getSiteSettingsPath(), JSON.stringify(toSave, null, 2), 'utf-8');
@@ -979,6 +1166,7 @@ export async function saveStoredSiteSettings(
             heroCtaLink: toSave.heroCtaLink,
             headingFont: toSave.headingFont,
             bodyFont: toSave.bodyFont,
+            extendedConfig: extendedJson,
             updatedAt: new Date(),
           })
           .where(eq(siteSettings.id, 'default'));
@@ -995,6 +1183,7 @@ export async function saveStoredSiteSettings(
           heroCtaLink: toSave.heroCtaLink,
           headingFont: toSave.headingFont,
           bodyFont: toSave.bodyFont,
+          extendedConfig: extendedJson,
           updatedAt: new Date(),
         });
       }

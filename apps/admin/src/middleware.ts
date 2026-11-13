@@ -8,7 +8,9 @@ export async function middleware(req: NextRequest) {
   if (
     pathname.startsWith('/_next') ||
     pathname.startsWith('/uploads') ||
+    pathname.startsWith('/seed') ||
     pathname === '/api/health' ||
+    pathname === '/api/favicon.svg' ||
     pathname === '/favicon.ico'
   ) {
     return NextResponse.next();
@@ -53,5 +55,5 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|seed/|uploads/|api/favicon.svg).*)'],
 };

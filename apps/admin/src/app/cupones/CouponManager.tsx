@@ -371,10 +371,12 @@ export default function CouponManager({ coupons: initialCoupons }: CouponManager
                 </p>
               </div>
               <button
+                type="button"
+                aria-label="Cerrar modal"
                 onClick={() => setIsModalOpen(false)}
-                className="text-gray-400 hover:text-black text-xl font-bold p-1"
+                className="text-gray-400 hover:text-black p-1 rounded-lg"
               >
-                ✕
+                <svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
               </button>
             </div>
 

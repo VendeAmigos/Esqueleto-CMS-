@@ -16,6 +16,9 @@ importers:
       drizzle-orm:
         specifier: ^0.45.3
         version: 0.45.3(@libsql/client@0.18.0)(gel@2.2.1)(postgres@3.4.9)
+      input-switch-polyfill:
+        specifier: ^1.12.0
+        version: 1.12.0
       next:
         specifier: ^14.2.24
         version: 14.2.35(@babel/core@7.29.7)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
@@ -2058,6 +2061,9 @@ packages:
 
   inherits@2.0.4:
     resolution: {integrity: sha512-k/vGaX4/Yla3WzyMCvTQOXYeIHvqOKtnqBduzTHpzpQZzAskKMhZ2K+EnBiSM9zGSoIFeMpXKxa4dYeZIQqewQ==}
+
+  input-switch-polyfill@1.12.0:
+    resolution: {integrity: sha512-4IF+lwC4jjInFPWWjHDcVJWvWiTHm1RnGa+P9uLhOleal69NPbUnrcPHJJhuexyUqOnyA0QenXhtZNuZX4gqWA==}
 
   is-arrayish@0.3.4:
     resolution: {integrity: sha512-m6UrgzFVUYawGBh1dUsWR5M2Clqic9RVXC/9f8ceNlv2IcO9j9J/z8UoCLPqtsPBFNzEpfR3xftohbfqDx8EQA==}
@@ -4177,7 +4183,7 @@ snapshots:
 
   '@types/ws@8.18.2':
     dependencies:
-      '@types/node': 26.6.3
+      '@types/node': 22.20.4
     optional: true
 
   '@ungap/structured-clone@1.4.0': {}
@@ -4914,6 +4920,8 @@ snapshots:
   import-meta-resolve@4.2.0: {}
 
   inherits@2.0.4: {}
+
+  input-switch-polyfill@1.12.0: {}
 
   is-arrayish@0.3.4:
     optional: true

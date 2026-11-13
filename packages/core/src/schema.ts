@@ -62,6 +62,7 @@ export const siteSettings = pgTable('site_settings', {
   heroCtaLink: text('hero_cta_link').notNull().default('/catalogo'),
   headingFont: text('heading_font').notNull().default('Plus Jakarta Sans'),
   bodyFont: text('body_font').notNull().default('Inter'),
+  extendedConfig: text('extended_config'),
   updatedAt: timestamp('updated_at').notNull().$defaultFn(() => new Date()),
 });
 

@@ -8,7 +8,7 @@ export default async function CategoriasPage() {
   const allCategories = await getStoredCategories();
 
   return (
-    <main className="min-h-screen p-8 max-w-7xl mx-auto space-y-8">
+    <main className="min-h-screen p-4 sm:p-6 md:p-8 max-w-7xl mx-auto space-y-6 sm:space-y-8">
       <div className="border-b border-gray-200 pb-5 flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4">
         <div>
           <span className="text-xs font-bold uppercase tracking-wider text-indigo-600 bg-indigo-50 px-2.5 py-1 rounded-md">

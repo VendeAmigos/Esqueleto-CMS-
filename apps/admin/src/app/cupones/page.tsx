@@ -24,7 +24,7 @@ export default async function CuponesPage() {
   }
 
   return (
-    <main className="min-h-screen p-8 max-w-7xl mx-auto space-y-8">
+    <main className="min-h-screen p-4 sm:p-6 md:p-8 max-w-7xl mx-auto space-y-6 sm:space-y-8">
       {/* Encabezado */}
       <div className="flex flex-col md:flex-row md:items-end justify-between border-b border-gray-200 pb-5 gap-4">
         <div>

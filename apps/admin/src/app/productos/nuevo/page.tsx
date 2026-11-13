@@ -8,8 +8,8 @@ export default async function NuevoProductoPage() {
   const allCategories = await getStoredCategories();
 
   return (
-    <main className="min-h-screen p-8 max-w-4xl mx-auto">
-      <div className="border-b border-gray-200 pb-5 mb-8 flex items-center justify-between">
+    <div className="min-h-screen p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto">
+      <div className="border-b border-gray-200 pb-5 mb-8 flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-gray-900">
             Nuevo Producto
@@ -27,6 +27,6 @@ export default async function NuevoProductoPage() {
       </div>
 
       <ProductForm categories={allCategories} />
-    </main>
+    </div>
   );
 }

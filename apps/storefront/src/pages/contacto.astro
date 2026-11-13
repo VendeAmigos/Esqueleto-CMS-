@@ -1,102 +1,215 @@
 ---
+// apps/storefront/src/pages/contacto.astro
 import Layout from '../layouts/Layout.astro';
+import { getStoredSiteSettings, getContrastTextColor } from '@esqueleto/core';
 
-// Configuración de la página de contacto (Editable por el negocio)
-const contactInfo = {
-  title: "Contáctanos",
-  subtitle: "Estamos aquí para ayudarte. Envíanos tus dudas o comentarios.",
-  email: "soporte@tutienda.com",
-  phone: "+52 55 1234 5678",
-  address: "Av. Principal 123, Ciudad de México",
-  businessHours: "Lunes a Viernes de 9:00 AM a 6:00 PM"
-};
+const settings = await getStoredSiteSettings();
+const panelContrast = getContrastTextColor(settings.accentColor || '#4f46e5');
+const hasWhatsapp = settings.whatsappEnabled && Boolean(settings.whatsappNumber);
+const whatsappClean = (settings.whatsappNumber || '').replace(/[^\d]/g, '');
+
+const socials = [
+  { label: 'Instagram', href: settings.instagramUrl },
+  { label: 'TikTok', href: settings.tiktokUrl },
+  { label: 'Facebook', href: settings.facebookUrl },
+].filter((s) => Boolean(s.href && s.href.trim()));
 ---
 
-<Layout title={contactInfo.title} description={contactInfo.subtitle}>
-  <div class="max-w-7xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
-    <div class="max-w-3xl mx-auto">
-      <h1 class="text-4xl font-extrabold text-gray-900 tracking-tight text-center mb-4">
-        {contactInfo.title}
+<Layout title={settings.contactTitle || 'Contáctanos'} description={settings.contactSubtitle}>
+  <div class="max-w-4xl mx-auto py-6 sm:py-10 px-1 sm:px-4">
+    <div class="text-center mb-8 sm:mb-10 space-y-2">
+      <h1 class="text-3xl sm:text-4xl font-extrabold text-gray-900 tracking-tight">
+        {settings.contactTitle}
       </h1>
-      <p class="text-lg text-gray-500 text-center mb-12">
-        {contactInfo.subtitle}
+      <p class="text-base sm:text-lg text-gray-500 max-w-2xl mx-auto">
+        {settings.contactSubtitle}
       </p>
+    </div>
 
-      <div class="bg-white shadow-xl rounded-2xl overflow-hidden border border-gray-100">
-        <div class="grid grid-cols-1 md:grid-cols-2">
-          
-          <!-- Información de Contacto -->
-          <div class="bg-indigo-600 p-10 text-white flex flex-col justify-between">
-            <div>
-              <h3 class="text-xl font-semibold mb-6">Información de Negocio</h3>
-              
-              <div class="space-y-6">
-                <div class="flex items-start">
-                  <svg class="h-6 w-6 text-indigo-200 mt-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <div class="bg-white shadow-xl theme-radius-card overflow-hidden border border-gray-100">
+      <div class="grid grid-cols-1 md:grid-cols-2">
+        <!-- Información de Contacto -->
+        <div
+          class="p-6 sm:p-10 flex flex-col justify-between gap-8"
+          style={`background-color: ${settings.accentColor}; color: ${panelContrast};`}
+        >
+          <div>
+            <h2 class="text-xl font-bold mb-6">Información de Negocio</h2>
+
+            <div class="space-y-5 text-sm">
+              {settings.contactEmail && (
+                <div class="flex items-start gap-3.5">
+                  <svg class="h-5 w-5 shrink-0 mt-0.5 opacity-80" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                   </svg>
-                  <div class="ml-4">
-                    <p class="text-sm font-medium text-indigo-200">Email</p>
-                    <p class="text-base">{contactInfo.email}</p>
+                  <div class="min-w-0">
+                    <p class="text-xs font-semibold opacity-75">Email</p>
+                    <a href={`mailto:${settings.contactEmail}`} class="font-medium break-all hover:underline">
+                      {settings.contactEmail}
+                    </a>
                   </div>
                 </div>
+              )}
 
-                <div class="flex items-start">
-                  <svg class="h-6 w-6 text-indigo-200 mt-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              {settings.contactPhone && (
+                <div class="flex items-start gap-3.5">
+                  <svg class="h-5 w-5 shrink-0 mt-0.5 opacity-80" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
                   </svg>
-                  <div class="ml-4">
-                    <p class="text-sm font-medium text-indigo-200">Teléfono</p>
-                    <p class="text-base">{contactInfo.phone}</p>
+                  <div>
+                    <p class="text-xs font-semibold opacity-75">Teléfono</p>
+                    <p class="font-medium">{settings.contactPhone}</p>
                   </div>
                 </div>
+              )}
 
-                <div class="flex items-start">
-                  <svg class="h-6 w-6 text-indigo-200 mt-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              {settings.contactAddress && (
+                <div class="flex items-start gap-3.5">
+                  <svg class="h-5 w-5 shrink-0 mt-0.5 opacity-80" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                   </svg>
-                  <div class="ml-4">
-                    <p class="text-sm font-medium text-indigo-200">Ubicación</p>
-                    <p class="text-base">{contactInfo.address}</p>
+                  <div>
+                    <p class="text-xs font-semibold opacity-75">Ubicación</p>
+                    <p class="font-medium">{settings.contactAddress}</p>
                   </div>
                 </div>
-              </div>
-            </div>
-            
-            <div class="mt-10">
-              <p class="text-sm text-indigo-200 font-medium">Horario de Atención</p>
-              <p class="text-base">{contactInfo.businessHours}</p>
+              )}
             </div>
           </div>
 
-          <!-- Formulario (Visual) -->
-          <div class="p-10">
-            <h3 class="text-xl font-semibold text-gray-900 mb-6">Envíanos un mensaje</h3>
-            <form class="space-y-6" onsubmit="return false;">
+          <div class="space-y-4">
+            {settings.contactHours && (
               <div>
-                <label for="name" class="block text-sm font-medium text-gray-700">Nombre completo</label>
-                <input type="text" id="name" name="name" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 py-2 px-3 border" required>
+                <p class="text-xs font-semibold opacity-75">Horario de Atención</p>
+                <p class="text-sm font-medium mt-0.5">{settings.contactHours}</p>
               </div>
-              
-              <div>
-                <label for="email" class="block text-sm font-medium text-gray-700">Correo electrónico</label>
-                <input type="email" id="email" name="email" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 py-2 px-3 border" required>
+            )}
+
+            {socials.length > 0 && (
+              <div class="flex flex-wrap gap-2 pt-1">
+                {socials.map((s) => (
+                  <a
+                    href={s.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="px-3 py-1.5 rounded-full text-xs font-bold border border-current/25 hover:bg-black/15 transition-colors"
+                  >
+                    {s.label}
+                  </a>
+                ))}
               </div>
-              
-              <div>
-                <label for="message" class="block text-sm font-medium text-gray-700">Mensaje</label>
-                <textarea id="message" name="message" rows="4" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 py-2 px-3 border" required></textarea>
-              </div>
-              
-              <button type="submit" class="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-gray-900 hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-900 transition-colors">
-                Enviar Mensaje
-              </button>
-            </form>
+            )}
           </div>
-          
+        </div>
+
+        <!-- Formulario Interactivo -->
+        <div class="p-6 sm:p-10">
+          <h2 class="text-xl font-bold text-gray-900 mb-5">Envíanos un mensaje</h2>
+          <form
+            id="contact-form"
+            class="space-y-4"
+            data-contact-email={settings.contactEmail}
+            data-whatsapp={hasWhatsapp ? whatsappClean : ''}
+            data-site-name={settings.siteName}
+          >
+            <div>
+              <label for="contact-name" class="block text-sm font-semibold text-gray-700 mb-1">
+                Nombre completo
+              </label>
+              <input
+                type="text"
+                id="contact-name"
+                name="name"
+                autocomplete="name"
+                enterkeyhint="next"
+                required
+                class="block w-full rounded-xl border border-gray-300 shadow-xs focus:border-black focus:ring-black py-2.5 px-3 text-sm"
+              />
+            </div>
+
+            <div>
+              <label for="contact-email" class="block text-sm font-semibold text-gray-700 mb-1">
+                Correo electrónico
+              </label>
+              <input
+                type="email"
+                id="contact-email"
+                name="email"
+                autocomplete="email"
+                enterkeyhint="next"
+                required
+                class="block w-full rounded-xl border border-gray-300 shadow-xs focus:border-black focus:ring-black py-2.5 px-3 text-sm"
+              />
+            </div>
+
+            <div>
+              <label for="contact-message" class="block text-sm font-semibold text-gray-700 mb-1">
+                Mensaje
+              </label>
+              <textarea
+                id="contact-message"
+                name="message"
+                rows={4}
+                required
+                class="block w-full rounded-xl border border-gray-300 shadow-xs focus:border-black focus:ring-black py-2.5 px-3 text-sm resize-y"
+              />
+            </div>
+
+            <button
+              type="submit"
+              class="w-full flex justify-center py-3 px-4 theme-radius-btn shadow-sm text-sm font-bold text-white bg-gray-900 hover:bg-black transition-all active:scale-[0.98]"
+            >
+              Enviar Mensaje
+            </button>
+
+            <div
+              id="contact-status"
+              role="status"
+              aria-live="polite"
+              class="hidden rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs font-medium text-emerald-800"
+            />
+          </form>
         </div>
       </div>
     </div>
   </div>
 </Layout>
+
+<script>
+  function initContactForm() {
+    const form = document.getElementById('contact-form') as HTMLFormElement | null;
+    if (!form || form.dataset.bound === 'true') return;
+    form.dataset.bound = 'true';
+
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const name = (document.getElementById('contact-name') as HTMLInputElement | null)?.value.trim() || '';
+      const email = (document.getElementById('contact-email') as HTMLInputElement | null)?.value.trim() || '';
+      const message = (document.getElementById('contact-message') as HTMLTextAreaElement | null)?.value.trim() || '';
+      const statusBox = document.getElementById('contact-status');
+
+      if (!name || !email || !message) return;
+
+      const wa = form.dataset.whatsapp || '';
+      const targetEmail = form.dataset.contactEmail || '';
+      const siteName = form.dataset.siteName || 'Tienda';
+
+      if (statusBox) {
+        statusBox.textContent = `¡Gracias, ${name}! Preparamos tu mensaje para enviarlo a ${siteName}.`;
+        statusBox.classList.remove('hidden');
+      }
+
+      if (wa) {
+        const text = `Hola ${siteName}, soy ${name} (${email}). ${message}`;
+        window.open(`https://wa.me/${wa}?text=${encodeURIComponent(text)}`, '_blank', 'noopener,noreferrer');
+      } else if (targetEmail) {
+        const subject = `Contacto Web — ${name}`;
+        const body = `Nombre: ${name}\nCorreo: ${email}\n\n${message}`;
+        window.location.href = `mailto:${targetEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+      }
+    });
+  }
+
+  document.addEventListener('astro:page-load', initContactForm);
+</script>

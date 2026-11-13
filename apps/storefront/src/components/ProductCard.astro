@@ -1,5 +1,6 @@
 ---
 // apps/storefront/src/components/ProductCard.astro
+import { formatMoney, getCurrencyLocale } from '@esqueleto/core';
 
 interface ModifierOptionData {
   id: string;
@@ -19,28 +20,50 @@ interface ModifierGroupData {
 interface Props {
   id: string;
   name: string;
-  price: number; // Siempre en centavos (ej. 29900 = $299.00)
+  price: number; // Siempre en centavos
   image: string;
   category: string;
   description?: string;
   modifiers?: ModifierGroupData[];
+  currencyCode?: string;
+  currencyLocale?: string;
+  eagerImage?: boolean;
 }
 
-const { id, name, price, image, category, description, modifiers = [] } = Astro.props;
+const {
+  id,
+  name,
+  price,
+  image,
+  category,
+  description,
+  modifiers = [],
+  currencyCode = 'MXN',
+  currencyLocale,
+  eagerImage = false,
+} = Astro.props;
 
-const formattedPrice = new Intl.NumberFormat('es-MX', {
-  style: 'currency',
-  currency: 'MXN',
-}).format(price / 100);
+const safeLocale = getCurrencyLocale(currencyCode, currencyLocale);
+const formattedPrice = formatMoney(price, currencyCode, safeLocale);
 
 const hasModifiers = modifiers && modifiers.length > 0;
 const cardId = `product-card-${id}`;
+const safeVtId = String(id || '').replace(/[^a-zA-Z0-9_-]/g, '-');
 ---
 
 <article
   id={cardId}
-  class="group relative flex flex-col overflow-hidden rounded-2xl border border-gray-200/90 bg-white shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-md"
-  data-product-json={JSON.stringify({ id, name, price, image, category, modifiers })}
+  class="group relative flex flex-col overflow-hidden theme-radius-card border border-gray-200/90 bg-white shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-md"
+  data-product-json={JSON.stringify({
+    id,
+    name,
+    price,
+    image,
+    category,
+    modifiers,
+    currencyCode,
+    currencyLocale: safeLocale,
+  })}
 >
   <!-- Contenedor de la Imagen con Badges y Enlace a Detalle -->
   <a
@@ -50,10 +73,15 @@ const cardId = `product-card-${id}`;
     <img
       src={image}
       alt={name}
-      loading="lazy"
+      width="600"
+      height="600"
+      loading={eagerImage ? 'eager' : 'lazy'}
+      decoding="async"
+      transition:name={`prod-img-${safeVtId}`}
+      style="view-transition-class: vt-prod-img;"
       class="h-full w-full object-cover object-center transition-transform duration-500 ease-out group-hover:scale-105"
     />
-    <span class="absolute top-3 left-3 rounded-full bg-white/95 backdrop-blur-sm px-3 py-1 text-xs font-semibold text-gray-800 shadow-sm border border-gray-100">
+    <span class="absolute top-3 left-3 rounded-full bg-white/95 backdrop-blur-sm px-3 py-1 text-xs font-semibold text-gray-800 shadow-sm border border-gray-100 max-w-[80%] truncate">
       {category}
     </span>
     {hasModifiers && (
@@ -65,9 +93,13 @@ const cardId = `product-card-${id}`;
   </a>
 
   <!-- Detalles del Producto -->
-  <div class="flex flex-1 flex-col p-5">
+  <div class="flex flex-1 flex-col p-4 sm:p-5">
     <a href={`/producto/${id}`} class="group/title block">
-      <h3 class="text-base font-bold text-gray-900 group-hover/title:text-indigo-600 transition-colors line-clamp-1">
+      <h3
+        transition:name={`prod-title-${safeVtId}`}
+        style="view-transition-class: vt-prod-title;"
+        class="w-fit max-w-full text-base font-bold text-gray-900 group-hover/title:text-indigo-600 transition-colors line-clamp-2 leading-snug"
+      >
         {name}
       </h3>
     </a>
@@ -77,8 +109,8 @@ const cardId = `product-card-${id}`;
         {description}
       </p>
     )}
-    
-    <div class="mt-3 flex items-baseline justify-between">
+
+    <div class="mt-3 flex items-baseline justify-between gap-2">
       <div>
         <span class="text-xs text-gray-400 block font-medium">
           {hasModifiers ? 'Desde' : 'Precio'}
@@ -88,16 +120,16 @@ const cardId = `product-card-${id}`;
         </span>
       </div>
       <span class="text-[11px] text-gray-400">
-        MXN con IVA
+        {currencyCode} con IVA
       </span>
     </div>
 
     <!-- Botón de Acción -->
-    <div class="mt-5 pt-3 border-t border-gray-100">
+    <div class="mt-auto pt-4 border-t border-gray-100">
       {hasModifiers ? (
         <a
           href={`/producto/${id}`}
-          class="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-gray-900 px-4 py-2.5 text-sm font-semibold text-white transition-all duration-200 hover:bg-black active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-gray-900 focus:ring-offset-2"
+          class="w-full inline-flex items-center justify-center gap-2 theme-radius-btn bg-gray-900 px-4 py-2.5 text-sm font-semibold text-white transition-all duration-200 hover:bg-black active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-gray-900 focus:ring-offset-2"
         >
           <span>Ver producto</span>
           <svg
@@ -115,7 +147,7 @@ const cardId = `product-card-${id}`;
         <button
           type="button"
           data-action-btn
-          class="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-gray-900 px-4 py-2.5 text-sm font-semibold text-white transition-all duration-200 hover:bg-black active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-gray-900 focus:ring-offset-2"
+          class="w-full inline-flex items-center justify-center gap-2 theme-radius-btn bg-gray-900 px-4 py-2.5 text-sm font-semibold text-white transition-all duration-200 hover:bg-black active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-gray-900 focus:ring-offset-2"
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -133,31 +165,37 @@ const cardId = `product-card-${id}`;
     </div>
   </div>
 
-  <!-- Modal de Modificadores (si tiene opciones configurables) -->
+  <!-- Modal de Modificadores -->
   {hasModifiers && (
     <dialog
       data-modal
-      class="product-modal backdrop:bg-black/60 rounded-3xl p-0 shadow-2xl border border-gray-200 w-full max-w-lg overflow-hidden m-auto"
+      {...({ closedby: 'any' } as Record<string, string>)}
+      aria-labelledby={`modal-title-${safeVtId}`}
+      class="product-modal backdrop:bg-black/60 backdrop:backdrop-blur-sm rounded-3xl p-0 shadow-2xl border border-gray-200 w-[calc(100%-2rem)] max-w-lg overflow-hidden m-auto"
     >
-      <div class="p-6 bg-white max-h-[85vh] overflow-y-auto space-y-6">
-        <!-- Cabecera del Modal -->
-        <div class="flex items-start justify-between border-b border-gray-100 pb-4">
-          <div class="flex items-center gap-3">
+      <div class="p-5 sm:p-6 bg-white max-h-[85vh] overflow-y-auto space-y-6">
+        <div class="flex items-start justify-between border-b border-gray-100 pb-4 gap-3">
+          <div class="flex items-center gap-3 min-w-0">
             <img
               src={image}
               alt={name}
-              class="h-14 w-14 rounded-xl object-cover border border-gray-200"
+              width="56"
+              height="56"
+              class="h-14 w-14 rounded-xl object-cover border border-gray-200 shrink-0"
             />
-            <div>
+            <div class="min-w-0">
               <span class="text-xs font-semibold uppercase tracking-wider text-indigo-600">{category}</span>
-              <h4 class="text-lg font-bold text-gray-900">{name}</h4>
+              <h4 id={`modal-title-${safeVtId}`} class="text-lg font-bold text-gray-900 truncate">
+                {name}
+              </h4>
               <p class="text-xs text-gray-400">Base: {formattedPrice}</p>
             </div>
           </div>
           <button
             type="button"
             data-close-modal
-            class="text-gray-400 hover:text-gray-600 p-1.5 rounded-lg hover:bg-gray-100 transition-colors"
+            aria-label="Cerrar opciones"
+            class="text-gray-400 hover:text-gray-600 p-1.5 rounded-lg hover:bg-gray-100 transition-colors shrink-0"
           >
             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
@@ -165,29 +203,29 @@ const cardId = `product-card-${id}`;
           </button>
         </div>
 
-        <!-- Lista de Modificadores Dinámicos -->
         <div class="space-y-5">
           {modifiers.map((group) => (
             <div class="rounded-2xl border border-gray-200 bg-gray-50/60 p-4 space-y-2.5">
-              <div class="flex items-center justify-between">
+              <div class="flex items-center justify-between gap-2">
                 <span class="text-sm font-bold text-gray-900">
                   {group.name}
                   {group.required && <span class="text-red-500 ml-1">*</span>}
                 </span>
-                <span class="text-[11px] font-medium text-gray-500">
+                <span class="text-[11px] font-medium text-gray-500 shrink-0">
                   {group.type === 'single' ? 'Elige 1' : 'Opcional'}
                 </span>
               </div>
 
               <div class="space-y-2">
                 {group.options.map((opt) => {
-                  const deltaFormatted = opt.priceDelta > 0 
-                    ? `+${new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(opt.priceDelta / 100)}`
-                    : 'Sin costo extra';
+                  const deltaFormatted =
+                    opt.priceDelta > 0
+                      ? `+${formatMoney(opt.priceDelta, currencyCode, safeLocale)}`
+                      : 'Sin costo extra';
 
                   return (
-                    <label class="flex items-center justify-between p-2.5 rounded-xl border border-gray-200 bg-white hover:border-black cursor-pointer transition-all">
-                      <div class="flex items-center gap-2.5">
+                    <label class="flex items-center justify-between gap-2 p-2.5 rounded-xl border border-gray-200 bg-white hover:border-black cursor-pointer transition-all">
+                      <div class="flex items-center gap-2.5 min-w-0">
                         <input
                           type={group.type === 'single' ? 'radio' : 'checkbox'}
                           name={`mod-${id}-${group.id}`}
@@ -198,11 +236,15 @@ const cardId = `product-card-${id}`;
                           data-opt-name={opt.name}
                           data-delta={opt.priceDelta}
                           checked={opt.isDefault}
-                          class="h-4 w-4 text-black focus:ring-black border-gray-300"
+                          class="h-4 w-4 text-black focus:ring-black border-gray-300 shrink-0"
                         />
-                        <span class="text-xs font-semibold text-gray-800">{opt.name}</span>
+                        <span class="text-xs font-semibold text-gray-800 truncate">{opt.name}</span>
                       </div>
-                      <span class={`text-xs font-mono font-medium ${opt.priceDelta > 0 ? 'text-gray-900 font-bold' : 'text-gray-400'}`}>
+                      <span
+                        class={`text-xs font-mono font-medium shrink-0 ${
+                          opt.priceDelta > 0 ? 'text-gray-900 font-bold' : 'text-gray-400'
+                        }`}
+                      >
                         {deltaFormatted}
                       </span>
                     </label>
@@ -213,18 +255,17 @@ const cardId = `product-card-${id}`;
           ))}
         </div>
 
-        <!-- Pie del Modal con Precio Dinámico Calculado -->
         <div class="border-t border-gray-100 pt-4 flex items-center justify-between gap-4">
           <div>
             <span class="text-[11px] font-medium text-gray-400 block">Total con opciones</span>
-            <span data-modal-total class="text-2xl font-black text-gray-900">
+            <span data-modal-total class="text-xl sm:text-2xl font-black text-gray-900">
               {formattedPrice}
             </span>
           </div>
           <button
             type="button"
             data-confirm-add
-            class="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-black px-5 py-3 text-sm font-bold text-white shadow-sm hover:bg-gray-800 transition-all active:scale-[0.98]"
+            class="flex-1 inline-flex items-center justify-center gap-2 theme-radius-btn bg-black px-5 py-3 text-sm font-bold text-white shadow-sm hover:bg-gray-800 transition-all active:scale-[0.98]"
           >
             <span>Agregar al Carrito</span>
             <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -240,10 +281,16 @@ const cardId = `product-card-${id}`;
 <script>
   import { addItem } from '../store/cart';
 
-  const currencyFormatter = new Intl.NumberFormat('es-MX', {
-    style: 'currency',
-    currency: 'MXN',
-  });
+  function formatCardMoney(cents: number, currencyCode = 'MXN', locale = 'es-MX'): string {
+    try {
+      return new Intl.NumberFormat(locale, {
+        style: 'currency',
+        currency: currencyCode,
+      }).format(cents / 100);
+    } catch {
+      return `$${(cents / 100).toFixed(2)} ${currencyCode}`;
+    }
+  }
 
   function initCards() {
     const cards = document.querySelectorAll<HTMLElement>('article[data-product-json]');
@@ -290,28 +337,6 @@ const cardId = `product-card-${id}`;
         const confirmBtn = modal.querySelector<HTMLButtonElement>('button[data-confirm-add]');
         const totalSpan = modal.querySelector<HTMLElement>('[data-modal-total]');
 
-        actionBtn?.addEventListener('click', () => {
-          modal.showModal();
-          recalculateModalTotal();
-        });
-
-        closeBtn?.addEventListener('click', () => {
-          modal.close();
-        });
-
-        modal.addEventListener('click', (e) => {
-          const rect = modal.getBoundingClientRect();
-          const isInDialog = (
-            rect.top <= e.clientY &&
-            e.clientY <= rect.top + rect.height &&
-            rect.left <= e.clientX &&
-            e.clientX <= rect.left + rect.width
-          );
-          if (!isInDialog) {
-            modal.close();
-          }
-        });
-
         function getSelectedModifiers() {
           if (!modal) return [];
           const inputs = modal.querySelectorAll<HTMLInputElement>('input[data-opt-id]:checked');
@@ -333,8 +358,34 @@ const cardId = `product-card-${id}`;
           const extraCents = selected.reduce((sum, s) => sum + s.priceDelta, 0);
           const totalCents = product.price + extraCents;
           if (totalSpan) {
-            totalSpan.textContent = currencyFormatter.format(totalCents / 100);
+            totalSpan.textContent = formatCardMoney(
+              totalCents,
+              product.currencyCode || 'MXN',
+              product.currencyLocale || 'es-MX'
+            );
           }
+        }
+
+        actionBtn?.addEventListener('click', () => {
+          modal.showModal();
+          recalculateModalTotal();
+        });
+
+        closeBtn?.addEventListener('click', () => {
+          modal.close();
+        });
+
+        if (!('closedBy' in HTMLDialogElement.prototype)) {
+          modal.addEventListener('click', (e) => {
+            if (e.target !== modal) return;
+            const rect = modal.getBoundingClientRect();
+            const isDialogContent =
+              rect.top <= e.clientY &&
+              e.clientY <= rect.top + rect.height &&
+              rect.left <= e.clientX &&
+              e.clientX <= rect.left + rect.width;
+            if (!isDialogContent) modal.close();
+          });
         }
 
         modal.querySelectorAll('input[data-opt-id]').forEach((input) => {
@@ -372,6 +423,5 @@ const cardId = `product-card-${id}`;
     });
   }
 
-  initCards();
   document.addEventListener('astro:page-load', initCards);
 </script>

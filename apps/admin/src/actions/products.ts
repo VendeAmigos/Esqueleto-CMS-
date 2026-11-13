@@ -10,6 +10,7 @@ import {
   eq,
   createStoredProduct,
   updateStoredProduct,
+  setStoredProductActive,
   deleteStoredProduct,
   bulkUpsertStoredProducts,
   getStoredCategories,
@@ -293,6 +294,35 @@ export async function bulkImportProductsAction(rows: BulkProductRowInput[]) {
     updated: stats.updated,
     total: stats.total,
   };
+}
+
+export async function toggleProductActiveAction(id: string, nextActive: boolean) {
+  if (!id) {
+    return { error: "ID de producto requerido." };
+  }
+
+  try {
+    const updated = await setStoredProductActive(id, nextActive);
+    if (!updated) {
+      return { error: "Producto no encontrado." };
+    }
+
+    if (await isDatabaseAvailable()) {
+      await ensureSchema();
+      await db
+        .update(products)
+        .set({ isActive: nextActive })
+        .where(eq(products.id, id));
+    }
+
+    revalidatePath("/");
+    revalidatePath("/productos");
+    revalidatePath(`/productos/${id}`);
+    return { success: true, isActive: nextActive };
+  } catch (error) {
+    console.error("Error toggling product active state:", error);
+    return { error: "No se pudo actualizar el estado del producto." };
+  }
 }
 
 export async function deleteProduct(id: string) {

@@ -48,11 +48,13 @@ CREATE TABLE IF NOT EXISTS site_settings (
   hero_cta_link TEXT NOT NULL DEFAULT '/catalogo',
   heading_font TEXT NOT NULL DEFAULT 'Plus Jakarta Sans',
   body_font TEXT NOT NULL DEFAULT 'Inter',
+  extended_config TEXT,
   updated_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
 ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS heading_font TEXT NOT NULL DEFAULT 'Plus Jakarta Sans';
 ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS body_font TEXT NOT NULL DEFAULT 'Inter';
+ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS extended_config TEXT;
 
 INSERT INTO site_settings (id, site_name, logo_color, hero_title, hero_subtitle, hero_image_url, hero_cta_text, hero_cta_link)
 VALUES (
@@ -151,9 +153,9 @@ CREATE INDEX IF NOT EXISTS idx_orders_created_at ON orders(created_at DESC);
 -- ============================================================
 INSERT INTO categories (id, name, slug, image_url, grid_span, display_order)
 VALUES 
-  ('cat-prints-01', 'Prints & Láminas de Arte', 'prints-arte', 'https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?w=900&auto=format&fit=crop&q=80', '1x5@1,1|5x6', 1),
-  ('cat-stickers-02', 'Stickers & Papelería', 'stickers-papeleria', 'https://images.unsplash.com/photo-1589998059171-988d887df646?w=900&auto=format&fit=crop&q=80', '2x3@2,1|5x6', 2),
-  ('cat-acc-03', 'Pines & Llaveros Acrílicos', 'pines-llaveros', 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=900&auto=format&fit=crop&q=80', '1x4@5,1|5x6', 3),
+  ('cat-prints-01', 'Prints & Láminas de Arte', 'prints-arte', '/seed/cat-prints.jpg', '1x5@1,1|5x6', 1),
+  ('cat-stickers-02', 'Stickers & Papelería', 'stickers-papeleria', '/seed/cat-stickers.jpg', '2x3@2,1|5x6', 2),
+  ('cat-acc-03', 'Pines & Llaveros Acrílicos', 'pines-llaveros', '/seed/cat-pines.jpg', '1x4@5,1|5x6', 3),
   ('cat-textil-04', 'Merch Textil & Totebags', 'merch-textil', 'https://images.unsplash.com/photo-1544816155-12df9643f363?w=900&auto=format&fit=crop&q=80', '2x2@2,4|5x6', 4),
   ('cat-orig-05', 'Obras Originales & Libretas', 'obras-originales', 'https://images.unsplash.com/photo-1513364776144-60967b0f800f?w=900&auto=format&fit=crop&q=80', '2x2@4,5|5x6', 5)
 ON CONFLICT (id) DO NOTHING;
@@ -163,14 +165,14 @@ ON CONFLICT (id) DO NOTHING;
 -- ============================================================
 INSERT INTO products (id, title, description, image_url, base_price, is_active, is_featured, category_id)
 VALUES
-  ('prod-print-jardin', 'Print Fine Art "El Jardín de los Recuerdos"', 'Lámina de ilustración impresa en papel algodón de 310g con tintas pigmentadas de archivo. Colores vibrantes de larga duración.', 'https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?w=800&auto=format&fit=crop&q=80', 18000, true, true, 'cat-prints-01'),
+  ('prod-print-jardin', 'Print Fine Art "El Jardín de los Recuerdos"', 'Lámina de ilustración impresa en papel algodón de 310g con tintas pigmentadas de archivo. Colores vibrantes de larga duración.', '/seed/prod-print-jardin.jpg', 18000, true, true, 'cat-prints-01'),
   ('prod-print-estrellas', 'Lámina de Autor "Cazadora de Estrellas"', 'Ilustración digital de atmósfera nocturna y fantasía botánica sobre papel texturizado Fine Art.', 'https://images.unsplash.com/photo-1578301978693-85fa9c0320b9?w=800&auto=format&fit=crop&q=80', 22000, true, true, 'cat-prints-01'),
-  ('prod-pack-stickers', 'Pack de 6 Stickers Holográficos "Criaturas Mágicas"', 'Set de 6 adhesivos de vinilo grueso ultra-resistente al agua, raspaduras y sol UV. Brillo holográfico premium.', 'https://images.unsplash.com/photo-1589998059171-988d887df646?w=800&auto=format&fit=crop&q=80', 9500, true, true, 'cat-stickers-02'),
-  ('prod-pin-corazon', 'Pin Metálico Esmaltado "Corazón Florecido" (Hard Enamel)', 'Broche metálico coleccionable de 3.5cm en esmalte duro pulido con baño en oro y tarjeta ilustrada de respaldo.', 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800&auto=format&fit=crop&q=80', 14000, true, true, 'cat-acc-03'),
-  ('prod-llavero-zorro', 'Llavero Acrílico Translúcido Glitter "Zorro Astral"', 'Llavero de doble cara de acrílico resistente de 6.5cm con destellos glitter suspendidos y capa epóxica anti-rayas.', 'https://images.unsplash.com/photo-1588850561407-ed78c282e89b?w=800&auto=format&fit=crop&q=80', 12500, true, false, 'cat-acc-03'),
-  ('prod-totebag-lectura', 'Totebag Ilustrada "Lectura Nocturna" (100% Algodón Pesado)', 'Bolsa de lona resistente de 320g con serigrafía artesanal duradera. Perfecta para libros, libretas y compras.', 'https://images.unsplash.com/photo-1544816155-12df9643f363?w=800&auto=format&fit=crop&q=80', 28000, true, false, 'cat-textil-04'),
+  ('prod-pack-stickers', 'Pack de 6 Stickers Holográficos "Criaturas Mágicas"', 'Set de 6 adhesivos de vinilo grueso ultra-resistente al agua, raspaduras y sol UV. Brillo holográfico premium.', '/seed/prod-stickers-criaturas.jpg', 9500, true, true, 'cat-stickers-02'),
+  ('prod-pin-corazon', 'Pin Metálico Esmaltado "Corazón Florecido" (Hard Enamel)', 'Broche metálico coleccionable de 3.5cm en esmalte duro pulido con baño en oro y tarjeta ilustrada de respaldo.', '/seed/prod-pin-corazon.jpg', 14000, true, true, 'cat-acc-03'),
+  ('prod-llavero-zorro', 'Llavero Acrílico Translúcido Glitter "Zorro Astral"', 'Llavero de doble cara de acrílico resistente de 6.5cm con destellos glitter suspendidos y capa epóxica anti-rayas.', '/seed/prod-llavero-zorro.jpg', 12500, true, false, 'cat-acc-03'),
+  ('prod-totebag-lectura', 'Totebag Ilustrada "Lectura Nocturna" (100% Algodón Pesado)', 'Bolsa de lona resistente de 320g con serigrafía artesanal duradera. Perfecta para libros, libretas y compras.', '/seed/prod-totebag-lectura.jpg', 28000, true, false, 'cat-textil-04'),
   ('prod-hoodie-eclipse', 'Hoodie Oversize Bordada "Eclipse Floral"', 'Sudadera con capucha en felpa perchada de 340g con bordado de alta densidad en el pecho y print dorsal.', 'https://images.unsplash.com/photo-1556905055-8f358a7a47b2?w=800&auto=format&fit=crop&q=80', 65000, true, false, 'cat-textil-04'),
-  ('prod-sketchbook-autor', 'Sketchbook Tapa Dura "Pinceladas del Alma" (200g)', 'Cuaderno cosido a mano con 160 páginas en papel mix media libre de ácido. Ideal para gouache, tinta y acuarela.', 'https://images.unsplash.com/photo-1513364776144-60967b0f800f?w=800&auto=format&fit=crop&q=80', 24000, true, false, 'cat-orig-05')
+  ('prod-sketchbook-autor', 'Sketchbook Tapa Dura "Pinceladas del Alma" (200g)', 'Cuaderno cosido a mano con 160 páginas en papel mix media libre de ácido. Ideal para gouache, tinta y acuarela.', '/seed/prod-sketchbook.jpg', 24000, true, false, 'cat-orig-05')
 ON CONFLICT (id) DO NOTHING;
 
 -- Modificadores Print Jardín

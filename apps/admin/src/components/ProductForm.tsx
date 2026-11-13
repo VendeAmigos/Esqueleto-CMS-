@@ -753,9 +753,9 @@ export default function ProductForm({ categories, initialData, isEdit = false }:
                   {group.options.map((opt, optIdx) => (
                     <div
                       key={optIdx}
-                      className="flex items-center gap-3 bg-white p-3 rounded-xl border border-gray-200"
+                      className="flex flex-wrap sm:flex-nowrap items-center gap-2.5 sm:gap-3 bg-white p-3 rounded-xl border border-gray-200"
                     >
-                      <div className="flex-1">
+                      <div className="min-w-0 flex-1 basis-full sm:basis-auto">
                         <input
                           type="text"
                           required
@@ -766,7 +766,7 @@ export default function ProductForm({ categories, initialData, isEdit = false }:
                         />
                       </div>
 
-                      <div className="w-36">
+                      <div className="w-28 sm:w-32 shrink-0">
                         <div className="relative rounded-lg shadow-sm">
                           <span className="absolute inset-y-0 left-0 flex items-center pl-2.5 text-gray-400 text-xs">
                             +$
@@ -851,8 +851,9 @@ export default function ProductForm({ categories, initialData, isEdit = false }:
                 Vista Previa en Tienda
               </span>
               {isFeatured && (
-                <span className="bg-amber-100 text-amber-800 text-[10px] font-bold px-2 py-0.5 rounded-full">
-                  ★ Destacado
+                <span className="inline-flex items-center gap-1 bg-amber-100 text-amber-800 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                  <svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" className="h-3 w-3 text-amber-700" viewBox="0 0 24 24" fill="currentColor"><path d="M12 17.27 18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" /></svg>
+                  Destacado
                 </span>
               )}
             </div>
@@ -877,7 +878,7 @@ export default function ProductForm({ categories, initialData, isEdit = false }:
                 )}
               </div>
               <div className="p-4 space-y-2">
-                <h3 className="font-bold text-gray-900 text-base line-clamp-1">
+                <h3 className="font-bold text-gray-900 text-base line-clamp-2">
                   {title || 'Nombre del Producto'}
                 </h3>
                 <p className="text-xs text-gray-500 line-clamp-2">

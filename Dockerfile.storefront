@@ -27,6 +27,7 @@ COPY --from=builder /app/packages ./packages
 COPY --from=builder /app/apps/storefront/node_modules ./apps/storefront/node_modules
 COPY --from=builder /app/apps/storefront/dist ./apps/storefront/dist
 COPY --from=builder /app/apps/storefront/package.json ./apps/storefront/package.json
+COPY --from=builder ["/app/Logo Afótica.svg", "./Logo Afótica.svg"]
 
 EXPOSE 4321
 

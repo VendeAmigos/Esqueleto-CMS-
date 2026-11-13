@@ -5,6 +5,7 @@ import { persistentAtom } from '@nanostores/persistent';
  * Se persisten en localStorage para que el cliente no tenga que reescribirlos.
  */
 export interface ShippingData {
+  deliveryMethod: 'delivery' | 'pickup';
   fullName: string;
   phone: string;
   street: string;
@@ -23,6 +24,7 @@ export interface ShippingData {
 }
 
 export const emptyShipping: ShippingData = {
+  deliveryMethod: 'delivery',
   fullName: '',
   phone: '',
   street: '',
@@ -43,7 +45,12 @@ export const $shipping = persistentAtom<ShippingData>('esqueleto_shipping:', emp
   encode: JSON.stringify,
   decode: (value: string): ShippingData => {
     try {
-      return { ...emptyShipping, ...JSON.parse(value) };
+      const parsed = JSON.parse(value);
+      return {
+        ...emptyShipping,
+        ...parsed,
+        deliveryMethod: parsed?.deliveryMethod === 'pickup' ? 'pickup' : 'delivery',
+      };
     } catch {
       return emptyShipping;
     }
@@ -61,6 +68,11 @@ export function getShippingErrors(s: ShippingData): { field: keyof ShippingData;
 
   if (s.fullName.trim().length < 3) errors.push({ field: 'fullName', message: 'Escribe tu nombre completo' });
   if (!/^\d{10}$/.test(phone)) errors.push({ field: 'phone', message: 'Teléfono a 10 dígitos' });
+
+  if (s.deliveryMethod === 'pickup') {
+    return errors;
+  }
+
   if (!/^\d{5}$/.test(s.zip.trim())) errors.push({ field: 'zip', message: 'Código postal de 5 dígitos' });
   if (!s.street.trim()) errors.push({ field: 'street', message: 'Escribe la calle' });
   if (!s.extNumber.trim()) errors.push({ field: 'extNumber', message: 'Número exterior' });

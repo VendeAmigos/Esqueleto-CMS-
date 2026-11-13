@@ -82,7 +82,7 @@ export default async function AdminDashboardPage() {
   const maxDailyRevenue = Math.max(...last7Days.map((d) => d.revenueMxn), 100);
 
   return (
-    <main className="min-h-screen p-8 max-w-7xl mx-auto space-y-10">
+    <main className="min-h-screen p-4 sm:p-6 md:p-8 max-w-7xl mx-auto space-y-8 sm:space-y-10">
       <div className="border-b border-gray-200 pb-5 flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4">
         <div>
           <span className="text-xs font-bold uppercase tracking-wider text-indigo-600 bg-indigo-50 px-2.5 py-1 rounded-md">
@@ -326,9 +326,12 @@ export default async function AdminDashboardPage() {
                     <span className="font-bold text-gray-900">
                       {ord.customerName || 'Cliente'}
                     </span>
-                    <span className="text-gray-400 block text-[11px] truncate">
-                      📍 {ord.shippingMunicipality || ord.shippingCity || 'Envío nacional'} •{' '}
-                      {ord.itemsSummary || 'Artículos'}
+                    <span className="text-gray-400 text-[11px] truncate inline-flex items-center gap-1 max-w-full">
+                      <svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" className="h-3 w-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                      <span className="truncate">
+                        {ord.shippingMunicipality || ord.shippingCity || 'Envío nacional'} •{' '}
+                        {ord.itemsSummary || 'Artículos'}
+                      </span>
                     </span>
                   </div>
                   <div className="text-right shrink-0">

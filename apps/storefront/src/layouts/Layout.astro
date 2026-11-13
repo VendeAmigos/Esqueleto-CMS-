@@ -1,66 +1,434 @@
 ---
 // apps/storefront/src/layouts/Layout.astro
+import { ViewTransitions } from 'astro:transitions';
 import Navbar from '../components/Navbar.astro';
-import { getStoredSiteSettings } from '@esqueleto/core';
+import Footer from '../components/Footer.astro';
+import { getStoredSiteSettings, getContrastTextColor, getSvgCacheVersion } from '@esqueleto/core';
 
 interface Props {
   title: string;
   description?: string;
+  ogImage?: string;
+  isHome?: boolean;
 }
 
 const settings = await getStoredSiteSettings();
-const { title, description = settings.heroSubtitle || 'E-commerce Open Source Plug & Play de alto rendimiento' } = Astro.props;
+const {
+  title,
+  description = settings.seoDescription ||
+    settings.heroSubtitle ||
+    'E-commerce Open Source Plug & Play de alto rendimiento',
+  ogImage = settings.ogImageUrl || settings.heroImageUrl || '',
+  isHome = false,
+} = Astro.props;
 
 const headingFont = settings.headingFont || 'Plus Jakarta Sans';
 const bodyFont = settings.bodyFont || 'Inter';
+const fontWeights = (settings.fontWeights || '400;500;600;700;800').replace(/[^0-9;]/g, '') || '400;500;600;700;800';
 const uniqueFonts = Array.from(new Set([headingFont, bodyFont]));
 const googleFontsUrl = `https://fonts.googleapis.com/css2?${uniqueFonts
-  .map((f) => `family=${encodeURIComponent(f)}:wght@300;400;500;600;700;800`)
+  .map((f) => `family=${encodeURIComponent(f)}:wght@${fontWeights}`)
   .join('&')}&display=swap`;
+
+const primaryContrast = getContrastTextColor(settings.logoColor);
+const accentContrast = getContrastTextColor(settings.accentColor);
+
+const cardRadiusMap: Record<string, string> = {
+  none: '0px',
+  soft: '0.5rem',
+  rounded: '1rem',
+  pill: '1.5rem',
+};
+const btnRadiusMap: Record<string, string> = {
+  none: '0px',
+  soft: '0.5rem',
+  rounded: '0.75rem',
+  pill: '9999px',
+};
+const cardRadiusCss = cardRadiusMap[settings.cardRadius] || '1rem';
+const btnRadiusCss = btnRadiusMap[settings.cardRadius] || '0.75rem';
+
+const cleanSiteName = settings.siteName || 'ESQUELETO CMS';
+const pageTitle = isHome
+  ? settings.seoTitleSuffix
+    ? `${cleanSiteName} ${settings.seoTitleSuffix}`
+    : cleanSiteName
+  : settings.seoTitleSuffix
+    ? `${title} | ${cleanSiteName} ${settings.seoTitleSuffix}`
+    : `${title} | ${cleanSiteName}`;
+
+const customFavicon = (settings.faviconUrl || '').trim();
+const hasCustomFavicon = Boolean(customFavicon && customFavicon !== '/favicon.svg');
+const faviconHref = hasCustomFavicon
+  ? customFavicon
+  : settings.logoSvg?.trim()
+    ? `/api/favicon.svg?v=${getSvgCacheVersion(settings.logoSvg, settings.logoColor)}`
+    : '/favicon.svg';
+const colorSchemeMeta = settings.colorTheme === 'auto' ? 'light dark' : settings.colorTheme;
+
+const whatsappHref =
+  settings.whatsappEnabled && settings.whatsappNumber
+    ? `https://wa.me/${settings.whatsappNumber.replace(/[^\d]/g, '')}?text=${encodeURIComponent(
+        settings.whatsappMessage || 'Hola, me interesa información sobre sus productos.'
+      )}`
+    : '';
+
+const rootCssVars = [
+  `--font-heading: '${headingFont}', system-ui, sans-serif`,
+  `--font-body: '${bodyFont}', system-ui, sans-serif`,
+  `--brand-primary: ${settings.logoColor}`,
+  `--brand-primary-contrast: ${primaryContrast}`,
+  `--brand-accent: ${settings.accentColor}`,
+  `--brand-accent-contrast: ${accentContrast}`,
+  `--bg-page-light: ${settings.backgroundColor}`,
+  `--bg-surface-light: ${settings.surfaceColor}`,
+  `--text-main-light: ${settings.textColor}`,
+  `--radius-card: ${cardRadiusCss}`,
+  `--radius-btn: ${btnRadiusCss}`,
+].join('; ');
 ---
 
 <!doctype html>
 <html
   lang="es"
   class="scroll-smooth"
-  style={`--font-heading: '${headingFont}', system-ui, sans-serif; --font-body: '${bodyFont}', system-ui, sans-serif;`}
+  data-theme={settings.colorTheme}
+  data-font-scale={settings.fontScale}
+  data-button-style={settings.buttonStyle}
+  style={rootCssVars}
 >
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="color-scheme" content={colorSchemeMeta} />
+    <link rel="icon" type={faviconHref.includes('.svg') ? 'image/svg+xml' : undefined} href={faviconHref} />
+    <link rel="expect" href="#main-content" {...({ blocking: 'render' } as any)} />
     <meta name="generator" content={Astro.generator} />
-    <title>{title} | {settings.siteName}</title>
+    <title>{pageTitle}</title>
     <meta name="description" content={description} />
+    <meta property="og:title" content={pageTitle} />
+    <meta property="og:description" content={description} />
+    {ogImage && <meta property="og:image" content={ogImage} />}
+    <meta property="og:type" content="website" />
+
+    <!-- View Transitions suaves entre páginas, productos y categorías -->
+    <ViewTransitions fallback="animate" />
 
     <!-- Google Fonts Dinámicas desde el CMS -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href={googleFontsUrl} rel="stylesheet" />
+
+    {settings.ga4MeasurementId && (
+      <>
+        <script
+          is:inline
+          async
+          src={`https://www.googletagmanager.com/gtag/js?id=${encodeURIComponent(settings.ga4MeasurementId)}`}
+        />
+        <script
+          is:inline
+          define:vars={{ gaId: settings.ga4MeasurementId }}
+        >
+          window.dataLayer = window.dataLayer || [];
+          function gtag() {
+            window.dataLayer.push(arguments);
+          }
+          gtag('js', new Date());
+          gtag('config', gaId);
+        </script>
+      </>
+    )}
+
+    {settings.metaPixelId && (
+      <script is:inline define:vars={{ pixelId: settings.metaPixelId }}>
+        !(function (f, b, e, v, n, t, s) {
+          if (f.fbq) return;
+          n = f.fbq = function () {
+            n.callMethod ? n.callMethod.apply(n, arguments) : n.queue.push(arguments);
+          };
+          if (!f._fbq) f._fbq = n;
+          n.push = n;
+          n.loaded = true;
+          n.version = '2.0';
+          n.queue = [];
+          t = b.createElement(e);
+          t.async = true;
+          t.src = v;
+          s = b.getElementsByTagName(e)[0];
+          s.parentNode.insertBefore(t, s);
+        })(window, document, 'script', 'https://connect.facebook.net/en_US/fbevents.js');
+        window.fbq('init', pixelId);
+        window.fbq('track', 'PageView');
+      </script>
+    )}
   </head>
-  <body class="bg-gray-50 text-gray-900 min-h-screen flex flex-col antialiased">
+
+  <body class="min-h-screen flex flex-col antialiased theme-body">
     <!-- Barra de Navegación Global -->
-    <Navbar />
+    <Navbar settings={settings} />
 
     <!-- Contenido Dinámico de la Página -->
-    <main class="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pb-24 md:pb-8">
+    <main id="main-content" class="flex-1 w-full max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-6 sm:py-8">
       <slot />
     </main>
 
-    <!-- Footer Mínimo y Elegante -->
-    <footer class="border-t border-gray-200 bg-white py-6 mt-auto">
-      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center text-sm text-gray-500">
-        &copy; {new Date().getFullYear()} {settings.siteName}. Todos los derechos reservados.
-      </div>
-    </footer>
+    <!-- Footer Dinámico con Marca de Agua Afótica -->
+    <Footer settings={settings} />
+
+    <!-- Botón flotante de WhatsApp opcional -->
+    {whatsappHref && (
+      <a
+        href={whatsappHref}
+        target="_blank"
+        rel="noopener noreferrer"
+        aria-label="Chatear por WhatsApp"
+        class="fixed bottom-20 right-4 md:bottom-6 md:right-6 z-40 inline-flex items-center gap-2 px-4 py-3 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs sm:text-sm shadow-xl transition-transform hover:scale-105 active:scale-95"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 shrink-0" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M12.031 2c-5.516 0-9.969 4.453-9.969 9.969 0 1.766.469 3.484 1.344 5.016l-1.406 5.141 5.266-1.375c1.469.797 3.109 1.219 4.766 1.219 5.516 0 9.969-4.453 9.969-9.969S17.547 2 12.031 2zm5.813 14.125c-.25.703-1.453 1.344-2 1.422-.516.078-1.172.109-1.891-.125-.438-.141-1-.328-1.719-.641-3.031-1.313-5-4.359-5.156-4.563-.156-.203-1.234-1.641-1.234-3.125s.781-2.219 1.063-2.516c.281-.297.609-.375.813-.375h.594c.188 0 .438-.078.688.531.25.609.859 2.109.938 2.266.078.156.125.344.016.547-.109.203-.156.328-.313.5-.156.172-.328.391-.469.516-.156.156-.313.328-.141.641.172.313.781 1.297 1.672 2.094 1.156 1.031 2.125 1.344 2.438 1.5.313.156.484.125.672-.078.188-.203.781-.906.984-1.219.203-.313.406-.266.688-.156.281.109 1.781.844 2.094 1 .313.156.516.234.594.359.078.125.078.734-.172 1.438z"/>
+        </svg>
+        <span class="hidden sm:inline">WhatsApp</span>
+      </a>
+    )}
   </body>
 </html>
 
 <style is:global>
-  body {
-    font-family: var(--font-body);
+  :root {
+    --bg-page: var(--bg-page-light, #f9fafb);
+    --bg-surface: var(--bg-surface-light, #ffffff);
+    --bg-elevated: #f3f4f6;
+    --bg-header: rgba(255, 255, 255, 0.88);
+    --text-main: var(--text-main-light, #111827);
+    --text-muted: #4b5563;
+    --border-subtle: rgba(17, 24, 39, 0.1);
   }
-  h1, h2, h3, h4, .font-heading {
+
+  html[data-theme='dark'] {
+    --bg-page: #0b0f19;
+    --bg-surface: #111827;
+    --bg-elevated: #1f2937;
+    --bg-header: rgba(17, 24, 39, 0.88);
+    --text-main: #f9fafb;
+    --text-muted: #9ca3af;
+    --border-subtle: rgba(255, 255, 255, 0.12);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    html[data-theme='auto'] {
+      --bg-page: #0b0f19;
+      --bg-surface: #111827;
+      --bg-elevated: #1f2937;
+      --bg-header: rgba(17, 24, 39, 0.88);
+      --text-main: #f9fafb;
+      --text-muted: #9ca3af;
+      --border-subtle: rgba(255, 255, 255, 0.12);
+    }
+  }
+
+  /* Soporte de tema oscuro en utilidades de tarjetas de catálogo y formularios */
+  html[data-theme='dark'] .bg-white,
+  html[data-theme='dark'] .theme-surface {
+    background-color: var(--bg-surface) !important;
+  }
+  html[data-theme='dark'] .bg-gray-50 {
+    background-color: var(--bg-elevated) !important;
+  }
+  html[data-theme='dark'] .text-gray-900,
+  html[data-theme='dark'] .text-black {
+    color: var(--text-main) !important;
+  }
+  html[data-theme='dark'] .text-gray-700,
+  html[data-theme='dark'] .text-gray-600,
+  html[data-theme='dark'] .text-gray-500 {
+    color: var(--text-muted) !important;
+  }
+  html[data-theme='dark'] .border-gray-200,
+  html[data-theme='dark'] .border-gray-100 {
+    border-color: var(--border-subtle) !important;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    html[data-theme='auto'] .bg-white,
+    html[data-theme='auto'] .theme-surface {
+      background-color: var(--bg-surface) !important;
+    }
+    html[data-theme='auto'] .bg-gray-50 {
+      background-color: var(--bg-elevated) !important;
+    }
+    html[data-theme='auto'] .text-gray-900,
+    html[data-theme='auto'] .text-black {
+      color: var(--text-main) !important;
+    }
+    html[data-theme='auto'] .text-gray-700,
+    html[data-theme='auto'] .text-gray-600,
+    html[data-theme='auto'] .text-gray-500 {
+      color: var(--text-muted) !important;
+    }
+    html[data-theme='auto'] .border-gray-200,
+    html[data-theme='auto'] .border-gray-100 {
+      border-color: var(--border-subtle) !important;
+    }
+  }
+
+  body.theme-body {
+    background-color: var(--bg-page);
+    color: var(--text-main);
+    font-family: var(--font-body);
+    overflow-x: clip;
+    overflow-wrap: anywhere;
+  }
+
+  .theme-header {
+    background-color: var(--bg-header);
+  }
+
+  .theme-surface {
+    background-color: var(--bg-surface);
+    color: var(--text-main);
+  }
+
+  .theme-radius-card {
+    border-radius: var(--radius-card);
+  }
+
+  .theme-radius-btn {
+    border-radius: var(--radius-btn);
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  .font-heading {
     font-family: var(--font-heading);
+    text-wrap: balance;
+  }
+
+  p {
+    text-wrap: pretty;
+  }
+
+  html[data-font-scale='compact'] {
+    font-size: 15px;
+  }
+
+  html[data-font-scale='editorial'] h1 {
+    letter-spacing: -0.025em;
+  }
+
+  /* View Transitions API: morphing suave, orgánico y amigable sin saltos agresivos */
+  @media (prefers-reduced-motion: no-preference) {
+    @view-transition {
+      navigation: auto;
+    }
+
+    ::view-transition-group(*) {
+      animation-duration: 500ms;
+      animation-timing-function: cubic-bezier(0.37, 0, 0.25, 1);
+    }
+
+    ::view-transition-old(root),
+    ::view-transition-new(root) {
+      animation-duration: 380ms;
+      animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    ::view-transition-group(.vt-cat-img),
+    ::view-transition-group(.vt-prod-img) {
+      animation-duration: 620ms;
+      animation-timing-function: cubic-bezier(0.37, 0, 0.25, 1);
+      overflow: clip;
+      border-radius: var(--radius-card);
+    }
+
+    ::view-transition-old(.vt-cat-img),
+    ::view-transition-new(.vt-cat-img),
+    ::view-transition-old(.vt-prod-img),
+    ::view-transition-new(.vt-prod-img) {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: center;
+      animation-duration: 500ms;
+      animation-timing-function: ease-in-out;
+    }
+
+    ::view-transition-group(.vt-cat-title),
+    ::view-transition-group(.vt-prod-title) {
+      animation-duration: 560ms;
+      animation-timing-function: cubic-bezier(0.37, 0, 0.25, 1);
+    }
+
+    ::view-transition-old(.vt-cat-title),
+    ::view-transition-new(.vt-cat-title),
+    ::view-transition-old(.vt-prod-title),
+    ::view-transition-new(.vt-prod-title) {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      object-position: left center;
+      animation-duration: 460ms;
+      animation-timing-function: ease-in-out;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    @view-transition {
+      navigation: none;
+    }
+
+    ::view-transition-group(*),
+    ::view-transition-old(*),
+    ::view-transition-new(*) {
+      animation: none !important;
+    }
+  }
+
+  /* Diálogos nativos modernos: scroll isolation + transición suave de entrada */
+  dialog:modal,
+  dialog::backdrop {
+    overscroll-behavior: contain;
+  }
+
+  dialog {
+    opacity: 0;
+    transition:
+      opacity 220ms cubic-bezier(0.22, 1, 0.36, 1),
+      transform 220ms cubic-bezier(0.22, 1, 0.36, 1),
+      overlay 220ms,
+      display 220ms;
+    transition-behavior: allow-discrete;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    dialog {
+      transform: translateY(10px) scale(0.98);
+    }
+  }
+
+  dialog[open] {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+
+  @starting-style {
+    dialog[open] {
+      opacity: 0;
+    }
+    @media (prefers-reduced-motion: no-preference) {
+      dialog[open] {
+        transform: translateY(12px) scale(0.97);
+      }
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    dialog,
+    dialog[open] {
+      transition: none;
+      transform: none;
+    }
   }
 </style>

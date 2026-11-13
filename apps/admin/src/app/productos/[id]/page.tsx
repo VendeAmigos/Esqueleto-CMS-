@@ -34,11 +34,11 @@ export default async function EditarProductoPage({
   };
 
   return (
-    <main className="min-h-screen p-8 max-w-6xl mx-auto">
-      <div className="border-b border-gray-200 pb-5 mb-8 flex items-center justify-between">
-        <div>
+    <div className="min-h-screen p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto">
+      <div className="border-b border-gray-200 pb-5 mb-8 flex flex-wrap items-center justify-between gap-4">
+        <div className="min-w-0">
           <span className="text-xs font-mono text-gray-400">ID: {product.id}</span>
-          <h1 className="text-3xl font-bold tracking-tight text-gray-900">
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-gray-900 break-words">
             Editar Producto: {product.title}
           </h1>
           <p className="mt-1 text-sm text-gray-500">
@@ -47,7 +47,7 @@ export default async function EditarProductoPage({
         </div>
         <Link
           href="/productos"
-          className="text-sm font-semibold text-gray-700 hover:text-black bg-white border border-gray-300 px-4 py-2 rounded-xl shadow-2xs"
+          className="text-sm font-semibold text-gray-700 hover:text-black bg-white border border-gray-300 px-4 py-2 rounded-xl shadow-2xs shrink-0"
         >
           &larr; Volver al Catálogo
         </Link>
@@ -58,6 +58,6 @@ export default async function EditarProductoPage({
         initialData={initialData}
         isEdit={true}
       />
-    </main>
+    </div>
   );
 }

@@ -4,6 +4,7 @@ node_modules/
 
 # Builds y compilaciones
 .next/
+.next-dev/
 dist/
 .astro/
 out/

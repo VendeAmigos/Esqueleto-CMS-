@@ -111,9 +111,10 @@ export default function OrdersTable({ orders }: { orders: OrderItem[] }) {
                         href={`https://wa.me/52${order.customerPhone.replace(/\D/g, '')}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 text-xs text-emerald-600 hover:text-emerald-700 font-medium mt-0.5"
+                        className="inline-flex items-center gap-1.5 text-xs text-emerald-600 hover:text-emerald-700 font-medium mt-0.5"
                       >
-                        <span>📱 {order.customerPhone}</span>
+                        <svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" className="h-3.5 w-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
+                        <span>{order.customerPhone}</span>
                         <span className="text-[10px] bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200">WhatsApp</span>
                       </a>
                     ) : (
@@ -124,12 +125,14 @@ export default function OrdersTable({ orders }: { orders: OrderItem[] }) {
                   <td className="px-6 py-4 text-sm text-gray-600 max-w-xs">
                     {fullAddress ? (
                       <div>
-                        <div className="truncate text-xs font-medium text-gray-800" title={fullAddress}>
-                          📍 {fullAddress}
+                        <div className="truncate text-xs font-medium text-gray-800 flex items-center gap-1" title={fullAddress}>
+                          <svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" className="h-3.5 w-3.5 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                          <span className="truncate">{fullAddress}</span>
                         </div>
                         {hasCoords ? (
                           <span className="inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200">
-                            📌 GPS Exacto ({order.locationSource || 'map'})
+                            <svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" className="h-2.5 w-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /></svg>
+                            GPS Exacto ({order.locationSource || 'map'})
                           </span>
                         ) : (
                           <span className="inline-block mt-1 text-[11px] text-gray-400">
@@ -171,10 +174,10 @@ export default function OrdersTable({ orders }: { orders: OrderItem[] }) {
                           : 'bg-amber-100 text-amber-800 border-amber-300'
                       }`}
                     >
-                      <option value="pending">⏳ Pendiente de Pago</option>
-                      <option value="paid">✓ Pagado (Aprobado)</option>
-                      <option value="shipped">🚚 Enviado al Cliente</option>
-                      <option value="cancelled">✕ Cancelado</option>
+                      <option value="pending">Pendiente de Pago</option>
+                      <option value="paid">Pagado (Aprobado)</option>
+                      <option value="shipped">Enviado al Cliente</option>
+                      <option value="cancelled">Cancelado</option>
                     </select>
                   </td>
 
@@ -195,8 +198,8 @@ export default function OrdersTable({ orders }: { orders: OrderItem[] }) {
 
       {/* MODAL DE DETALLE DE ORDEN CON DIRECCIÓN Y MINI-MAPA */}
       {selectedOrder && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
-          <div className="bg-white rounded-3xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl border border-gray-100 p-6 space-y-6">
+        <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in overflow-y-auto">
+          <div className="bg-white rounded-3xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl border border-gray-100 p-6 space-y-6 my-4 sm:my-0">
             
             {/* Cabecera */}
             <div className="flex items-start justify-between border-b border-gray-100 pb-4">
@@ -210,10 +213,12 @@ export default function OrdersTable({ orders }: { orders: OrderItem[] }) {
                 </p>
               </div>
               <button
+                type="button"
+                aria-label="Cerrar detalle de orden"
                 onClick={() => setSelectedOrder(null)}
                 className="p-2 text-gray-400 hover:text-gray-700 rounded-xl hover:bg-gray-100 transition-colors"
               >
-                ✕
+                <svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
               </button>
             </div>
 
@@ -224,7 +229,10 @@ export default function OrdersTable({ orders }: { orders: OrderItem[] }) {
                 <p className="text-sm font-bold text-gray-900">{selectedOrder.customerName || 'No especificado'}</p>
                 {selectedOrder.customerPhone && (
                   <p className="text-xs text-gray-600 mt-1 flex items-center gap-2">
-                    <span>📞 {selectedOrder.customerPhone}</span>
+                    <span className="inline-flex items-center gap-1">
+                      <svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" className="h-3.5 w-3.5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
+                      {selectedOrder.customerPhone}
+                    </span>
                     <a
                       href={`https://wa.me/52${selectedOrder.customerPhone.replace(/\D/g, '')}`}
                       target="_blank"
@@ -236,7 +244,10 @@ export default function OrdersTable({ orders }: { orders: OrderItem[] }) {
                   </p>
                 )}
                 {selectedOrder.customerEmail && (
-                  <p className="text-xs text-gray-500 mt-0.5">✉️ {selectedOrder.customerEmail}</p>
+                  <p className="text-xs text-gray-500 mt-1 inline-flex items-center gap-1">
+                    <svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" className="h-3.5 w-3.5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+                    {selectedOrder.customerEmail}
+                  </p>
                 )}
               </div>
 
@@ -259,7 +270,8 @@ export default function OrdersTable({ orders }: { orders: OrderItem[] }) {
             {selectedOrder.shippingReferences && (
               <div className="bg-amber-50/80 border border-amber-200/80 rounded-2xl p-4">
                 <h4 className="text-xs font-bold text-amber-800 uppercase tracking-wider flex items-center gap-1.5 mb-1">
-                  <span>🏠 Referencias para encontrar la casa:</span>
+                  <svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>
+                  <span>Referencias para encontrar la casa:</span>
                 </h4>
                 <p className="text-sm text-amber-950 font-medium">
                   {selectedOrder.shippingReferences}
@@ -270,9 +282,10 @@ export default function OrdersTable({ orders }: { orders: OrderItem[] }) {
             {/* Mini-mapa y Enlace a Google Maps */}
             {selectedOrder.shippingLat != null && selectedOrder.shippingLng != null ? (
               <div className="space-y-3">
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between flex-wrap gap-2">
                   <h4 className="text-xs font-bold text-gray-700 uppercase tracking-wider flex items-center gap-1.5">
-                    <span>🗺️ Ubicación Exacta del Cliente:</span>
+                    <svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" className="h-3.5 w-3.5 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                    <span>Ubicación Exacta del Cliente:</span>
                     <span className="text-[11px] font-mono font-normal text-gray-500">
                       ({selectedOrder.shippingLat.toFixed(5)}, {selectedOrder.shippingLng.toFixed(5)})
                     </span>

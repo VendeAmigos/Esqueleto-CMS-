@@ -942,8 +942,9 @@ export default function CategoryGridManager({
             </span>
           )}
           {saveStatus === 'saved' && (
-            <span className="text-xs font-bold text-emerald-800 bg-emerald-100 px-3 py-1.5 rounded-xl">
-              ✓ Guardado en tienda
+            <span className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-800 bg-emerald-100 px-3 py-1.5 rounded-xl">
+              <svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>
+              Guardado en tienda
             </span>
           )}
 
@@ -981,7 +982,7 @@ export default function CategoryGridManager({
                     : 'bg-white text-gray-700 border-amber-300'
                 }`}
               >
-                {idx === 0 ? `▶ Siguiente: ${u.name}` : u.name}
+                {idx === 0 ? `Siguiente: ${u.name}` : u.name}
               </span>
             ))}
           </div>
@@ -1091,9 +1092,12 @@ export default function CategoryGridManager({
                 {/* Fondo con foto en modo Preview */}
                 {showPhotosInGrid && cat.imageUrl && (
                   <>
-                    <div
-                      className="absolute inset-0 bg-cover bg-center pointer-events-none transition-transform duration-500 group-hover:scale-105"
-                      style={{ backgroundImage: `url('${cat.imageUrl}')` }}
+                    <img
+                      src={cat.imageUrl}
+                      alt={cat.name}
+                      loading="eager"
+                      decoding="async"
+                      className="absolute inset-0 h-full w-full object-cover pointer-events-none transition-transform duration-500 group-hover:scale-105"
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/45 to-black/30 pointer-events-none" />
                   </>
@@ -1103,11 +1107,12 @@ export default function CategoryGridManager({
                 <button
                   type="button"
                   data-no-drag="true"
+                  aria-label="Quitar bloque del grid"
                   onClick={() => handleRemoveFromGrid(cat.id)}
                   title="Quitar bloque del grid (liberar celdas +)"
-                  className="absolute top-1.5 right-1.5 z-30 w-6 h-6 bg-[#e84a8a] hover:bg-[#d13674] text-white text-xs font-bold leading-none flex items-center justify-center rounded-lg shadow transition-colors"
+                  className="absolute top-1.5 right-1.5 z-30 w-6 h-6 bg-[#e84a8a] hover:bg-[#d13674] text-white flex items-center justify-center rounded-lg shadow transition-colors"
                 >
-                  ✕
+                  <svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>
                 </button>
 
                 {/* Etiqueta superior de posición y arrastre */}
@@ -1147,9 +1152,16 @@ export default function CategoryGridManager({
                         fileInputRef.current?.click();
                       }}
                       title="Cambiar foto de portada"
-                      className="px-2 py-1 rounded-lg bg-white/90 hover:bg-white text-gray-900 text-[10px] font-bold shadow-2xs"
+                      className="px-2 py-1 rounded-lg bg-white/90 hover:bg-white text-gray-900 text-[10px] font-bold shadow-2xs inline-flex items-center gap-1"
                     >
-                      {isUploading === cat.id ? '...' : '📷 Foto'}
+                      {isUploading === cat.id ? (
+                        '...'
+                      ) : (
+                        <>
+                          <svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                          <span>Foto</span>
+                        </>
+                      )}
                     </button>
 
                     <button
@@ -1163,9 +1175,10 @@ export default function CategoryGridManager({
                         setEditRowSpan(cat.rowSpan);
                       }}
                       title="Editar nombre, slug y dimensiones"
-                      className="px-2 py-1 rounded-lg bg-white/90 hover:bg-white text-gray-900 text-[10px] font-bold shadow-2xs"
+                      className="px-2 py-1 rounded-lg bg-white/90 hover:bg-white text-gray-900 text-[10px] font-bold shadow-2xs inline-flex items-center gap-1"
                     >
-                      ✎ Editar
+                      <svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                      <span>Editar</span>
                     </button>
                   </div>
 
@@ -1240,7 +1253,7 @@ export default function CategoryGridManager({
         {/* Barra inferior de ayuda y botones de guardado */}
         <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
           <p className="text-xs text-gray-600">
-            💡 <strong>Movimiento libre activado:</strong> Arrastra cualquier categoría a donde quieras (los demás bloques se intercambian o acomodan automáticamente), usa los botones <strong>Ancho/Alto (-/+)</strong> o estira la esquina <strong>⌟</strong>.
+            <strong>Movimiento libre activado:</strong> Arrastra cualquier categoría a donde quieras (los demás bloques se intercambian o acomodan automáticamente), usa los botones <strong>Ancho/Alto (-/+)</strong> o estira desde la esquina inferior derecha.
           </p>
           <div className="flex items-center gap-2">
             <button
@@ -1281,10 +1294,11 @@ export default function CategoryGridManager({
               </div>
               <button
                 type="button"
+                aria-label="Cerrar"
                 onClick={() => setPendingCellRect(null)}
-                className="w-8 h-8 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-600 flex items-center justify-center font-bold"
+                className="w-8 h-8 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-600 flex items-center justify-center"
               >
-                ✕
+                <svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>
               </button>
             </div>
 
@@ -1381,10 +1395,11 @@ export default function CategoryGridManager({
               </h3>
               <button
                 type="button"
+                aria-label="Cerrar"
                 onClick={() => setEditingCat(null)}
-                className="w-8 h-8 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-600 flex items-center justify-center font-bold"
+                className="w-8 h-8 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-600 flex items-center justify-center"
               >
-                ✕
+                <svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>
               </button>
             </div>
 

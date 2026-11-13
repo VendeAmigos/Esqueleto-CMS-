@@ -1,25 +1,52 @@
 ---
 // apps/storefront/src/components/Navbar.astro
-import { getStoredSiteSettings } from '@esqueleto/core';
+import { getStoredSiteSettings, getContrastTextColor, type StoredSiteAppearance } from '@esqueleto/core';
 
-const storedSettings = await getStoredSiteSettings();
+interface Props {
+  settings?: StoredSiteAppearance;
+}
+
+const storedSettings = Astro.props.settings || (await getStoredSiteSettings());
+const logoColor = storedSettings.logoColor || '#ec4899';
+const badgeTextColor = getContrastTextColor(logoColor);
+const announcementContrast = getContrastTextColor(storedSettings.announcementBg || '#111827');
+
 const settings = {
   siteName: storedSettings.siteName || 'LUNA ART STUDIO',
   logoSvg: storedSettings.logoSvg || '',
-  logoColor: storedSettings.logoColor || '#ec4899',
+  logoColor,
+  announcementEnabled: storedSettings.announcementEnabled,
+  announcementText: storedSettings.announcementText,
+  announcementLink: storedSettings.announcementLink || '/catalogo',
+  announcementBg: storedSettings.announcementBg || '#111827',
 };
 
 const pathname = Astro.url.pathname;
 ---
 
+{settings.announcementEnabled && settings.announcementText && (
+  <div
+    class="w-full py-2 px-4 text-center text-xs sm:text-sm font-semibold tracking-tight transition-colors"
+    style={`background-color: ${settings.announcementBg}; color: ${announcementContrast};`}
+  >
+    <a href={settings.announcementLink} class="inline-flex items-center justify-center gap-1.5 hover:underline">
+      <span>{settings.announcementText}</span>
+      <span aria-hidden="true">&rarr;</span>
+    </a>
+  </div>
+)}
+
 <!-- BARRA DE NAVEGACIÓN SUPERIOR (DESKTOP & HEADER MÓVIL) -->
-<header class="sticky top-0 z-50 w-full border-b border-gray-200/80 bg-white/85 backdrop-blur-md transition-all duration-200">
+<header
+  transition:persist="site-header"
+  class="sticky top-0 z-50 w-full border-b backdrop-blur-md transition-all duration-200 theme-header"
+  style="border-color: var(--border-subtle);"
+>
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-    <div class="flex items-center justify-between h-16">
-      
+    <div class="flex items-center justify-between h-16 gap-3">
       <!-- Logotipo y Nombre de la Tienda -->
-      <div class="flex items-center gap-3">
-        <a href="/" class="flex items-center gap-2.5 group">
+      <div class="flex items-center gap-3 min-w-0">
+        <a href="/" class="flex items-center gap-2.5 group min-w-0">
           {settings.logoSvg ? (
             <div
               class="w-8 h-8 flex items-center justify-center shrink-0 transition-transform duration-200 group-hover:scale-105 [&>svg]:w-full [&>svg]:h-full"
@@ -28,55 +55,66 @@ const pathname = Astro.url.pathname;
             />
           ) : (
             <div
-              class="w-8 h-8 rounded-lg text-white flex items-center justify-center font-bold text-sm tracking-wider transition-transform duration-200 group-hover:scale-105 shadow-sm"
-              style={`background-color: ${settings.logoColor};`}
+              class="w-8 h-8 rounded-lg flex items-center justify-center font-bold text-sm tracking-wider transition-transform duration-200 group-hover:scale-105 shadow-sm shrink-0"
+              style={`background-color: ${settings.logoColor}; color: ${badgeTextColor};`}
             >
               {settings.siteName.charAt(0) || 'E'}
             </div>
           )}
-          <span class="text-xl font-extrabold tracking-tight text-gray-900 group-hover:text-black">
+          <span
+            class="text-lg sm:text-xl font-extrabold tracking-tight truncate"
+            style="font-family: var(--font-heading); color: var(--text-main);"
+          >
             {settings.siteName}<span style={`color: ${settings.logoColor};`}>.</span>
           </span>
         </a>
       </div>
 
       <!-- Enlaces de Navegación Centrales (Desktop) -->
-      <nav class="hidden md:flex items-center space-x-8">
+      <nav class="hidden md:flex items-center space-x-7" aria-label="Navegación Principal">
         <a
           href="/"
-          class={`text-sm font-semibold transition-colors ${
-            pathname === '/' ? 'text-black' : 'text-gray-600 hover:text-black'
-          }`}
+          data-nav-href="/"
+          class={`text-sm font-semibold transition-colors ${pathname === '/' ? 'is-active' : 'opacity-70 hover:opacity-100'}`}
+          style="color: var(--text-main);"
         >
           Inicio
         </a>
         <a
           href="/categorias"
-          class={`text-sm font-semibold transition-colors ${
-            pathname.startsWith('/categorias') ? 'text-black' : 'text-gray-600 hover:text-black'
-          }`}
+          data-nav-href="/categorias"
+          class={`text-sm font-semibold transition-colors ${pathname.startsWith('/categorias') ? 'is-active' : 'opacity-70 hover:opacity-100'}`}
+          style="color: var(--text-main);"
         >
           Categorías
         </a>
         <a
           href="/catalogo"
-          class={`text-sm font-semibold transition-colors ${
-            pathname === '/catalogo' ? 'text-black' : 'text-gray-600 hover:text-black'
-          }`}
+          data-nav-href="/catalogo"
+          class={`text-sm font-semibold transition-colors ${pathname === '/catalogo' ? 'is-active' : 'opacity-70 hover:opacity-100'}`}
+          style="color: var(--text-main);"
         >
           Catálogo
+        </a>
+        <a
+          href="/contacto"
+          data-nav-href="/contacto"
+          class={`text-sm font-semibold transition-colors ${pathname === '/contacto' ? 'is-active' : 'opacity-70 hover:opacity-100'}`}
+          style="color: var(--text-main);"
+        >
+          Contacto
         </a>
       </nav>
 
       <!-- Área Derecha: Ícono de Carrito y Badges -->
-      <div class="flex items-center space-x-3">
+      <div class="flex items-center space-x-2 shrink-0">
         <a
           href="/carrito"
           id="cart-button"
-          class="relative p-2.5 text-gray-700 hover:text-black rounded-full hover:bg-gray-100 transition-colors"
+          class="relative p-2.5 rounded-full transition-colors hover:opacity-80"
+          style="color: var(--text-main);"
           aria-label="Ver Carrito de Compras"
         >
-          <!-- Ícono SVG de Bolsa de Compras -->
           <svg
             xmlns="http://www.w3.org/2000/svg"
             class="w-6 h-6"
@@ -92,122 +130,134 @@ const pathname = Astro.url.pathname;
             />
           </svg>
 
-          <!-- Badge Reactivo del Carrito (Desktop) -->
           <span
             id="cart-badge"
-            class="absolute -top-0.5 -right-0.5 flex items-center justify-center min-w-[20px] h-5 px-1 text-[11px] font-bold text-white rounded-full transition-all duration-200 opacity-0 scale-75 shadow-sm"
-            style={`background-color: ${settings.logoColor};`}
+            class="absolute -top-0.5 -right-0.5 flex items-center justify-center min-w-[20px] h-5 px-1 text-[11px] font-bold rounded-full transition-all duration-200 opacity-0 scale-75 shadow-sm"
+            style={`background-color: ${settings.logoColor}; color: ${badgeTextColor};`}
           >
             0
           </span>
         </a>
       </div>
-
     </div>
   </div>
 </header>
 
-<!-- BARRA DE NAVEGACIÓN MÓVIL (BOTTOM NAVIGATION BAR FIJA) -->
+<!-- BARRA DE NAVEGACIÓN MÓVIL (BOTTOM NAVIGATION BAR FIJA CON SAFE-AREA) -->
 <nav
-  class="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-lg border-t border-gray-200 px-4 py-2 flex items-center justify-around shadow-2xl safe-area-bottom"
+  transition:persist="site-mobile-nav"
+  class="md:hidden fixed bottom-0 left-0 right-0 z-50 backdrop-blur-lg border-t px-2 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] flex items-center justify-around shadow-2xl theme-header"
+  style="border-color: var(--border-subtle);"
   aria-label="Navegación Móvil"
 >
-  <!-- 1. Inicio -->
   <a
     href="/"
-    class={`flex flex-col items-center justify-center py-1 px-3 rounded-xl transition-all ${
-      pathname === '/' ? 'text-black font-bold' : 'text-gray-500 hover:text-gray-900'
-    }`}
+    data-mobile-href="/"
+    class={`flex flex-col items-center justify-center py-1 px-2 rounded-xl transition-all ${pathname === '/' ? 'font-bold opacity-100' : 'opacity-65 hover:opacity-100'}`}
+    style="color: var(--text-main);"
   >
-    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 mb-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width={pathname === '/' ? 2.25 : 1.75}>
+    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 mb-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width={1.9}>
       <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12l8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25" />
     </svg>
-    <span class="text-[11px]">Inicio</span>
+    <span class="text-[10px] sm:text-[11px]">Inicio</span>
   </a>
 
-  <!-- 2. Categorías -->
   <a
     href="/categorias"
-    class={`flex flex-col items-center justify-center py-1 px-3 rounded-xl transition-all ${
-      pathname.startsWith('/categorias') ? 'text-black font-bold' : 'text-gray-500 hover:text-gray-900'
-    }`}
+    data-mobile-href="/categorias"
+    class={`flex flex-col items-center justify-center py-1 px-2 rounded-xl transition-all ${pathname.startsWith('/categorias') ? 'font-bold opacity-100' : 'opacity-65 hover:opacity-100'}`}
+    style="color: var(--text-main);"
   >
-    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 mb-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width={pathname.startsWith('/categorias') ? 2.25 : 1.75}>
+    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 mb-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width={1.9}>
       <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z" />
     </svg>
-    <span class="text-[11px]">Categorías</span>
+    <span class="text-[10px] sm:text-[11px]">Categorías</span>
   </a>
 
-  <!-- 3. Catálogo -->
   <a
     href="/catalogo"
-    class={`flex flex-col items-center justify-center py-1 px-3 rounded-xl transition-all ${
-      pathname === '/catalogo' ? 'text-black font-bold' : 'text-gray-500 hover:text-gray-900'
-    }`}
+    data-mobile-href="/catalogo"
+    class={`flex flex-col items-center justify-center py-1 px-2 rounded-xl transition-all ${pathname === '/catalogo' ? 'font-bold opacity-100' : 'opacity-65 hover:opacity-100'}`}
+    style="color: var(--text-main);"
   >
-    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 mb-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width={pathname === '/catalogo' ? 2.25 : 1.75}>
+    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 mb-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width={1.9}>
       <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 10.5V6a3.75 3.75 0 10-7.5 0v4.5m11.356-1.993l1.263 12c.07.665-.45 1.243-1.119 1.243H4.25a1.125 1.125 0 01-1.12-1.243l1.264-12A1.125 1.125 0 015.513 7.5h12.974c.576 0 1.059.435 1.119.993z" />
     </svg>
-    <span class="text-[11px]">Catálogo</span>
+    <span class="text-[10px] sm:text-[11px]">Catálogo</span>
   </a>
 
-  <!-- 4. Carrito con Badge Móvil -->
   <a
     href="/carrito"
-    class={`relative flex flex-col items-center justify-center py-1 px-3 rounded-xl transition-all ${
-      pathname === '/carrito' ? 'text-black font-bold' : 'text-gray-500 hover:text-gray-900'
-    }`}
+    data-mobile-href="/carrito"
+    class={`relative flex flex-col items-center justify-center py-1 px-2 rounded-xl transition-all ${pathname === '/carrito' ? 'font-bold opacity-100' : 'opacity-65 hover:opacity-100'}`}
+    style="color: var(--text-main);"
   >
     <div class="relative">
-      <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 mb-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width={pathname === '/carrito' ? 2.25 : 1.75}>
+      <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 mb-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width={1.9}>
         <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 00-3 3h15.75m-12.75-3h11.218c1.121-2.3 2.1-4.684 2.924-7.138a60.114 60.114 0 00-16.536-1.84M7.5 14.25L5.106 5.272M6 20.25a.75.75 0 11-1.5 0 .75.75 0 011.5 0zm12.75 0a.75.75 0 11-1.5 0 .75.75 0 011.5 0z" />
       </svg>
       <span
         id="cart-badge-mobile"
-        class="absolute -top-1.5 -right-2.5 flex items-center justify-center min-w-[18px] h-4 px-1 text-[10px] font-bold text-white rounded-full transition-all duration-200 opacity-0 scale-75 shadow-sm"
-        style={`background-color: ${settings.logoColor};`}
+        class="absolute -top-1.5 -right-2.5 flex items-center justify-center min-w-[18px] h-4 px-1 text-[10px] font-bold rounded-full transition-all duration-200 opacity-0 scale-75 shadow-sm"
+        style={`background-color: ${settings.logoColor}; color: ${badgeTextColor};`}
       >
         0
       </span>
     </div>
-    <span class="text-[11px]">Carrito</span>
+    <span class="text-[10px] sm:text-[11px]">Carrito</span>
+  </a>
+
+  <a
+    href="/contacto"
+    data-mobile-href="/contacto"
+    class={`flex flex-col items-center justify-center py-1 px-2 rounded-xl transition-all ${pathname === '/contacto' ? 'font-bold opacity-100' : 'opacity-65 hover:opacity-100'}`}
+    style="color: var(--text-main);"
+  >
+    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 mb-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width={1.9}>
+      <path stroke-linecap="round" stroke-linejoin="round" d="M8.625 12a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H8.25m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H12m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 01-2.555-.337A5.972 5.972 0 015.41 20.97a5.969 5.969 0 01-.474-.065 4.48 4.48 0 00.978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25z" />
+    </svg>
+    <span class="text-[10px] sm:text-[11px]">Contacto</span>
   </a>
 </nav>
 
-<!-- Lógica reactiva Vanilla JS vinculada a Nano Stores -->
 <script>
   import { $cart } from '../store/cart';
 
-  const cartBadge = document.getElementById('cart-badge');
-  const cartBadgeMobile = document.getElementById('cart-badge-mobile');
-
-  // Suscripción al store reactivo y persistente
-  $cart.subscribe((cartItems) => {
+  function updateBadges(cartItems: readonly { quantity: number }[]) {
+    const cartBadge = document.getElementById('cart-badge');
+    const cartBadgeMobile = document.getElementById('cart-badge-mobile');
     const totalCount = cartItems.reduce((acc, item) => acc + item.quantity, 0);
     const countText = totalCount > 99 ? '99+' : totalCount.toString();
 
-    // Actualizar badge Desktop
-    if (cartBadge) {
-      cartBadge.textContent = countText;
+    for (const el of [cartBadge, cartBadgeMobile]) {
+      if (!el) continue;
+      el.textContent = countText;
       if (totalCount > 0) {
-        cartBadge.classList.remove('opacity-0', 'scale-75');
-        cartBadge.classList.add('opacity-100', 'scale-100');
+        el.classList.remove('opacity-0', 'scale-75');
+        el.classList.add('opacity-100', 'scale-100');
       } else {
-        cartBadge.classList.remove('opacity-100', 'scale-100');
-        cartBadge.classList.add('opacity-0', 'scale-75');
+        el.classList.remove('opacity-100', 'scale-100');
+        el.classList.add('opacity-0', 'scale-75');
       }
     }
+  }
 
-    // Actualizar badge Móvil
-    if (cartBadgeMobile) {
-      cartBadgeMobile.textContent = countText;
-      if (totalCount > 0) {
-        cartBadgeMobile.classList.remove('opacity-0', 'scale-75');
-        cartBadgeMobile.classList.add('opacity-100', 'scale-100');
-      } else {
-        cartBadgeMobile.classList.remove('opacity-100', 'scale-100');
-        cartBadgeMobile.classList.add('opacity-0', 'scale-75');
-      }
-    }
+  function updateActiveNavLinks() {
+    const current = window.location.pathname;
+    document.querySelectorAll<HTMLAnchorElement>('[data-nav-href], [data-mobile-href]').forEach((link) => {
+      const target = link.dataset.navHref || link.dataset.mobileHref || '';
+      const active =
+        target === '/' ? current === '/' : current === target || current.startsWith(`${target}/`);
+      link.classList.toggle('font-bold', active);
+      link.classList.toggle('opacity-100', active);
+      link.classList.toggle('opacity-70', !active && Boolean(link.dataset.navHref));
+      link.classList.toggle('opacity-65', !active && Boolean(link.dataset.mobileHref));
+    });
+  }
+
+  $cart.subscribe((items) => updateBadges(items));
+  document.addEventListener('astro:page-load', () => {
+    updateBadges($cart.get());
+    updateActiveNavLinks();
   });
 </script>

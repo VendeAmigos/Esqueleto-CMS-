@@ -99,13 +99,16 @@ async function initSchema() {
       hero_image_url TEXT DEFAULT 'https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?w=1600&auto=format&fit=crop&q=80',
       hero_cta_text TEXT NOT NULL DEFAULT 'Explorar Tienda de Arte',
       hero_cta_link TEXT NOT NULL DEFAULT '/catalogo',
+      heading_font TEXT NOT NULL DEFAULT 'Plus Jakarta Sans',
+      body_font TEXT NOT NULL DEFAULT 'Inter',
+      extended_config TEXT,
       updated_at TIMESTAMP NOT NULL DEFAULT NOW()
     );
   `;
 }
 
 export async function seed() {
-  console.log('🎨 Iniciando proceso de seed temático para Ilustradora...');
+  console.log('Iniciando proceso de seed temático para Ilustradora...');
   await initSchema();
 
   // 1. Limpieza de datos previos para regeneración limpia
@@ -130,7 +133,7 @@ export async function seed() {
         ${catPrintsId}, 
         'Prints & Láminas de Arte', 
         'prints-arte', 
-        'https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?w=900&auto=format&fit=crop&q=80',
+        '/seed/cat-prints.jpg',
         '2x2', 
         1
       ),
@@ -138,7 +141,7 @@ export async function seed() {
         ${catStickersId}, 
         'Stickers & Papelería', 
         'stickers-papeleria', 
-        'https://images.unsplash.com/photo-1589998059171-988d887df646?w=900&auto=format&fit=crop&q=80',
+        '/seed/cat-stickers.jpg',
         '2x1', 
         2
       ),
@@ -146,7 +149,7 @@ export async function seed() {
         ${catAccesoriosId}, 
         'Pines & Llaveros Acrílicos', 
         'pines-llaveros', 
-        'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=900&auto=format&fit=crop&q=80',
+        '/seed/cat-pines.jpg',
         '1x2', 
         3
       ),
@@ -181,7 +184,7 @@ export async function seed() {
       id: 'prod-print-jardin',
       title: 'Print Fine Art "El Jardín de los Recuerdos"',
       description: 'Lámina de ilustración impresa en papel algodón de 310g con tintas pigmentadas de archivo. Colores vibrantes de larga duración.',
-      imageUrl: 'https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?w=800&auto=format&fit=crop&q=80',
+      imageUrl: '/seed/prod-print-jardin.jpg',
       basePrice: 18000, // $180.00 MXN
       isFeatured: true,
       categoryId: catPrintsId,
@@ -250,7 +253,7 @@ export async function seed() {
       id: 'prod-pack-stickers',
       title: 'Pack de 6 Stickers Holográficos "Criaturas Mágicas"',
       description: 'Set de 6 adhesivos de vinilo grueso ultra-resistente al agua, raspaduras y sol UV. Brillo holográfico premium.',
-      imageUrl: 'https://images.unsplash.com/photo-1589998059171-988d887df646?w=800&auto=format&fit=crop&q=80',
+      imageUrl: '/seed/prod-stickers-criaturas.jpg',
       basePrice: 9500, // $95.00 MXN
       isFeatured: true,
       categoryId: catStickersId,
@@ -271,7 +274,7 @@ export async function seed() {
       id: 'prod-pin-corazon',
       title: 'Pin Metálico Esmaltado "Corazón Florecido" (Hard Enamel)',
       description: 'Broche metálico coleccionable de 3.5cm en esmalte duro pulido con baño en oro y tarjeta ilustrada de respaldo.',
-      imageUrl: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800&auto=format&fit=crop&q=80',
+      imageUrl: '/seed/prod-pin-corazon.jpg',
       basePrice: 14000, // $140.00 MXN
       isFeatured: true,
       categoryId: catAccesoriosId,
@@ -301,7 +304,7 @@ export async function seed() {
       id: 'prod-llavero-zorro',
       title: 'Llavero Acrílico Translúcido Glitter "Zorro Astral"',
       description: 'Llavero de doble cara de acrílico resistente de 6.5cm con destellos glitter suspendidos y capa epóxica anti-rayas.',
-      imageUrl: 'https://images.unsplash.com/photo-1588850561407-ed78c282e89b?w=800&auto=format&fit=crop&q=80',
+      imageUrl: '/seed/prod-llavero-zorro.jpg',
       basePrice: 12500, // $125.00 MXN
       isFeatured: false,
       categoryId: catAccesoriosId,
@@ -322,7 +325,7 @@ export async function seed() {
       id: 'prod-totebag-lectura',
       title: 'Totebag Ilustrada "Lectura Nocturna" (100% Algodón Pesado)',
       description: 'Bolsa de lona resistente de 320g con serigrafía artesanal duradera. Perfecta para libros, libretas y compras.',
-      imageUrl: 'https://images.unsplash.com/photo-1544816155-12df9643f363?w=800&auto=format&fit=crop&q=80',
+      imageUrl: '/seed/prod-totebag-lectura.jpg',
       basePrice: 28000, // $280.00 MXN
       isFeatured: false,
       categoryId: catTextilId,
@@ -383,7 +386,7 @@ export async function seed() {
       id: 'prod-sketchbook-autor',
       title: 'Sketchbook Tapa Dura "Pinceladas del Alma" (200g)',
       description: 'Cuaderno cosido a mano con 160 páginas en papel mix media libre de ácido. Ideal para gouache, tinta y acuarela.',
-      imageUrl: 'https://images.unsplash.com/photo-1513364776144-60967b0f800f?w=800&auto=format&fit=crop&q=80',
+      imageUrl: '/seed/prod-sketchbook.jpg',
       basePrice: 24000, // $240.00 MXN
       isFeatured: false,
       categoryId: catOriginalesId,
@@ -485,7 +488,7 @@ export async function seed() {
     ON CONFLICT (email) DO NOTHING;
   `;
 
-  console.log('✅ Tienda de Ilustradora poblada con éxito: categorías, productos, cupones y apariencia.');
+  console.log('Tienda de Ilustradora poblada con éxito: categorías, productos, cupones y apariencia.');
   await sql.end();
 }
 
@@ -498,16 +501,16 @@ seed().catch(async (err: any) => {
     err?.errno === -4078 ||
     err?.errno === -4092
   ) {
-    console.warn('\n⚠️  PostgreSQL no está corriendo en 127.0.0.1:5432.');
-    console.warn('👉 Si deseas usar base de datos persistente, inicia Docker Desktop y ejecuta:');
+    console.warn('\nPostgreSQL no está corriendo en 127.0.0.1:5432.');
+    console.warn('Si deseas usar base de datos persistente, inicia Docker Desktop y ejecuta:');
     console.warn('   docker compose up -d postgres\n');
-    console.warn('✅ No te preocupes: puedes ejecutar "pnpm run dev" ahora mismo y la tienda');
+    console.warn('No te preocupes: puedes ejecutar "pnpm run dev" ahora mismo y la tienda');
     console.warn('   funcionará automáticamente con el catálogo precargado de LUNA ART STUDIO.\n');
     try {
       await sql.end({ timeout: 1 });
     } catch {}
     process.exit(0);
   }
-  console.error('❌ Error en el proceso de seed:', err);
+  console.error('Error en el proceso de seed:', err);
   process.exit(1);
 });

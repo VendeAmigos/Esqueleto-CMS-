@@ -19,23 +19,22 @@ const gridBoardRows = categoriesWithCount.reduce((acc, cat) => {
 }, 3);
 
 const desktopRowHeightPx = gridBoardRows >= 6 ? 120 : gridBoardRows >= 5 ? 150 : 240;
+const safeSlugId = (slug: string) => String(slug || '').replace(/[^a-zA-Z0-9_-]/g, '-');
 ---
 
 <Layout
   title="Categorías"
   description="Explora todas las colecciones y departamentos de nuestra tienda."
 >
-  <div class="space-y-10">
-    <!-- Encabezado de la página -->
+  <div class="space-y-8 sm:space-y-10">
     <div class="border-b border-gray-200 pb-6 flex flex-col md:flex-row md:items-end justify-between gap-4">
       <div>
-        <!-- Breadcrumbs -->
         <nav class="flex items-center gap-2 text-xs text-gray-500 mb-2">
           <a href="/" class="hover:text-black transition-colors">Inicio</a>
           <span>/</span>
           <span class="text-black font-semibold">Categorías</span>
         </nav>
-        <h1 class="text-3xl sm:text-4xl font-extrabold tracking-tight text-gray-900">
+        <h1 class="text-2xl sm:text-4xl font-extrabold tracking-tight text-gray-900">
           Todas las Categorías
         </h1>
         <p class="mt-2 text-sm text-gray-500">
@@ -45,14 +44,13 @@ const desktopRowHeightPx = gridBoardRows >= 6 ? 120 : gridBoardRows >= 5 ? 150 :
 
       <a
         href="/catalogo"
-        class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-800 text-sm font-semibold transition-colors"
+        class="inline-flex items-center gap-2 px-5 py-2.5 theme-radius-btn bg-gray-100 hover:bg-gray-200 text-gray-800 text-sm font-semibold transition-colors self-start md:self-auto"
       >
         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" /></svg>
         Ver Catálogo Completo
       </a>
     </div>
 
-    <!-- Bento Grid de Categorías -->
     <style>
       @media (min-width: 1024px) {
         .bento-grid-container {
@@ -67,7 +65,7 @@ const desktopRowHeightPx = gridBoardRows >= 6 ? 120 : gridBoardRows >= 5 ? 150 :
       }
     </style>
     <div
-      class="bento-grid-container grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 auto-rows-[260px]"
+      class="bento-grid-container grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6 auto-rows-[220px] sm:auto-rows-[260px]"
       style={`--grid-cols: ${gridBoardCols}; --grid-row-h: ${desktopRowHeightPx}px;`}
     >
       {categoriesWithCount.map((cat) => {
@@ -78,11 +76,12 @@ const desktopRowHeightPx = gridBoardRows >= 6 ? 120 : gridBoardRows >= 5 ? 150 :
         const lgRow = parsedSpan.rowStart
           ? `${parsedSpan.rowStart} / span ${parsedSpan.rowSpan}`
           : `span ${parsedSpan.rowSpan}`;
+        const vtSlug = safeSlugId(cat.slug);
         return (
           <a
             href={`/categorias/${cat.slug}`}
-            style={`min-height: 240px; --lg-col: ${lgCol}; --lg-row: ${lgRow};`}
-            class={`bento-grid-card group relative rounded-3xl overflow-hidden shadow-sm hover:shadow-2xl transition-all duration-500 flex flex-col justify-end p-6 border border-gray-200 ${getGridSpanClass(
+            style={`min-height: 210px; --lg-col: ${lgCol}; --lg-row: ${lgRow};`}
+            class={`bento-grid-card group relative theme-radius-card overflow-hidden shadow-sm hover:shadow-2xl transition-all duration-500 flex flex-col justify-end p-5 sm:p-6 border border-gray-200 ${getGridSpanClass(
               cat.gridSpan
             )}`}
           >
@@ -90,25 +89,37 @@ const desktopRowHeightPx = gridBoardRows >= 6 ? 120 : gridBoardRows >= 5 ? 150 :
               <img
                 src={cat.imageUrl}
                 alt={cat.name}
-                class="absolute inset-0 h-full w-full object-cover object-center transition-transform duration-700 ease-out group-hover:scale-110"
+                width="800"
+                height="600"
+                loading="lazy"
+                decoding="async"
+                transition:name={`cat-img-${vtSlug}`}
+                style="view-transition-class: vt-cat-img;"
+                class="absolute inset-0 h-full w-full object-cover object-center transition-transform duration-700 ease-out group-hover:scale-105"
               />
             ) : (
-              <div class="absolute inset-0 bg-gradient-to-br from-gray-800 to-gray-950" />
+              <div
+                transition:name={`cat-img-${vtSlug}`}
+                style="view-transition-class: vt-cat-img;"
+                class="absolute inset-0 bg-gradient-to-br from-gray-800 to-gray-950"
+              />
             )}
 
             <div class="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent transition-opacity group-hover:via-black/55" />
 
-            <!-- Badge Superior -->
             <div class="relative z-10 self-start mb-auto">
-              <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-black/60 text-white/90 backdrop-blur-md border border-white/20 shadow-sm">
+              <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-black/60 text-white/95 backdrop-blur-md border border-white/20 shadow-sm">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 text-white/80" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" /></svg>
                 {cat.productCount} {cat.productCount === 1 ? 'producto' : 'productos'}
               </span>
             </div>
 
-            <!-- Contenido Inferior -->
             <div class="relative z-10 space-y-1">
-              <h2 class="text-2xl sm:text-3xl font-extrabold text-white tracking-tight drop-shadow-md">
+              <h2
+                transition:name={`cat-title-${vtSlug}`}
+                style="view-transition-class: vt-cat-title;"
+                class="w-fit max-w-full text-xl sm:text-3xl font-extrabold text-white tracking-tight drop-shadow-md"
+              >
                 {cat.name}
               </h2>
               <p class="text-xs text-white/80 font-medium inline-flex items-center gap-1 transition-transform group-hover:translate-x-1">

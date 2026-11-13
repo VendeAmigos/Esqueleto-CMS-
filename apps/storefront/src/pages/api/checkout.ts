@@ -9,6 +9,7 @@ import {
   markDatabaseOffline,
   getStoredProducts,
   getStoredPaymentSettings,
+  getStoredSiteSettings,
   saveStoredOrder,
 } from '@esqueleto/core';
 
@@ -26,6 +27,7 @@ interface CheckoutItemPayload {
 }
 
 interface ShippingPayload {
+  deliveryMethod?: 'delivery' | 'pickup';
   fullName?: string;
   phone?: string;
   street?: string;
@@ -45,13 +47,48 @@ interface ShippingPayload {
 const clean = (v: unknown, max = 200): string =>
   typeof v === 'string' ? v.trim().replace(/\s+/g, ' ').slice(0, max) : '';
 
-/** Valida y normaliza los datos de envío. Lanza Error con mensaje legible si falta algo. */
-function validateShipping(raw: ShippingPayload | undefined) {
+/** Valida y normaliza los datos de envío (o retiro presencial si está habilitado en CMS). */
+function validateShipping(
+  raw: ShippingPayload | undefined,
+  pickupAllowed: boolean,
+  pickupAddress: string
+) {
   if (!raw) throw new Error('Faltan los datos de envío');
 
   const phoneDigits = clean(raw.phone, 30).replace(/\D/g, '').replace(/^52(?=\d{10}$)/, '');
+  const isPickup = pickupAllowed && raw.deliveryMethod === 'pickup';
+
+  const customerName = clean(raw.fullName, 120);
+  if (customerName.length < 3 || !/^\d{10}$/.test(phoneDigits)) {
+    const contactMissing: string[] = [];
+    if (customerName.length < 3) contactMissing.push('nombre completo');
+    if (!/^\d{10}$/.test(phoneDigits)) contactMissing.push('teléfono a 10 dígitos');
+    throw new Error(`Completa tus datos de contacto: ${contactMissing.join(', ')}`);
+  }
+
+  if (isPickup) {
+    return {
+      isPickup: true,
+      customerName,
+      customerPhone: phoneDigits,
+      shippingStreet: pickupAddress || 'Recoger en Tienda / Estudio',
+      shippingExtNumber: 'S/N',
+      shippingIntNumber: null as string | null,
+      shippingNeighborhood: 'Entrega presencial',
+      shippingMunicipality: 'Tienda',
+      shippingCity: null as string | null,
+      shippingState: 'Local',
+      shippingZip: '00000',
+      shippingReferences: clean(raw.references, 500) || 'Modalidad: Recoger en tienda',
+      shippingLat: null as number | null,
+      shippingLng: null as number | null,
+      locationSource: 'pickup',
+    };
+  }
+
   const data = {
-    customerName: clean(raw.fullName, 120),
+    isPickup: false,
+    customerName,
     customerPhone: phoneDigits,
     shippingStreet: clean(raw.street),
     shippingExtNumber: clean(raw.extNumber, 20),
@@ -68,8 +105,6 @@ function validateShipping(raw: ShippingPayload | undefined) {
   };
 
   const missing: string[] = [];
-  if (data.customerName.length < 3) missing.push('nombre completo');
-  if (!/^\d{10}$/.test(data.customerPhone)) missing.push('teléfono a 10 dígitos');
   if (!data.shippingStreet) missing.push('calle');
   if (!data.shippingExtNumber) missing.push('número exterior');
   if (!data.shippingNeighborhood) missing.push('colonia');
@@ -114,12 +149,21 @@ export const POST: APIRoute = async ({ request, url }) => {
       });
     }
 
+    const siteSettings = await getStoredSiteSettings();
+    const activeCurrency = siteSettings.currencyCode || 'MXN';
+
     let shipping: ReturnType<typeof validateShipping>;
     try {
-      shipping = validateShipping(shippingRaw);
+      shipping = validateShipping(
+        shippingRaw,
+        Boolean(siteSettings.pickupEnabled),
+        siteSettings.pickupAddress || ''
+      );
     } catch (e: any) {
       throw new ValidationError(e.message);
     }
+
+    const { isPickup, ...shippingRecord } = shipping;
 
     // 1. Obtener productos auténticos desde el store híbrido (PostgreSQL o store local sin ECONNRESET)
     const allStoredProducts = await getStoredProducts();
@@ -165,7 +209,7 @@ export const POST: APIRoute = async ({ request, url }) => {
         title: titleWithModifiers,
         quantity: item.quantity,
         unit_price: verifiedUnitPriceCents / 100,
-        currency_id: 'MXN',
+        currency_id: activeCurrency,
         unitPriceCents: verifiedUnitPriceCents,
       };
     });
@@ -233,10 +277,24 @@ export const POST: APIRoute = async ({ request, url }) => {
       }
     }
 
-    const finalTotalCents = Math.max(0, subtotalCents - discountAmountCents);
+    const discountedSubtotalCents = Math.max(0, subtotalCents - discountAmountCents);
+    const unlockedFreeShipping =
+      siteSettings.freeShippingThresholdCents !== null &&
+      subtotalCents >= siteSettings.freeShippingThresholdCents;
+    const shippingFeeCents =
+      !isPickup && !unlockedFreeShipping && (siteSettings.shippingFeeCents || 0) > 0
+        ? siteSettings.shippingFeeCents
+        : 0;
+
+    const finalTotalCents = discountedSubtotalCents + shippingFeeCents;
 
     if (appliedDiscountCode) {
       itemsSummaryList.push(`[Cupón: ${appliedDiscountCode} (-$${(discountAmountCents / 100).toFixed(2)})]`);
+    }
+    if (isPickup) {
+      itemsSummaryList.push('[Entrega: Recoger en tienda]');
+    } else if (shippingFeeCents > 0) {
+      itemsSummaryList.push(`[Envío: +$${(shippingFeeCents / 100).toFixed(2)}]`);
     }
 
     // 5. Generar ID único para la orden y obtener configuración activa de pagos (CMS o .env)
@@ -259,8 +317,17 @@ export const POST: APIRoute = async ({ request, url }) => {
         title: vi.title,
         quantity: vi.quantity,
         unit_price: parseFloat(((vi.unitPriceCents * discountRatio) / 100).toFixed(2)),
-        currency_id: 'MXN',
+        currency_id: activeCurrency,
       }));
+      if (shippingFeeCents > 0) {
+        mpItems.push({
+          id: 'envio-domicilio',
+          title: 'Envío a domicilio',
+          quantity: 1,
+          unit_price: parseFloat((shippingFeeCents / 100).toFixed(2)),
+          currency_id: activeCurrency,
+        });
+      }
 
       const response = await preference.create({
         body: {
@@ -270,12 +337,12 @@ export const POST: APIRoute = async ({ request, url }) => {
           binary_mode: paymentConfig.binaryMode,
           payer: {
             ...(customerEmail ? { email: customerEmail } : {}),
-            name: shipping.customerName,
-            phone: { area_code: '52', number: shipping.customerPhone },
+            name: shippingRecord.customerName,
+            phone: { area_code: '52', number: shippingRecord.customerPhone },
             address: {
-              zip_code: shipping.shippingZip,
-              street_name: shipping.shippingStreet,
-              street_number: shipping.shippingExtNumber,
+              zip_code: shippingRecord.shippingZip,
+              street_name: shippingRecord.shippingStreet,
+              street_number: shippingRecord.shippingExtNumber,
             },
           },
           back_urls: {
@@ -299,7 +366,7 @@ export const POST: APIRoute = async ({ request, url }) => {
         itemsSummary: itemsSummaryList.join(' | '),
         itemsJson: JSON.stringify(items),
         mpPreferenceId: response.id || null,
-        ...shipping,
+        ...shippingRecord,
       });
 
       const isSandbox = paymentConfig.mpMode === 'sandbox' || rawMpToken.startsWith('TEST-');
@@ -331,7 +398,7 @@ export const POST: APIRoute = async ({ request, url }) => {
         customerEmail: customerEmail || 'cliente-prueba@afotica.com',
         itemsSummary: itemsSummaryList.join(' | '),
         itemsJson: JSON.stringify(items),
-        ...shipping,
+        ...shippingRecord,
       });
 
       return new Response(

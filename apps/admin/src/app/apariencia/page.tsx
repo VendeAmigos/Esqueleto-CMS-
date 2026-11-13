@@ -8,7 +8,7 @@ export default async function AparienciaPage() {
   const currentSettings = await getStoredSiteSettings();
 
   return (
-    <main className="min-h-screen p-8 max-w-6xl mx-auto">
+    <main className="min-h-screen p-4 sm:p-6 md:p-8 max-w-6xl mx-auto">
       <div className="border-b border-gray-200 pb-5 mb-8 flex justify-between items-end">
         <div>
           <span className="text-xs font-bold uppercase tracking-wider text-indigo-600 bg-indigo-50 px-2.5 py-1 rounded-md">

@@ -179,8 +179,8 @@ export default function ProductsToolbar({ existingProducts }: ProductsToolbarPro
   const handleDownloadTemplate = () => {
     const csvRows = [
       "id,nombre,descripcion,precio_mxn,categoria,imagen_url,destacado,activo",
-      ',Vela Aromática Lavanda & Coco,"Cera de soya artesanal 250g",280.00,Ediciones Especiales,https://images.unsplash.com/photo-1602874801007-bd458bb1b8b6?w=800,si,si',
-      ',Libreta Puntillada Astral,"Pasta dura 160 páginas 120g",195.00,Libretas & Journals,https://images.unsplash.com/photo-1544816155-12df9643f363?w=800,no,si',
+      ',Vela Aromática Lavanda & Coco,"Cera de soya artesanal 250g",280.00,Ediciones Especiales,/seed/prod-print-jardin.jpg,si,si',
+      ',Libreta Puntillada Astral,"Pasta dura 160 páginas 120g",195.00,Libretas & Journals,/seed/prod-sketchbook.jpg,no,si',
     ];
     const blob = new Blob(["\uFEFF" + csvRows.join("\n")], {
       type: "text/csv;charset=utf-8;",
@@ -262,7 +262,10 @@ export default function ProductsToolbar({ existingProducts }: ProductsToolbarPro
           className="bg-white border border-gray-300 text-gray-700 px-4 py-2.5 rounded-xl font-semibold hover:bg-gray-50 transition-colors shadow-2xs flex items-center gap-2 text-xs"
           title="Exportar catálogo actual a Excel / CSV para editar precios masivamente"
         >
-          <span>📤 Exportar CSV / Excel</span>
+          <svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" className="h-4 w-4 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+          </svg>
+          <span>Exportar CSV / Excel</span>
         </button>
 
         <button
@@ -270,14 +273,17 @@ export default function ProductsToolbar({ existingProducts }: ProductsToolbarPro
           onClick={() => setIsOpen(true)}
           className="bg-indigo-600 text-white px-4 py-2.5 rounded-xl font-semibold hover:bg-indigo-700 transition-colors shadow-sm flex items-center gap-2 text-xs"
         >
-          <span>⚡ Carga Masiva (CSV / Excel / JSON)</span>
+          <svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+          </svg>
+          <span>Carga Masiva (CSV / Excel / JSON)</span>
         </button>
       </div>
 
       {isOpen && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white rounded-3xl max-w-4xl w-full p-6 sm:p-8 shadow-2xl border border-gray-200 space-y-6 my-8">
-            <div className="flex items-start justify-between border-b border-gray-100 pb-4">
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-start sm:items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-3xl max-w-4xl w-full p-6 sm:p-8 shadow-2xl border border-gray-200 space-y-6 my-4 sm:my-8">
+            <div className="flex items-start justify-between gap-4 border-b border-gray-100 pb-4">
               <div>
                 <span className="text-xs font-bold uppercase tracking-wider text-indigo-600">
                   Importador & Actualizador Masivo
@@ -291,10 +297,13 @@ export default function ProductsToolbar({ existingProducts }: ProductsToolbarPro
               </div>
               <button
                 type="button"
+                aria-label="Cerrar modal"
                 onClick={() => setIsOpen(false)}
-                className="w-8 h-8 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-600 flex items-center justify-center font-bold"
+                className="w-8 h-8 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-600 flex items-center justify-center shrink-0"
               >
-                ✕
+                <svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
               </button>
             </div>
 
@@ -360,8 +369,11 @@ export default function ProductsToolbar({ existingProducts }: ProductsToolbarPro
             {previewRows.length > 0 && (
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 px-3 py-1 rounded-full">
-                    ✓ {previewRows.length} producto(s) listos para importar / actualizar
+                  <span className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 px-3 py-1 rounded-full">
+                    <svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" className="h-3.5 w-3.5 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                    </svg>
+                    {previewRows.length} producto(s) listos para importar / actualizar
                   </span>
                 </div>
                 <div className="max-h-52 overflow-y-auto border border-gray-200 rounded-2xl">
@@ -398,7 +410,7 @@ export default function ProductsToolbar({ existingProducts }: ProductsToolbarPro
                             <td className="px-3 py-2 font-mono font-bold text-gray-900">
                               ${Number(row.priceMxn || 0).toFixed(2)}
                             </td>
-                            <td className="px-3 py-2">{row.isFeatured ? "★ Sí" : "No"}</td>
+                            <td className="px-3 py-2">{row.isFeatured ? "Sí (Destacado)" : "No"}</td>
                           </tr>
                         );
                       })}

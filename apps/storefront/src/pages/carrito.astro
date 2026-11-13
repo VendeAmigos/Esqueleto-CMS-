@@ -2,16 +2,28 @@
 // apps/storefront/src/pages/carrito.astro
 import Layout from '../layouts/Layout.astro';
 import ShippingForm from '../components/ShippingForm.astro';
+import { getStoredSiteSettings, formatMoney, getCurrencyLocale } from '@esqueleto/core';
+
+const settings = await getStoredSiteSettings();
+const safeLocale = getCurrencyLocale(settings.currencyCode, settings.currencyLocale);
+const zeroMoney = formatMoney(0, settings.currencyCode, safeLocale);
 ---
 
 <Layout
   title="Carrito de Compras"
   description="Revisa tus productos y personalizaciones seleccionadas antes de proceder al pago seguro."
 >
-  <div class="max-w-7xl mx-auto py-4">
-    <!-- Encabezado de la Página -->
-    <div class="border-b border-gray-200 pb-5 mb-8">
-      <h1 class="text-3xl font-extrabold tracking-tight text-gray-900 sm:text-4xl">
+  <div
+    id="carrito-page-root"
+    class="max-w-7xl mx-auto py-2 sm:py-4"
+    data-currency={settings.currencyCode}
+    data-locale={safeLocale}
+    data-shipping-fee={String(settings.shippingFeeCents || 0)}
+    data-free-threshold={settings.freeShippingThresholdCents != null ? String(settings.freeShippingThresholdCents) : ''}
+    data-pickup-enabled={settings.pickupEnabled ? 'true' : 'false'}
+  >
+    <div class="border-b border-gray-200 pb-5 mb-6 sm:mb-8">
+      <h1 class="text-2xl sm:text-4xl font-extrabold tracking-tight text-gray-900">
         Carrito de Compras
       </h1>
       <p class="mt-2 text-sm text-gray-500">
@@ -19,13 +31,20 @@ import ShippingForm from '../components/ShippingForm.astro';
       </p>
     </div>
 
-    <!-- Cuadrícula Principal de 2 Columnas -->
-    <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-      
-      <!-- Columna Izquierda: Listado dinámico de artículos -->
-      <section class="lg:col-span-8">
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8 items-start">
+      <!-- Columna Izquierda: Artículos y Datos de Envío -->
+      <section class="lg:col-span-8 space-y-6 sm:space-y-8">
+        <div id="free-shipping-banner" class="hidden rounded-2xl border border-indigo-200 bg-indigo-50/70 p-4 text-xs text-indigo-950 space-y-2">
+          <div class="flex items-center justify-between gap-2 font-semibold">
+            <span id="free-shipping-text"></span>
+            <span id="free-shipping-pct" class="font-mono font-bold"></span>
+          </div>
+          <div class="h-2 w-full rounded-full bg-indigo-100 overflow-hidden">
+            <div id="free-shipping-bar" class="h-full rounded-full bg-indigo-600 transition-all duration-300" style="width: 0%;"></div>
+          </div>
+        </div>
+
         <div id="cart-container" class="space-y-4">
-          <!-- Renderizado dinámicamente en el cliente vía Nanostores -->
           <div class="flex items-center justify-center p-12 text-gray-400">
             <svg class="animate-spin h-6 w-6 text-gray-400 mr-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
               <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
@@ -35,15 +54,14 @@ import ShippingForm from '../components/ShippingForm.astro';
           </div>
         </div>
 
-        <!-- Sección de Datos de Envío y Ubicación -->
-        <div class="mt-8">
-          <ShippingForm />
+        <div>
+          <ShippingForm pickupEnabled={settings.pickupEnabled} pickupAddress={settings.pickupAddress} />
         </div>
       </section>
 
       <!-- Columna Derecha: Resumen de Compra -->
-      <aside class="lg:col-span-4 sticky top-24">
-        <div class="rounded-2xl border border-gray-200/90 bg-white p-6 shadow-sm">
+      <aside class="lg:col-span-4 lg:sticky lg:top-24">
+        <div class="theme-radius-card border border-gray-200/90 bg-white p-5 sm:p-6 shadow-sm">
           <h2 class="text-lg font-bold text-gray-900 border-b border-gray-100 pb-4">
             Resumen de Compra
           </h2>
@@ -51,21 +69,20 @@ import ShippingForm from '../components/ShippingForm.astro';
           <div class="mt-4 space-y-3 text-sm">
             <div class="flex items-center justify-between text-gray-600">
               <span>Subtotal estimado</span>
-              <span id="cart-subtotal" class="font-medium text-gray-900">$0.00</span>
+              <span id="cart-subtotal" class="font-medium text-gray-900">{zeroMoney}</span>
             </div>
 
-            <!-- Fila Dinámica de Descuento (Oculta si no hay cupón) -->
             <div id="cart-discount-row" class="hidden items-center justify-between text-emerald-600">
               <span class="flex items-center gap-1.5 font-medium">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" /></svg>
                 Descuento <span id="cart-discount-label" class="font-bold"></span>
               </span>
-              <span id="cart-discount-amount" class="font-bold">-$0.00</span>
+              <span id="cart-discount-amount" class="font-bold">-{zeroMoney}</span>
             </div>
 
             <div class="flex items-center justify-between text-gray-600">
-              <span>Envío estándar</span>
-              <span class="text-emerald-600 font-medium">Calculado en checkout</span>
+              <span id="cart-shipping-label">Envío estándar</span>
+              <span id="cart-shipping-amount" class="text-emerald-600 font-semibold">Gratis</span>
             </div>
             <div class="flex items-center justify-between text-gray-600">
               <span>Impuestos estimados</span>
@@ -74,11 +91,11 @@ import ShippingForm from '../components/ShippingForm.astro';
 
             <div class="border-t border-gray-100 pt-4 flex items-center justify-between text-base">
               <span class="font-bold text-gray-900">Total a pagar</span>
-              <span id="cart-total" class="text-2xl font-black text-gray-900">$0.00</span>
+              <span id="cart-total" class="text-2xl font-black text-gray-900">{zeroMoney}</span>
             </div>
           </div>
 
-          <!-- SECCIÓN: CÓDIGO DE DESCUENTO -->
+          <!-- Cupón -->
           <div class="mt-5 pt-4 border-t border-gray-100 space-y-2">
             <label for="discount-code-input" class="block text-xs font-bold text-gray-700 uppercase tracking-wider">
               ¿Tienes un cupón de descuento?
@@ -89,18 +106,17 @@ import ShippingForm from '../components/ShippingForm.astro';
                 type="text"
                 id="discount-code-input"
                 placeholder="Ej. ARTE10"
-                class="flex-1 rounded-xl border border-gray-200 px-3.5 py-2 text-xs font-mono font-bold uppercase tracking-wider text-black focus:border-black focus:ring-black"
+                class="flex-1 min-w-0 rounded-xl border border-gray-200 px-3.5 py-2 text-xs font-mono font-bold uppercase tracking-wider text-black focus:border-black focus:ring-black"
               />
               <button
                 type="button"
                 id="apply-discount-btn"
-                class="px-4 py-2 rounded-xl bg-black hover:bg-gray-800 text-white text-xs font-bold shadow-sm transition-all active:scale-95 disabled:opacity-40"
+                class="px-4 py-2 theme-radius-btn bg-black hover:bg-gray-800 text-white text-xs font-bold shadow-sm transition-all active:scale-95 disabled:opacity-40 shrink-0"
               >
                 Aplicar
               </button>
             </div>
 
-            <!-- Badge de Cupón Activo -->
             <div id="applied-discount-badge" class="hidden items-center justify-between p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-xs">
               <div class="flex items-center gap-2 text-emerald-800 font-medium">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 text-emerald-700" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" /></svg>
@@ -109,14 +125,15 @@ import ShippingForm from '../components/ShippingForm.astro';
               <button
                 type="button"
                 id="remove-discount-btn"
-                class="text-emerald-600 hover:text-red-600 p-1 font-bold text-xs"
+                aria-label="Quitar cupón"
+                class="text-emerald-600 hover:text-red-600 p-1 rounded"
                 title="Quitar cupón"
               >
-                ✕
+                <svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12" /></svg>
               </button>
             </div>
 
-            <p id="discount-message" class="text-[11px] font-medium hidden"></p>
+            <p id="discount-message" role="status" aria-live="polite" class="text-[11px] font-medium hidden"></p>
           </div>
 
           <div class="mt-4 pt-3 border-t border-gray-100 space-y-1.5">
@@ -126,32 +143,42 @@ import ShippingForm from '../components/ShippingForm.astro';
             <input
               type="email"
               id="customer-email"
+              name="email"
+              autocomplete="email"
               placeholder="tu-correo@ejemplo.com"
               class="w-full rounded-xl border border-gray-200 px-3.5 py-2 text-sm text-gray-900 focus:border-black focus:ring-black"
             />
           </div>
 
-          <!-- Estado en vivo de la Dirección de Envío Obligatoria -->
+          <!-- Estado en vivo de dirección -->
           <div
             id="shipping-readiness-box"
             class="mt-4 rounded-xl border border-amber-200 bg-amber-50/80 p-3 text-xs text-amber-900 space-y-1"
           >
             <div class="font-bold flex items-center gap-1.5" id="shipping-readiness-title">
-              <span>📍 Dirección de envío obligatoria</span>
+              <span>Datos de entrega obligatorios</span>
             </div>
             <p id="shipping-readiness-desc" class="text-[11px] text-amber-800">
-              Completa tu nombre, teléfono y domicilio en la sección izquierda para habilitar el pago.
+              Completa tu nombre, teléfono y dirección en la sección izquierda para habilitar el pago.
             </p>
           </div>
+
+          <!-- Banner inline de error (reemplaza alert()) -->
+          <div
+            id="checkout-error-banner"
+            role="alert"
+            aria-live="assertive"
+            class="hidden mt-4 rounded-xl border border-red-200 bg-red-50 p-3 text-xs font-medium text-red-800"
+          />
 
           <div class="mt-4 space-y-3">
             <button
               id="checkout-btn"
               type="button"
-              class="w-full flex items-center justify-center gap-2 rounded-xl bg-gray-900 px-6 py-3.5 text-base font-semibold text-white shadow-sm transition-all duration-200 hover:bg-black active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-gray-900"
+              class="w-full flex items-center justify-center gap-2 theme-radius-btn bg-gray-900 px-5 py-3.5 text-sm sm:text-base font-semibold text-white shadow-sm transition-all duration-200 hover:bg-black active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-gray-900"
             >
-              <span>Pagar Seguro con Mercado Pago</span>
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <span id="checkout-btn-label">Pagar Seguro con Mercado Pago</span>
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
               </svg>
             </button>
@@ -164,7 +191,6 @@ import ShippingForm from '../components/ShippingForm.astro';
             </a>
           </div>
 
-          <!-- Sellos de Seguridad / Confianza -->
           <div class="mt-6 pt-4 border-t border-gray-100 flex items-center justify-center gap-4 text-xs text-gray-400">
             <span class="flex items-center gap-1.5">
               <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-emerald-600" viewBox="0 0 20 20" fill="currentColor">
@@ -175,7 +201,6 @@ import ShippingForm from '../components/ShippingForm.astro';
           </div>
         </div>
       </aside>
-
     </div>
   </div>
 </Layout>
@@ -184,234 +209,364 @@ import ShippingForm from '../components/ShippingForm.astro';
   import { $cart, removeItem, updateQuantity } from '../store/cart';
   import { $shipping, getShippingErrors } from '../store/shipping';
 
-  const currencyFormatter = new Intl.NumberFormat('es-MX', {
-    style: 'currency',
-    currency: 'MXN',
-  });
+  let unsubscribeCart: (() => void) | null = null;
+  let unsubscribeShipping: (() => void) | null = null;
 
-  const cartContainer = document.getElementById('cart-container');
-  const cartTotal = document.getElementById('cart-total');
-  const cartSubtotal = document.getElementById('cart-subtotal');
-  const checkoutBtn = document.getElementById('checkout-btn') as HTMLButtonElement | null;
-
-  function renderCart(): void {
-    if (!cartContainer || !cartTotal || !cartSubtotal) return;
-
-    const cartItems = $cart.get();
-
-    // 1. Estado de Carrito Vacío
-    if (cartItems.length === 0) {
-      cartContainer.innerHTML = `
-        <div class="rounded-2xl border border-dashed border-gray-300 bg-white p-12 text-center">
-          <div class="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-gray-100 text-gray-400">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" stroke-linejoin="round" stroke-width="1.5" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
-            </svg>
-          </div>
-          <h3 class="mt-4 text-lg font-bold text-gray-900">Tu carrito está vacío</h3>
-          <p class="mt-1 text-sm text-gray-500">Parece que aún no has agregado productos a tu compra.</p>
-          <div class="mt-6">
-            <a
-              href="/catalogo"
-              class="inline-flex items-center gap-2 rounded-xl bg-gray-900 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-black transition-colors"
-            >
-              Explorar Catálogo &rarr;
-            </a>
-          </div>
-        </div>
-      `;
-
-      cartTotal.textContent = currencyFormatter.format(0);
-      cartSubtotal.textContent = currencyFormatter.format(0);
-      if (checkoutBtn) checkoutBtn.disabled = true;
-      return;
-    }
-
-    // 2. Renderizado de Artículos con Modificadores
-    let totalCents = 0;
-    let itemsHtml = '';
-
-    cartItems.forEach((item) => {
-      const itemKey = item.instanceId || item.id;
-      const unitCents = item.unitPrice || item.basePrice || 0;
-      const itemTotalCents = unitCents * item.quantity;
-      totalCents += itemTotalCents;
-
-      const unitFormatted = currencyFormatter.format(unitCents / 100);
-      const subtotalFormatted = currencyFormatter.format(itemTotalCents / 100);
-
-      // Renderizar tags de modificadores seleccionados
-      let modifiersHtml = '';
-      if (item.selectedModifiers && item.selectedModifiers.length > 0) {
-        const badges = item.selectedModifiers
-          .map((m) => {
-            const deltaText = m.priceDelta > 0 
-              ? ` (+${currencyFormatter.format(m.priceDelta / 100)})` 
-              : '';
-            return `<span class="inline-flex items-center gap-1 rounded-md bg-gray-100 px-2 py-0.5 text-[11px] font-medium text-gray-700 border border-gray-200">
-              <strong>${m.modifierName}:</strong> ${m.optionName}${deltaText}
-            </span>`;
-          })
-          .join('');
-        modifiersHtml = `<div class="mt-2 flex flex-wrap gap-1.5">${badges}</div>`;
-      }
-
-      itemsHtml += `
-        <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 rounded-2xl border border-gray-200/90 bg-white p-4 sm:p-5 shadow-sm transition-all hover:border-gray-300">
-          <div class="flex items-start gap-4 w-full sm:w-auto flex-1">
-            <div class="h-20 w-20 flex-shrink-0 overflow-hidden rounded-xl bg-gray-100 border border-gray-200">
-              <img
-                src="${item.image || 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=800&auto=format&fit=crop&q=80'}"
-                alt="${item.title}"
-                class="h-full w-full object-cover object-center"
-              />
-            </div>
-
-            <div class="flex-1">
-              <span class="text-xs font-semibold text-gray-400 uppercase tracking-wider">${item.category || 'General'}</span>
-              <h3 class="text-base font-bold text-gray-900">${item.title}</h3>
-              <p class="text-xs text-gray-500 mt-0.5">${unitFormatted} c/u</p>
-              ${modifiersHtml}
-            </div>
-          </div>
-
-          <div class="flex items-center justify-between sm:justify-end gap-6 w-full sm:w-auto border-t sm:border-t-0 pt-3 sm:pt-0 border-gray-100">
-            <!-- Selector de Cantidad -->
-            <div class="flex items-center border border-gray-200 rounded-xl bg-gray-50 p-0.5">
-              <button
-                type="button"
-                data-qty-decrease="${itemKey}"
-                class="px-2 py-1 text-gray-600 hover:text-black hover:bg-white rounded-lg transition-colors text-xs font-bold"
-                title="Reducir cantidad"
-              >
-                -
-              </button>
-              <span class="px-3 py-1 text-xs font-bold text-gray-900">
-                ${item.quantity}
-              </span>
-              <button
-                type="button"
-                data-qty-increase="${itemKey}"
-                class="px-2 py-1 text-gray-600 hover:text-black hover:bg-white rounded-lg transition-colors text-xs font-bold"
-                title="Aumentar cantidad"
-              >
-                +
-              </button>
-            </div>
-
-            <div class="text-right min-w-[90px]">
-              <span class="text-base font-bold text-gray-900">${subtotalFormatted}</span>
-            </div>
-
-            <button
-              type="button"
-              data-remove-id="${itemKey}"
-              class="p-2 text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition-colors"
-              title="Eliminar producto"
-              aria-label="Eliminar ${item.title}"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" stroke-width="1.75" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-              </svg>
-            </button>
-          </div>
-        </div>
-      `;
-    });
-
-    cartContainer.innerHTML = itemsHtml;
-
-    // 3. Formateo y Actualización de Totales con Descuento
-    updateTotals(totalCents);
-    if (checkoutBtn) checkoutBtn.disabled = false;
-
-    // 4. Delegación de Eventos para botones
-    cartContainer.querySelectorAll<HTMLButtonElement>('button[data-remove-id]').forEach((btn) => {
-      btn.addEventListener('click', (e) => {
-        e.preventDefault();
-        const id = btn.getAttribute('data-remove-id');
-        if (id) removeItem(id);
-      });
-    });
-
-    cartContainer.querySelectorAll<HTMLButtonElement>('button[data-qty-decrease]').forEach((btn) => {
-      btn.addEventListener('click', (e) => {
-        e.preventDefault();
-        const id = btn.getAttribute('data-qty-decrease');
-        const item = cartItems.find((i) => (i.instanceId || i.id) === id);
-        if (item) updateQuantity(id!, item.quantity - 1);
-      });
-    });
-
-    cartContainer.querySelectorAll<HTMLButtonElement>('button[data-qty-increase]').forEach((btn) => {
-      btn.addEventListener('click', (e) => {
-        e.preventDefault();
-        const id = btn.getAttribute('data-qty-increase');
-        const item = cartItems.find((i) => (i.instanceId || i.id) === id);
-        if (item) updateQuantity(id!, item.quantity + 1);
-      });
-    });
-  }
-
-  // Estado del Cupón en memoria del cliente
   interface ActiveCoupon {
     code: string;
     discountType: string;
     discountValue: number;
     discountAmount: number;
   }
-  let activeCoupon: ActiveCoupon | null = null;
 
-  function updateTotals(subtotalCents: number): void {
-    if (!cartTotal || !cartSubtotal) return;
+  function createEmptyCartNode(): HTMLElement {
+    const wrap = document.createElement('div');
+    wrap.className = 'theme-radius-card border border-dashed border-gray-300 bg-white p-10 sm:p-12 text-center';
 
-    cartSubtotal.textContent = currencyFormatter.format(subtotalCents / 100);
+    const iconBox = document.createElement('div');
+    iconBox.className = 'mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-gray-100 text-gray-400';
+    iconBox.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" /></svg>`;
 
-    const discountRow = document.getElementById('cart-discount-row');
-    const discountLabel = document.getElementById('cart-discount-label');
-    const discountAmountEl = document.getElementById('cart-discount-amount');
+    const title = document.createElement('h3');
+    title.className = 'mt-4 text-lg font-bold text-gray-900';
+    title.textContent = 'Tu carrito está vacío';
 
-    if (activeCoupon && subtotalCents > 0) {
-      // Recalcular descuento según subtotal actual
-      let calculatedDiscountCents = 0;
-      if (activeCoupon.discountType === 'percentage') {
-        calculatedDiscountCents = Math.round((subtotalCents * activeCoupon.discountValue) / 100);
-      } else {
-        calculatedDiscountCents = Math.min(activeCoupon.discountValue, subtotalCents);
-      }
+    const subtitle = document.createElement('p');
+    subtitle.className = 'mt-1 text-sm text-gray-500';
+    subtitle.textContent = 'Parece que aún no has agregado productos a tu compra.';
 
-      activeCoupon.discountAmount = calculatedDiscountCents;
-      const finalTotalCents = Math.max(0, subtotalCents - calculatedDiscountCents);
+    const ctaWrap = document.createElement('div');
+    ctaWrap.className = 'mt-6';
+    const ctaLink = document.createElement('a');
+    ctaLink.href = '/catalogo';
+    ctaLink.className =
+      'inline-flex items-center gap-2 theme-radius-btn bg-gray-900 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-black transition-colors';
+    ctaLink.textContent = 'Explorar Catálogo →';
+    ctaWrap.appendChild(ctaLink);
 
-      if (discountRow) discountRow.classList.remove('hidden');
-      if (discountRow) discountRow.classList.add('flex');
-      if (discountLabel) discountLabel.textContent = `(${activeCoupon.code})`;
-      if (discountAmountEl) {
-        discountAmountEl.textContent = `-${currencyFormatter.format(calculatedDiscountCents / 100)}`;
-      }
-
-      cartTotal.textContent = currencyFormatter.format(finalTotalCents / 100);
-    } else {
-      if (discountRow) discountRow.classList.add('hidden');
-      if (discountRow) discountRow.classList.remove('flex');
-      cartTotal.textContent = currencyFormatter.format(subtotalCents / 100);
-    }
+    wrap.append(iconBox, title, subtitle, ctaWrap);
+    return wrap;
   }
 
-  $cart.subscribe(() => {
-    renderCart();
-  });
-
-  // Nota: el sitio no usa <ClientRouter />, así que 'astro:page-load' no se dispara.
-  // Se inicializa directamente y también en page-load (por si se agregan View Transitions).
   function initCartPage(): void {
-    const root = document.getElementById('checkout-btn');
-    if (!root || root.dataset.initialized === 'true') return;
-    root.dataset.initialized = 'true';
+    const rootEl = document.getElementById('carrito-page-root');
+    const checkoutBtnEl = document.getElementById('checkout-btn') as HTMLButtonElement | null;
+    if (!rootEl || !checkoutBtnEl || rootEl.dataset.initialized === 'true') return;
+    rootEl.dataset.initialized = 'true';
+
+    // Limpiar suscripciones de vistas previas tras View Transitions
+    unsubscribeCart?.();
+    unsubscribeShipping?.();
+
+    const currencyCode = rootEl.dataset.currency || 'MXN';
+    const currencyLocale = rootEl.dataset.locale || 'es-MX';
+    const baseShippingFeeCents = Math.max(0, Number(rootEl.dataset.shippingFee || '0') || 0);
+    const rawThreshold = rootEl.dataset.freeThreshold;
+    const freeThresholdCents =
+      rawThreshold !== undefined && rawThreshold !== '' && Number.isFinite(Number(rawThreshold))
+        ? Number(rawThreshold)
+        : null;
+    const pickupAllowed = rootEl.dataset.pickupEnabled === 'true';
+
+    const formatMoneyClient = (cents: number): string => {
+      try {
+        return new Intl.NumberFormat(currencyLocale, {
+          style: 'currency',
+          currency: currencyCode,
+        }).format((cents || 0) / 100);
+      } catch {
+        return `$${((cents || 0) / 100).toFixed(2)} ${currencyCode}`;
+      }
+    };
+
+    const cartContainer = document.getElementById('cart-container');
+    const cartTotal = document.getElementById('cart-total');
+    const cartSubtotal = document.getElementById('cart-subtotal');
+    const cartShippingLabel = document.getElementById('cart-shipping-label');
+    const cartShippingAmount = document.getElementById('cart-shipping-amount');
+    const checkoutBtnLabel = document.getElementById('checkout-btn-label');
+    const checkoutErrorBanner = document.getElementById('checkout-error-banner');
+    const freeBanner = document.getElementById('free-shipping-banner');
+    const freeText = document.getElementById('free-shipping-text');
+    const freePct = document.getElementById('free-shipping-pct');
+    const freeBar = document.getElementById('free-shipping-bar');
+
+    let activeCoupon: ActiveCoupon | null = null;
+
+    const showCheckoutError = (msg: string) => {
+      if (!checkoutErrorBanner) return;
+      if (!msg) {
+        checkoutErrorBanner.textContent = '';
+        checkoutErrorBanner.classList.add('hidden');
+        return;
+      }
+      checkoutErrorBanner.textContent = msg;
+      checkoutErrorBanner.classList.remove('hidden');
+    };
+
+    function updateTotals(subtotalCents: number): void {
+      if (!cartTotal || !cartSubtotal) return;
+
+      cartSubtotal.textContent = formatMoneyClient(subtotalCents);
+
+      const discountRow = document.getElementById('cart-discount-row');
+      const discountLabel = document.getElementById('cart-discount-label');
+      const discountAmountEl = document.getElementById('cart-discount-amount');
+
+      let discountCents = 0;
+      if (activeCoupon && subtotalCents > 0) {
+        discountCents =
+          activeCoupon.discountType === 'percentage'
+            ? Math.round((subtotalCents * activeCoupon.discountValue) / 100)
+            : Math.min(activeCoupon.discountValue, subtotalCents);
+        activeCoupon.discountAmount = discountCents;
+        discountRow?.classList.remove('hidden');
+        discountRow?.classList.add('flex');
+        if (discountLabel) discountLabel.textContent = `(${activeCoupon.code})`;
+        if (discountAmountEl) discountAmountEl.textContent = `-${formatMoneyClient(discountCents)}`;
+      } else {
+        discountRow?.classList.add('hidden');
+        discountRow?.classList.remove('flex');
+      }
+
+      const shippingState = $shipping.get();
+      const isPickup = pickupAllowed && shippingState.deliveryMethod === 'pickup';
+      const unlockedFree = freeThresholdCents !== null && subtotalCents >= freeThresholdCents;
+      const effectiveShippingCents =
+        subtotalCents <= 0 || isPickup || unlockedFree ? 0 : baseShippingFeeCents;
+
+      if (cartShippingLabel && cartShippingAmount) {
+        if (isPickup) {
+          cartShippingLabel.textContent = 'Retiro en tienda';
+          cartShippingAmount.textContent = 'Gratis';
+          cartShippingAmount.className = 'text-emerald-600 font-semibold';
+        } else if (baseShippingFeeCents === 0 || unlockedFree) {
+          cartShippingLabel.textContent = 'Envío estándar';
+          cartShippingAmount.textContent = 'Gratis';
+          cartShippingAmount.className = 'text-emerald-600 font-semibold';
+        } else {
+          cartShippingLabel.textContent = 'Envío estándar';
+          cartShippingAmount.textContent = formatMoneyClient(effectiveShippingCents);
+          cartShippingAmount.className = 'text-gray-900 font-semibold';
+        }
+      }
+
+      if (freeBanner && freeText && freePct && freeBar) {
+        if (
+          !isPickup &&
+          baseShippingFeeCents > 0 &&
+          freeThresholdCents !== null &&
+          freeThresholdCents > 0 &&
+          subtotalCents > 0
+        ) {
+          freeBanner.classList.remove('hidden');
+          const ratio = Math.min(100, Math.round((subtotalCents / freeThresholdCents) * 100));
+          freePct.textContent = `${ratio}%`;
+          freeBar.style.width = `${ratio}%`;
+          if (subtotalCents >= freeThresholdCents) {
+            freeText.textContent = '¡Felicidades! Desbloqueaste envío gratis en tu pedido.';
+          } else {
+            const remaining = freeThresholdCents - subtotalCents;
+            freeText.textContent = `Te faltan ${formatMoneyClient(remaining)} para obtener envío gratis.`;
+          }
+        } else {
+          freeBanner.classList.add('hidden');
+        }
+      }
+
+      const finalTotalCents = Math.max(0, subtotalCents - discountCents) + effectiveShippingCents;
+      const formattedFinal = formatMoneyClient(finalTotalCents);
+      cartTotal.textContent = formattedFinal;
+
+      if (checkoutBtnLabel) {
+        checkoutBtnLabel.textContent =
+          subtotalCents > 0 ? `Pagar Seguro — ${formattedFinal}` : 'Pagar Seguro con Mercado Pago';
+      }
+    }
+
+    function renderCart(): void {
+      if (!cartContainer) return;
+
+      const cartItems = $cart.get();
+      cartContainer.replaceChildren();
+
+      if (cartItems.length === 0) {
+        cartContainer.appendChild(createEmptyCartNode());
+        updateTotals(0);
+        checkoutBtnEl!.disabled = true;
+        return;
+      }
+
+      let totalCents = 0;
+
+      cartItems.forEach((item) => {
+        const itemKey = item.instanceId || item.id;
+        const unitCents = item.unitPrice || item.basePrice || 0;
+        const itemTotalCents = unitCents * item.quantity;
+        totalCents += itemTotalCents;
+
+        const row = document.createElement('div');
+        row.className =
+          'flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 theme-radius-card border border-gray-200/90 bg-white p-4 sm:p-5 shadow-sm transition-all hover:border-gray-300';
+
+        // Lado izquierdo: Imagen + Info
+        const left = document.createElement('div');
+        left.className = 'flex items-start gap-4 w-full sm:w-auto flex-1 min-w-0';
+
+        const imgWrap = document.createElement('div');
+        imgWrap.className = 'h-20 w-20 flex-shrink-0 overflow-hidden rounded-xl bg-gray-100 border border-gray-200';
+        const img = document.createElement('img');
+        img.src =
+          item.image ||
+          '/seed/prod-print-jardin.jpg';
+        img.alt = item.title;
+        img.width = 80;
+        img.height = 80;
+        img.className = 'h-full w-full object-cover object-center';
+        imgWrap.appendChild(img);
+
+        const info = document.createElement('div');
+        info.className = 'flex-1 min-w-0';
+
+        const catSpan = document.createElement('span');
+        catSpan.className = 'text-xs font-semibold text-gray-400 uppercase tracking-wider block truncate';
+        catSpan.textContent = item.category || 'General';
+
+        const titleEl = document.createElement('h3');
+        titleEl.className = 'text-base font-bold text-gray-900 break-words';
+        titleEl.textContent = item.title;
+
+        const unitEl = document.createElement('p');
+        unitEl.className = 'text-xs text-gray-500 mt-0.5';
+        unitEl.textContent = `${formatMoneyClient(unitCents)} c/u`;
+
+        info.append(catSpan, titleEl, unitEl);
+
+        if (item.selectedModifiers && item.selectedModifiers.length > 0) {
+          const modsWrap = document.createElement('div');
+          modsWrap.className = 'mt-2 flex flex-wrap gap-1.5';
+          item.selectedModifiers.forEach((m) => {
+            const badge = document.createElement('span');
+            badge.className =
+              'inline-flex items-center gap-1 rounded-md bg-gray-100 px-2 py-0.5 text-[11px] font-medium text-gray-700 border border-gray-200';
+            const strong = document.createElement('strong');
+            strong.textContent = `${m.modifierName}: `;
+            const deltaText = m.priceDelta > 0 ? ` (+${formatMoneyClient(m.priceDelta)})` : '';
+            badge.appendChild(strong);
+            badge.appendChild(document.createTextNode(`${m.optionName}${deltaText}`));
+            modsWrap.appendChild(badge);
+          });
+          info.appendChild(modsWrap);
+        }
+
+        left.append(imgWrap, info);
+
+        // Lado derecho: Cantidad + Subtotal + Eliminar
+        const right = document.createElement('div');
+        right.className =
+          'flex items-center justify-between sm:justify-end gap-4 sm:gap-6 w-full sm:w-auto border-t sm:border-t-0 pt-3 sm:pt-0 border-gray-100';
+
+        const qtyBox = document.createElement('div');
+        qtyBox.className = 'flex items-center border border-gray-200 rounded-xl bg-gray-50 p-0.5';
+
+        const btnDec = document.createElement('button');
+        btnDec.type = 'button';
+        btnDec.className =
+          'px-2.5 py-1 text-gray-600 hover:text-black hover:bg-white rounded-lg transition-colors text-xs font-bold';
+        btnDec.title = 'Reducir cantidad';
+        btnDec.ariaLabel = `Reducir cantidad de ${item.title}`;
+        btnDec.textContent = '-';
+        btnDec.addEventListener('click', (e) => {
+          e.preventDefault();
+          updateQuantity(itemKey, item.quantity - 1);
+        });
+
+        const qtyVal = document.createElement('span');
+        qtyVal.className = 'px-3 py-1 text-xs font-bold text-gray-900';
+        qtyVal.textContent = String(item.quantity);
+
+        const btnInc = document.createElement('button');
+        btnInc.type = 'button';
+        btnInc.className =
+          'px-2.5 py-1 text-gray-600 hover:text-black hover:bg-white rounded-lg transition-colors text-xs font-bold';
+        btnInc.title = 'Aumentar cantidad';
+        btnInc.ariaLabel = `Aumentar cantidad de ${item.title}`;
+        btnInc.textContent = '+';
+        btnInc.addEventListener('click', (e) => {
+          e.preventDefault();
+          updateQuantity(itemKey, item.quantity + 1);
+        });
+
+        qtyBox.append(btnDec, qtyVal, btnInc);
+
+        const priceWrap = document.createElement('div');
+        priceWrap.className = 'text-right min-w-[85px]';
+        const priceSpan = document.createElement('span');
+        priceSpan.className = 'text-base font-bold text-gray-900';
+        priceSpan.textContent = formatMoneyClient(itemTotalCents);
+        priceWrap.appendChild(priceSpan);
+
+        const btnRemove = document.createElement('button');
+        btnRemove.type = 'button';
+        btnRemove.className = 'p-2 text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition-colors';
+        btnRemove.title = 'Eliminar producto';
+        btnRemove.ariaLabel = `Eliminar ${item.title}`;
+        btnRemove.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>`;
+        btnRemove.addEventListener('click', (e) => {
+          e.preventDefault();
+          removeItem(itemKey);
+        });
+
+        right.append(qtyBox, priceWrap, btnRemove);
+        row.append(left, right);
+        cartContainer.appendChild(row);
+      });
+
+      updateTotals(totalCents);
+      checkoutBtnEl!.disabled = false;
+    }
+
+    const updateShippingReadinessUI = () => {
+      const readinessBox = document.getElementById('shipping-readiness-box');
+      const readinessTitle = document.getElementById('shipping-readiness-title');
+      const readinessDesc = document.getElementById('shipping-readiness-desc');
+      if (!readinessBox || !readinessTitle || !readinessDesc) return;
+
+      const s = $shipping.get();
+      const errs = getShippingErrors(s);
+      if (errs.length === 0) {
+        readinessBox.className =
+          'mt-4 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-900 space-y-1';
+        if (pickupAllowed && s.deliveryMethod === 'pickup') {
+          readinessTitle.textContent = 'Datos listos para recoger en tienda';
+          readinessDesc.textContent = `Recibe: ${s.fullName} (${s.phone})`;
+        } else {
+          readinessTitle.textContent = 'Dirección de envío lista';
+          readinessDesc.textContent = `${s.street} #${s.extNumber}, Col. ${s.neighborhood}, CP ${s.zip} (${s.municipality}, ${s.state})`;
+        }
+        readinessDesc.className = 'text-[11px] text-emerald-800';
+      } else {
+        readinessBox.className =
+          'mt-4 rounded-xl border border-amber-200 bg-amber-50/80 p-3 text-xs text-amber-900 space-y-1';
+        readinessTitle.textContent = `Datos obligatorios (${errs.length} pendiente${errs.length === 1 ? '' : 's'})`;
+        readinessDesc.className = 'text-[11px] text-amber-800';
+        readinessDesc.textContent = `Falta completar: ${errs.map((e) => e.message.toLowerCase()).join(', ')}.`;
+      }
+
+      // Recalcular envío y total cuando el usuario alterna entre domicilio y pickup
+      const subtotalCents = $cart
+        .get()
+        .reduce((sum, i) => sum + (i.unitPrice || i.basePrice || 0) * i.quantity, 0);
+      updateTotals(subtotalCents);
+    };
+
+    unsubscribeCart = $cart.subscribe(() => renderCart());
+    unsubscribeShipping = $shipping.subscribe(() => updateShippingReadinessUI());
 
     renderCart();
+    updateShippingReadinessUI();
 
-    // 1. Manejo de Cupón de Descuento
+    // Cupón de Descuento
     const discountInput = document.getElementById('discount-code-input') as HTMLInputElement | null;
     const applyDiscountBtn = document.getElementById('apply-discount-btn') as HTMLButtonElement | null;
     const discountMessage = document.getElementById('discount-message');
@@ -427,192 +582,138 @@ import ShippingForm from '../components/ShippingForm.astro';
       discountMessage.classList.remove('hidden');
     };
 
-    if (applyDiscountBtn && discountInput) {
-      applyDiscountBtn.addEventListener('click', async () => {
-        const code = discountInput.value.trim().toUpperCase();
-        if (!code) {
-          showDiscountMsg('Ingresa un código de descuento', true);
-          return;
-        }
-
-        const cartItems = $cart.get();
-        const currentSubtotalCents = cartItems.reduce(
-          (sum, i) => sum + (i.unitPrice || i.basePrice || 0) * i.quantity,
-          0
-        );
-
-        if (currentSubtotalCents <= 0) {
-          showDiscountMsg('El carrito está vacío', true);
-          return;
-        }
-
-        applyDiscountBtn.disabled = true;
-        applyDiscountBtn.textContent = '...';
-
-        try {
-          const res = await fetch('/api/discount/validate', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ code, cartSubtotal: currentSubtotalCents }),
-          });
-
-          const data = await res.json();
-
-          if (res.ok && data.valid) {
-            activeCoupon = {
-              code: data.code,
-              discountType: data.discountType,
-              discountValue: data.discountValue,
-              discountAmount: data.discountAmount,
-            };
-
-            // Mostrar badge y ocultar input
-            if (discountInputContainer) discountInputContainer.classList.add('hidden');
-            if (appliedBadge) {
-              appliedBadge.classList.remove('hidden');
-              appliedBadge.classList.add('flex');
-            }
-            if (appliedText) {
-              appliedText.textContent = `${data.code} (${data.message})`;
-            }
-            showDiscountMsg('', false);
-
-            renderCart();
-          } else {
-            showDiscountMsg(data.error || 'Código de descuento no válido', true);
-          }
-        } catch (e: any) {
-          showDiscountMsg('Error al verificar el cupón', true);
-        } finally {
-          applyDiscountBtn.disabled = false;
-          applyDiscountBtn.textContent = 'Aplicar';
-        }
-      });
-    }
-
-    if (removeDiscountBtn) {
-      removeDiscountBtn.addEventListener('click', () => {
-        activeCoupon = null;
-        if (appliedBadge) {
-          appliedBadge.classList.add('hidden');
-          appliedBadge.classList.remove('flex');
-        }
-        if (discountInputContainer) discountInputContainer.classList.remove('hidden');
-        if (discountInput) discountInput.value = '';
-        if (discountMessage) discountMessage.classList.add('hidden');
-        renderCart();
-      });
-    }
-
-    // 2. Sincronizar estado visual de la dirección de envío obligatoria
-    const readinessBox = document.getElementById('shipping-readiness-box');
-    const readinessTitle = document.getElementById('shipping-readiness-title');
-    const readinessDesc = document.getElementById('shipping-readiness-desc');
-
-    const updateShippingReadinessUI = () => {
-      if (!readinessBox || !readinessTitle || !readinessDesc) return;
-      const s = $shipping.get();
-      const errs = getShippingErrors(s);
-      if (errs.length === 0) {
-        readinessBox.className =
-          'mt-4 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-900 space-y-1';
-        readinessTitle.textContent = '✓ Dirección de envío lista';
-        readinessDesc.className = 'text-[11px] text-emerald-800';
-        readinessDesc.textContent = `${s.street} #${s.extNumber}, Col. ${s.neighborhood}, CP ${s.zip} (${s.municipality}, ${s.state})`;
-      } else {
-        readinessBox.className =
-          'mt-4 rounded-xl border border-amber-200 bg-amber-50/80 p-3 text-xs text-amber-900 space-y-1';
-        readinessTitle.textContent = `📍 Dirección obligatoria (${errs.length} pendiente${errs.length === 1 ? '' : 's'})`;
-        readinessDesc.className = 'text-[11px] text-amber-800';
-        readinessDesc.textContent = `Falta completar: ${errs.map((e) => e.message.toLowerCase()).join(', ')}.`;
+    applyDiscountBtn?.addEventListener('click', async () => {
+      if (!discountInput) return;
+      const code = discountInput.value.trim().toUpperCase();
+      if (!code) {
+        showDiscountMsg('Ingresa un código de descuento', true);
+        return;
       }
-    };
 
-    updateShippingReadinessUI();
-    $shipping.subscribe(updateShippingReadinessUI);
+      const cartItems = $cart.get();
+      const currentSubtotalCents = cartItems.reduce(
+        (sum, i) => sum + (i.unitPrice || i.basePrice || 0) * i.quantity,
+        0
+      );
 
-    // 3. Checkout Click con Validación Estricta de Dirección y Cupón
-    const checkoutBtnEl = document.getElementById('checkout-btn') as HTMLButtonElement | null;
-    if (checkoutBtnEl) {
-      checkoutBtnEl.addEventListener('click', async () => {
-        const cartItems = $cart.get();
-        if (cartItems.length === 0) return;
+      if (currentSubtotalCents <= 0) {
+        showDiscountMsg('El carrito está vacío', true);
+        return;
+      }
 
-        // Validar datos de envío obligatorios y resaltar todos los campos faltantes
-        const shippingData = $shipping.get();
-        const errors = getShippingErrors(shippingData);
-        if (errors.length > 0) {
-          errors.forEach((err) => {
-            const wrap = document.querySelector(`[data-field-wrap="${err.field}"]`);
-            wrap
-              ?.querySelectorAll('input, select')
-              .forEach((el) => el.classList.add('border-red-400', 'ring-2', 'ring-red-100'));
-            const errEl = wrap?.querySelector('.field-error');
-            if (errEl) {
-              errEl.textContent = err.message;
-              errEl.classList.remove('hidden');
-            }
-          });
+      applyDiscountBtn.disabled = true;
+      applyDiscountBtn.textContent = '...';
 
-          const first = errors[0];
-          const targetInput = document.getElementById(`ship-${first.field}`);
-          if (targetInput) {
-            targetInput.focus();
-            targetInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          }
-          alert(
-            `⚠️ Para continuar al pago es obligatorio completar tu dirección de envío.\n\nPor favor revisa: ${errors
-              .map((e) => e.message)
-              .join(', ')}.`
-          );
-          return;
+      try {
+        const res = await fetch('/api/discount/validate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code, cartSubtotal: currentSubtotalCents }),
+        });
+
+        const data = await res.json();
+        if (res.ok && data.valid) {
+          activeCoupon = {
+            code: data.code,
+            discountType: data.discountType,
+            discountValue: data.discountValue,
+            discountAmount: data.discountAmount,
+          };
+          discountInputContainer?.classList.add('hidden');
+          appliedBadge?.classList.remove('hidden');
+          appliedBadge?.classList.add('flex');
+          if (appliedText) appliedText.textContent = `${data.code} (${data.message})`;
+          showDiscountMsg('', false);
+          renderCart();
+        } else {
+          showDiscountMsg(data.error || 'Código de descuento no válido', true);
         }
+      } catch {
+        showDiscountMsg('Error al verificar el cupón', true);
+      } finally {
+        applyDiscountBtn.disabled = false;
+        applyDiscountBtn.textContent = 'Aplicar';
+      }
+    });
 
-        const emailInput = document.getElementById('customer-email') as HTMLInputElement | null;
-        const customerEmail = emailInput?.value?.trim() || '';
+    removeDiscountBtn?.addEventListener('click', () => {
+      activeCoupon = null;
+      appliedBadge?.classList.add('hidden');
+      appliedBadge?.classList.remove('flex');
+      discountInputContainer?.classList.remove('hidden');
+      if (discountInput) discountInput.value = '';
+      discountMessage?.classList.add('hidden');
+      renderCart();
+    });
 
-        const originalText = checkoutBtnEl.innerHTML;
-        checkoutBtnEl.disabled = true;
-        checkoutBtnEl.innerHTML = `
-          <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
-          </svg>
-          Procesando tu pedido...
-        `;
+    // Checkout Click
+    checkoutBtnEl.addEventListener('click', async () => {
+      showCheckoutError('');
+      const cartItems = $cart.get();
+      if (cartItems.length === 0) return;
 
-        try {
-          const response = await fetch('/api/checkout', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              items: cartItems,
-              customerEmail,
-              discountCode: activeCoupon ? activeCoupon.code : undefined,
-              shipping: shippingData,
-            }),
+      const shippingData = $shipping.get();
+      const errors = getShippingErrors(shippingData);
+      if (errors.length > 0) {
+        errors.forEach((err) => {
+          const wrap = document.querySelector(`[data-field-wrap="${err.field}"]`);
+          wrap?.querySelectorAll('input, select').forEach((el) => {
+            el.classList.add('border-red-400', 'ring-2', 'ring-red-100');
+            el.setAttribute('aria-invalid', 'true');
           });
-
-          if (response.ok) {
-            const { url } = await response.json();
-            $cart.set([]); // Limpiar carrito
-            window.location.href = url;
-          } else {
-            const errData = await response.json().catch(() => null);
-            throw new Error(errData?.error || 'Error al generar la sesión de pago');
+          const errEl = wrap?.querySelector('.field-error');
+          if (errEl) {
+            errEl.textContent = err.message;
+            errEl.classList.remove('hidden');
           }
-        } catch (error: any) {
-          console.error('Checkout error:', error);
-          alert(error.message || 'Hubo un error al procesar tu pago. Por favor intenta de nuevo.');
-          checkoutBtnEl.disabled = false;
-          checkoutBtnEl.innerHTML = originalText;
+        });
+
+        const first = errors[0];
+        const targetInput = document.getElementById(`ship-${first.field}`);
+        if (targetInput) {
+          targetInput.focus();
+          targetInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
-      });
-    }
+        showCheckoutError(
+          `Completa los campos obligatorios antes de continuar: ${errors.map((e) => e.message).join(', ')}.`
+        );
+        return;
+      }
+
+      const emailInput = document.getElementById('customer-email') as HTMLInputElement | null;
+      const customerEmail = emailInput?.value?.trim() || '';
+
+      checkoutBtnEl.disabled = true;
+      if (checkoutBtnLabel) checkoutBtnLabel.textContent = 'Procesando tu pedido...';
+
+      try {
+        const response = await fetch('/api/checkout', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            items: cartItems,
+            customerEmail,
+            discountCode: activeCoupon ? activeCoupon.code : undefined,
+            shipping: shippingData,
+          }),
+        });
+
+        if (response.ok) {
+          const { url } = await response.json();
+          $cart.set([]);
+          window.location.href = url;
+        } else {
+          const errData = await response.json().catch(() => null);
+          throw new Error(errData?.error || 'Error al generar la sesión de pago');
+        }
+      } catch (error: any) {
+        console.error('Checkout error:', error);
+        showCheckoutError(error.message || 'Hubo un error al procesar tu pago. Por favor intenta de nuevo.');
+        checkoutBtnEl.disabled = false;
+        renderCart();
+      }
+    });
   }
 
-  initCartPage();
   document.addEventListener('astro:page-load', initCartPage);
 </script>

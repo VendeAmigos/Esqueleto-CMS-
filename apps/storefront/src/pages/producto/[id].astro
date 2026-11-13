@@ -6,6 +6,9 @@ import {
   getStoredProductById,
   getStoredProducts,
   getStoredCategories,
+  getStoredSiteSettings,
+  formatMoney,
+  getCurrencyLocale,
 } from '@esqueleto/core';
 
 const { id } = Astro.params;
@@ -14,10 +17,11 @@ if (!id) {
   return Astro.redirect('/catalogo');
 }
 
-const [product, allProducts, allCategories] = await Promise.all([
+const [product, allProducts, allCategories, settings] = await Promise.all([
   getStoredProductById(id),
   getStoredProducts(),
   getStoredCategories(),
+  getStoredSiteSettings(),
 ]);
 
 if (!product) {
@@ -30,25 +34,25 @@ const category = product.categoryId
 
 const modifiersWithOpts = product.modifiers || [];
 
-const relatedProducts = allProducts
-  .filter((p) => p.id !== product.id)
-  .slice(0, 4);
+const relatedProducts = Array.from(
+  new Map(allProducts.filter((p) => p.id !== product.id).map((p) => [p.id, p])).values()
+).slice(0, 4);
 
-const formattedBasePrice = new Intl.NumberFormat('es-MX', {
-  style: 'currency',
-  currency: 'MXN',
-}).format(product.basePrice / 100);
+const safeLocale = getCurrencyLocale(settings.currencyCode, settings.currencyLocale);
+const formattedBasePrice = formatMoney(product.basePrice, settings.currencyCode, safeLocale);
+const safeVtId = String(product.id || '').replace(/[^a-zA-Z0-9_-]/g, '-');
 
 const hasModifiers = modifiersWithOpts.length > 0;
 ---
 
 <Layout
-  title={`${product.title} | Tienda`}
+  title={product.title}
   description={product.description || `Compra ${product.title} con opciones personalizadas y envío seguro.`}
+  ogImage={product.imageUrl || undefined}
 >
-  <div class="space-y-12 py-4">
+  <div class="space-y-10 sm:space-y-12 py-2 sm:py-4">
     <!-- Migas de Pan (Breadcrumbs) -->
-    <nav class="flex items-center gap-2 text-xs text-gray-500 font-medium">
+    <nav class="flex flex-wrap items-center gap-2 text-xs text-gray-500 font-medium">
       <a href="/" class="hover:text-black transition-colors">Inicio</a>
       <span>/</span>
       <a href="/catalogo" class="hover:text-black transition-colors">Catálogo</a>
@@ -65,15 +69,22 @@ const hasModifiers = modifiersWithOpts.length > 0;
     </nav>
 
     <!-- Sección Principal de Producto: 2 Columnas -->
-    <div class="grid grid-cols-1 lg:grid-cols-12 gap-10 items-start">
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 items-start">
       
       <!-- Columna Izquierda: Galería y Foto Principal -->
       <div class="lg:col-span-6 space-y-4">
-        <div class="relative aspect-square w-full rounded-3xl overflow-hidden bg-gray-100 border border-gray-200/80 shadow-sm group">
+        <div class="relative aspect-square w-full theme-radius-card overflow-hidden bg-gray-100 border border-gray-200/80 shadow-sm group">
           <img
             id="main-product-image"
-            src={product.imageUrl || 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=900&auto=format&fit=crop&q=80'}
+            src={product.imageUrl || '/seed/prod-print-jardin.jpg'}
             alt={product.title}
+            width="900"
+            height="900"
+            loading="eager"
+            fetchpriority="high"
+            decoding="async"
+            transition:name={`prod-img-${safeVtId}`}
+            style="view-transition-class: vt-prod-img;"
             class="h-full w-full object-cover object-center transition-transform duration-500 ease-out group-hover:scale-105"
           />
 
@@ -132,6 +143,8 @@ const hasModifiers = modifiersWithOpts.length > 0;
           category: category?.name || 'General',
           basePrice: product.basePrice,
           modifiers: modifiersWithOpts,
+          currencyCode: settings.currencyCode,
+          currencyLocale: safeLocale,
         })}
       >
         <!-- Encabezado del Producto -->
@@ -144,7 +157,11 @@ const hasModifiers = modifiersWithOpts.length > 0;
               {category.name}
             </a>
           )}
-          <h1 class="text-3xl sm:text-4xl font-extrabold tracking-tight text-gray-900 leading-tight">
+          <h1
+            transition:name={`prod-title-${safeVtId}`}
+            style="view-transition-class: vt-prod-title;"
+            class="w-fit max-w-full text-2xl sm:text-4xl font-extrabold tracking-tight text-gray-900 leading-tight"
+          >
             {product.title}
           </h1>
 
@@ -152,12 +169,12 @@ const hasModifiers = modifiersWithOpts.length > 0;
           <div class="mt-4 flex items-baseline gap-3">
             <span
               id="dynamic-price-display"
-              class="text-3xl font-black text-gray-900 tracking-tight"
+              class="text-2xl sm:text-3xl font-black text-gray-900 tracking-tight"
             >
               {formattedBasePrice}
             </span>
             <span class="text-xs font-medium text-gray-500">
-              MXN con IVA incluido
+              {settings.currencyCode} con IVA incluido
             </span>
           </div>
 
@@ -207,7 +224,7 @@ const hasModifiers = modifiersWithOpts.length > 0;
                   <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
                     {group.options.map((opt: any) => {
                       const optDeltaFormatted = opt.priceDelta > 0
-                        ? `+${new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(opt.priceDelta / 100)}`
+                        ? `+${formatMoney(opt.priceDelta, settings.currencyCode, safeLocale)}`
                         : 'Incluido';
 
                       return (
@@ -307,7 +324,9 @@ const hasModifiers = modifiersWithOpts.length > 0;
         <!-- Notificación Toast de Éxito al Agregar -->
         <div
           id="cart-success-toast"
-          class="hidden fixed bottom-6 right-6 z-50 max-w-sm w-full bg-gray-900 text-white rounded-2xl p-4 shadow-2xl border border-gray-800 transition-all duration-300"
+          role="status"
+          aria-live="polite"
+          class="hidden fixed bottom-20 right-4 md:bottom-6 md:right-6 z-50 max-w-sm w-[calc(100%-2rem)] bg-gray-900 text-white rounded-2xl p-4 shadow-2xl border border-gray-800 transition-all duration-300"
         >
           <div class="flex items-start gap-3">
             <div class="h-8 w-8 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
@@ -359,7 +378,7 @@ const hasModifiers = modifiersWithOpts.length > 0;
           </a>
         </div>
 
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 sm:gap-6">
           {relatedProducts.map((p) => (
             <ProductCard
               id={p.id}
@@ -369,6 +388,8 @@ const hasModifiers = modifiersWithOpts.length > 0;
               image={p.imageUrl || 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=800&auto=format&fit=crop&q=80'}
               category={p.categoryName || 'General'}
               modifiers={[]}
+              currencyCode={settings.currencyCode}
+              currencyLocale={safeLocale}
             />
           ))}
         </div>
@@ -382,7 +403,8 @@ const hasModifiers = modifiersWithOpts.length > 0;
 
   function initProductCustomizer() {
     const container = document.getElementById('product-customizer-app');
-    if (!container) return;
+    if (!container || container.dataset.initialized === 'true') return;
+    container.dataset.initialized = 'true';
 
     let productData: any = {};
     try {
@@ -478,10 +500,14 @@ const hasModifiers = modifiersWithOpts.length > 0;
       const totalAmount = unitPrice * qty;
 
       if (priceDisplay) {
-        priceDisplay.textContent = new Intl.NumberFormat('es-MX', {
-          style: 'currency',
-          currency: 'MXN',
-        }).format(totalAmount / 100);
+        try {
+          priceDisplay.textContent = new Intl.NumberFormat(productData.currencyLocale || 'es-MX', {
+            style: 'currency',
+            currency: productData.currencyCode || 'MXN',
+          }).format(totalAmount / 100);
+        } catch {
+          priceDisplay.textContent = `$${(totalAmount / 100).toFixed(2)} ${productData.currencyCode || 'MXN'}`;
+        }
       }
 
       updateOptionCardStyles();
@@ -550,6 +576,5 @@ const hasModifiers = modifiersWithOpts.length > 0;
   }
 
   // Ejecución en carga inicial y transiciones Astro
-  initProductCustomizer();
   document.addEventListener('astro:page-load', initProductCustomizer);
 </script>
