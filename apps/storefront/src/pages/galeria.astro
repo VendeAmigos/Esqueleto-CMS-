@@ -1,0 +1,380 @@
+---
+// apps/storefront/src/pages/galeria.astro
+import Layout from '../layouts/Layout.astro';
+import {
+  getStoredGalleryColumns,
+  getStoredMediaItems,
+  getStoredProducts,
+  getStoredSiteSettings,
+  computePinterestStaggerPositions,
+} from '@esqueleto/core';
+
+const [mediaItems, galleryCols, products, settings] = await Promise.all([
+  getStoredMediaItems({ onlyPublic: true }),
+  getStoredGalleryColumns(),
+  getStoredProducts(),
+  getStoredSiteSettings(),
+]);
+
+// Mapear URL de imagen -> producto activo relacionado (si alguna foto pertenece a un producto)
+const productByImageUrl = new Map<string, { id: string; title: string }>();
+for (const prod of products) {
+  if (prod.imageUrl) {
+    productByImageUrl.set(prod.imageUrl, { id: prod.id, title: prod.title });
+  }
+  if (Array.isArray(prod.galleryImages)) {
+    for (const url of prod.galleryImages) {
+      if (!productByImageUrl.has(url)) {
+        productByImageUrl.set(url, { id: prod.id, title: prod.title });
+      }
+    }
+  }
+}
+
+const desktopPositions = computePinterestStaggerPositions(mediaItems, galleryCols);
+const mobilePositions = computePinterestStaggerPositions(mediaItems, 2);
+
+const FRAME_TINTS = [
+  '#fdf2f4',
+  '#fffbeb',
+  '#ecfdf5',
+  '#f0f9ff',
+  '#f5f3ff',
+  '#f0fdfa',
+];
+
+const galleryPayload = mediaItems.map((item, idx) => {
+  const linked = productByImageUrl.get(item.url) || null;
+  return {
+    index: idx,
+    url: item.url,
+    title: item.title || item.originalName || `Fotografía ${idx + 1}`,
+    width: item.width,
+    height: item.height,
+    linkedProductId: linked?.id || null,
+    linkedProductTitle: linked?.title || null,
+  };
+});
+---
+
+<Layout
+  title="Galería"
+  description={`Explora la galería visual y editorial de ${settings.siteName}.`}
+>
+  <div class="space-y-8 sm:space-y-10">
+    <!-- Encabezado Editorial -->
+    <div class="border-b border-gray-200/80 pb-6 flex flex-col md:flex-row md:items-end justify-between gap-4">
+      <div>
+        <nav class="flex items-center gap-2 text-xs text-gray-500 mb-2">
+          <a href="/" class="hover:text-black transition-colors">Inicio</a>
+          <span>/</span>
+          <span class="text-black font-semibold">Galería</span>
+        </nav>
+        <h1 class="text-2xl sm:text-4xl font-extrabold tracking-tight text-gray-900">
+          Galería &amp; Lookbook
+        </h1>
+        <p class="mt-2 text-sm text-gray-500 max-w-2xl">
+          Inspiración visual, detalles de autor y piezas terminadas en formato libre tipo tablero Pinterest.
+        </p>
+      </div>
+
+      <a
+        href="/catalogo"
+        class="inline-flex items-center gap-2 px-5 py-2.5 theme-radius-btn bg-gray-100 hover:bg-gray-200 text-gray-800 text-sm font-semibold transition-colors self-start md:self-auto"
+      >
+        <span>Explorar Tienda</span>
+        <span aria-hidden="true">&rarr;</span>
+      </a>
+    </div>
+
+    <style>
+      .pinterest-stagger-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        grid-auto-rows: 108px;
+        gap: 0.75rem;
+      }
+
+      .pinterest-stagger-item {
+        grid-column: var(--mob-col);
+        grid-row: var(--mob-row);
+      }
+
+      @media (min-width: 1024px) {
+        .pinterest-stagger-grid {
+          grid-template-columns: repeat(var(--gal-cols, 4), minmax(0, 1fr));
+          grid-auto-rows: 132px;
+          gap: 1.25rem;
+        }
+
+        .pinterest-stagger-item {
+          grid-column: var(--desk-col);
+          grid-row: var(--desk-row);
+        }
+      }
+    </style>
+
+    {mediaItems.length === 0 ? (
+      <div class="rounded-3xl border border-dashed border-gray-300 bg-gray-50/70 py-16 px-6 text-center space-y-3">
+        <h2 class="text-lg font-bold text-gray-900">La galería se está preparando</h2>
+        <p class="text-sm text-gray-500 max-w-md mx-auto">
+          Pronto exhibiremos nuestras colecciones y fotografías destacadas en este espacio.
+        </p>
+        <a
+          href="/catalogo"
+          class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-black text-white text-xs font-bold hover:bg-gray-800 transition-colors"
+        >
+          Ver catálogo de productos
+        </a>
+      </div>
+    ) : (
+      <div
+        id="pinterest-gallery-grid"
+        class="pinterest-stagger-grid"
+        style={`--gal-cols: ${galleryCols};`}
+        data-gallery-items={JSON.stringify(galleryPayload)}
+      >
+        {mediaItems.map((item, idx) => {
+          const dPos = desktopPositions.get(item.id);
+          const mPos = mobilePositions.get(item.id);
+          const linked = productByImageUrl.get(item.url);
+          const frameTint = FRAME_TINTS[idx % FRAME_TINTS.length];
+          const mobCol = mPos ? `${mPos.colStart} / span ${mPos.colSpan}` : 'span 1';
+          const mobRow = mPos ? `${mPos.subRowStart} / span ${mPos.subRowSpan}` : 'span 2';
+          const deskCol = dPos ? `${dPos.colStart} / span ${dPos.colSpan}` : 'span 1';
+          const deskRow = dPos ? `${dPos.subRowStart} / span ${dPos.subRowSpan}` : 'span 2';
+          const title = item.title || item.originalName || `Fotografía ${idx + 1}`;
+          const isFirst = idx === 0;
+          const isSecond = idx === 1;
+
+          return (
+            <button
+              type="button"
+              data-gallery-index={idx}
+              style={`--mob-col: ${mobCol}; --mob-row: ${mobRow}; --desk-col: ${deskCol}; --desk-row: ${deskRow}; background-color: ${frameTint};`}
+              aria-label={`Ampliar fotografía: ${title}`}
+              class="pinterest-stagger-item group relative w-full h-full theme-radius-card overflow-hidden border border-black/10 shadow-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-1 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-black"
+            >
+              <img
+                src={item.url}
+                alt={title}
+                width={item.width}
+                height={item.height}
+                loading={isFirst || isSecond ? 'eager' : 'lazy'}
+                fetchpriority={isFirst ? 'high' : undefined}
+                decoding="async"
+                class="h-full w-full object-cover object-center transition-transform duration-700 ease-out group-hover:scale-105"
+              />
+
+              <div class="absolute inset-0 bg-gradient-to-t from-black/75 via-black/10 to-transparent opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100 transition-opacity duration-300" />
+
+              <div class="absolute top-3 right-3 z-10 h-8 w-8 rounded-full bg-white/90 text-gray-900 shadow-sm flex items-center justify-center opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100 transition-all duration-300">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-4.35-4.35m0 0A7.5 7.5 0 1010.5 18a7.5 7.5 0 006.15-3.35z" />
+                </svg>
+              </div>
+
+              <div class="absolute inset-x-0 bottom-0 z-10 p-3.5 sm:p-4 translate-y-1 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 group-focus-visible:opacity-100 transition-all duration-300 space-y-1">
+                <p class="text-xs sm:text-sm font-bold text-white line-clamp-2 drop-shadow-sm">
+                  {title}
+                </p>
+                {linked && (
+                  <span class="inline-flex items-center gap-1 rounded-full bg-white/90 text-gray-900 px-2.5 py-0.5 text-[10px] font-extrabold">
+                    Producto: {linked.title}
+                  </span>
+                )}
+              </div>
+            </button>
+          );
+        })}
+      </div>
+    )}
+  </div>
+
+  <!-- Lightbox Modal Nativo (modern-web-guidance: dialog + light-dismiss-a-dialog) -->
+  <dialog
+    id="gallery-lightbox"
+    {...({ closedby: 'any' } as any)}
+    aria-labelledby="lightbox-title"
+    class="m-auto w-[min(95vw,68rem)] max-h-[90dvh] rounded-3xl border border-white/15 bg-neutral-950/95 text-white p-0 shadow-2xl open:flex open:flex-col backdrop:bg-black/80 backdrop:backdrop-blur-sm"
+  >
+    <div class="flex items-center justify-between gap-3 border-b border-white/10 px-5 py-3.5">
+      <div class="min-w-0">
+        <h2 id="lightbox-title" class="text-sm sm:text-base font-bold text-white truncate">
+          Fotografía
+        </h2>
+        <p id="lightbox-meta" class="text-[11px] text-neutral-400 font-mono"></p>
+      </div>
+      <div class="flex items-center gap-2 shrink-0">
+        <a
+          id="lightbox-product-link"
+          href="#"
+          class="hidden items-center gap-1.5 rounded-xl bg-white text-neutral-950 hover:bg-neutral-200 px-3.5 py-1.5 text-xs font-extrabold transition-colors"
+        >
+          Ver producto &rarr;
+        </a>
+        <form method="dialog">
+          <button
+            type="submit"
+            aria-label="Cerrar vista ampliada"
+            class="h-9 w-9 rounded-xl bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <div class="relative flex-1 min-h-0 flex items-center justify-center p-3 sm:p-5 bg-black/40 overflow-hidden">
+      <button
+        id="lightbox-prev"
+        type="button"
+        aria-label="Fotografía anterior"
+        class="absolute left-3 sm:left-5 z-10 h-10 w-10 rounded-full bg-black/65 hover:bg-black text-white border border-white/20 flex items-center justify-center transition-colors"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
+        </svg>
+      </button>
+
+      <img
+        id="lightbox-img"
+        src=""
+        alt=""
+        class="max-h-[70dvh] w-auto max-w-full rounded-2xl object-contain shadow-2xl"
+      />
+
+      <button
+        id="lightbox-next"
+        type="button"
+        aria-label="Fotografía siguiente"
+        class="absolute right-3 sm:right-5 z-10 h-10 w-10 rounded-full bg-black/65 hover:bg-black text-white border border-white/20 flex items-center justify-center transition-colors"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
+        </svg>
+      </button>
+    </div>
+  </dialog>
+</Layout>
+
+<script>
+  function initPinterestGalleryLightbox() {
+    const grid = document.getElementById('pinterest-gallery-grid');
+    const dialog = document.getElementById('gallery-lightbox') as HTMLDialogElement | null;
+    if (!grid || !dialog) return;
+
+    let items: Array<{
+      index: number;
+      url: string;
+      title: string;
+      width: number;
+      height: number;
+      linkedProductId: string | null;
+      linkedProductTitle: string | null;
+    }> = [];
+
+    try {
+      items = JSON.parse(grid.dataset.galleryItems || '[]');
+    } catch {
+      return;
+    }
+
+    if (items.length === 0) return;
+
+    const imgEl = document.getElementById('lightbox-img') as HTMLImageElement | null;
+    const titleEl = document.getElementById('lightbox-title');
+    const metaEl = document.getElementById('lightbox-meta');
+    const prodLink = document.getElementById('lightbox-product-link') as HTMLAnchorElement | null;
+    const prevBtn = document.getElementById('lightbox-prev');
+    const nextBtn = document.getElementById('lightbox-next');
+
+    let currentIndex = 0;
+
+    function showSlide(idx: number) {
+      const safeIdx = ((idx % items.length) + items.length) % items.length;
+      currentIndex = safeIdx;
+      const item = items[safeIdx];
+      if (!item || !imgEl) return;
+
+      imgEl.src = item.url;
+      imgEl.alt = item.title;
+      if (titleEl) titleEl.textContent = item.title;
+      if (metaEl) metaEl.textContent = `${safeIdx + 1} / ${items.length} · ${item.width} × ${item.height} px`;
+
+      if (prodLink) {
+        if (item.linkedProductId) {
+          prodLink.href = `/producto/${item.linkedProductId}`;
+          prodLink.textContent = `Ver "${item.linkedProductTitle || 'producto'}" →`;
+          prodLink.classList.remove('hidden');
+          prodLink.classList.add('inline-flex');
+        } else {
+          prodLink.classList.add('hidden');
+          prodLink.classList.remove('inline-flex');
+        }
+      }
+    }
+
+    grid.querySelectorAll<HTMLButtonElement>('[data-gallery-index]').forEach((btn) => {
+      if (btn.dataset.bound === '1') return;
+      btn.dataset.bound = '1';
+      btn.addEventListener('click', () => {
+        const idx = parseInt(btn.dataset.galleryIndex || '0', 10) || 0;
+        showSlide(idx);
+        if (!dialog.open) {
+          dialog.showModal();
+        }
+      });
+    });
+
+    if (prevBtn && prevBtn.dataset.bound !== '1') {
+      prevBtn.dataset.bound = '1';
+      prevBtn.addEventListener('click', () => showSlide(currentIndex - 1));
+    }
+
+    if (nextBtn && nextBtn.dataset.bound !== '1') {
+      nextBtn.dataset.bound = '1';
+      nextBtn.addEventListener('click', () => showSlide(currentIndex + 1));
+    }
+
+    if (dialog.dataset.bound !== '1') {
+      dialog.dataset.bound = '1';
+
+      dialog.addEventListener('close', () => {
+        dialog.returnValue = '';
+      });
+
+      dialog.addEventListener('keydown', (e) => {
+        if (e.key === 'ArrowLeft') {
+          e.preventDefault();
+          showSlide(currentIndex - 1);
+        } else if (e.key === 'ArrowRight') {
+          e.preventDefault();
+          showSlide(currentIndex + 1);
+        }
+      });
+
+      // Fallback de light-dismiss para navegadores sin `closedBy`
+      if (!('closedBy' in HTMLDialogElement.prototype)) {
+        let pressedOutside = false;
+        const outside = (e: PointerEvent) => {
+          const r = dialog.getBoundingClientRect();
+          return e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom;
+        };
+        dialog.addEventListener('pointerdown', (e) => {
+          pressedOutside = outside(e);
+        });
+        dialog.addEventListener('pointerup', (e) => {
+          if (pressedOutside && outside(e)) {
+            dialog.close();
+          }
+          pressedOutside = false;
+        });
+      }
+    }
+  }
+
+  document.addEventListener('astro:page-load', initPinterestGalleryLightbox);
+</script>

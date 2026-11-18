@@ -78,6 +78,7 @@ async function syncProductToPostgres(params: {
   title: string;
   description: string;
   imageUrl: string;
+  galleryImages?: string[];
   basePrice: number;
   categoryId: string | null;
   isFeatured: boolean;
@@ -88,6 +89,13 @@ async function syncProductToPostgres(params: {
 
   try {
     await ensureSchema();
+    const galleryJson = JSON.stringify(
+      Array.isArray(params.galleryImages) && params.galleryImages.length > 0
+        ? params.galleryImages
+        : params.imageUrl
+          ? [params.imageUrl]
+          : []
+    );
     const existing = await db
       .select({ id: products.id })
       .from(products)
@@ -100,6 +108,7 @@ async function syncProductToPostgres(params: {
           title: params.title,
           description: params.description,
           imageUrl: params.imageUrl,
+          galleryImagesJson: galleryJson,
           basePrice: params.basePrice,
           categoryId: params.categoryId || null,
           isFeatured: params.isFeatured,
@@ -112,6 +121,7 @@ async function syncProductToPostgres(params: {
         title: params.title,
         description: params.description,
         imageUrl: params.imageUrl,
+        galleryImagesJson: galleryJson,
         basePrice: params.basePrice,
         categoryId: params.categoryId || null,
         isFeatured: params.isFeatured,
@@ -143,12 +153,37 @@ async function syncProductToPostgres(params: {
   }
 }
 
+function parseGalleryImagesFromForm(raw: string | undefined, primaryImage: string): string[] {
+  const parsed: string[] = [];
+  if (raw) {
+    try {
+      const arr = JSON.parse(raw);
+      if (Array.isArray(arr)) {
+        for (const item of arr) {
+          const clean = String(item || '').trim();
+          if (clean) parsed.push(clean);
+        }
+      }
+    } catch {
+      // ignore invalid json
+    }
+  }
+  const cover = primaryImage.trim();
+  const combined = cover ? [cover, ...parsed] : parsed;
+  return Array.from(new Set(combined));
+}
+
 export async function createProduct(formData: FormData) {
   const name = formData.get("name")?.toString()?.trim();
   const description = formData.get("description")?.toString() || "";
   const price = formData.get("price")?.toString();
   const category = formData.get("category")?.toString() || null;
-  const image = formData.get("image")?.toString() || "";
+  const rawImage = formData.get("image")?.toString() || "";
+  const galleryImages = parseGalleryImagesFromForm(
+    formData.get("galleryImages")?.toString(),
+    rawImage
+  );
+  const image = rawImage.trim() || galleryImages[0] || "";
   const isFeatured = formData.get("isFeatured") === "true";
   const isActive = formData.get("isActive") !== "false";
   const modifiersRaw = formData.get("modifiers")?.toString();
@@ -166,6 +201,7 @@ export async function createProduct(formData: FormData) {
     title: name,
     description,
     imageUrl: image,
+    galleryImages,
     basePrice: priceInCents,
     categoryId: category || null,
     isFeatured,
@@ -178,6 +214,7 @@ export async function createProduct(formData: FormData) {
     title: name,
     description,
     imageUrl: image,
+    galleryImages,
     basePrice: priceInCents,
     categoryId: category || null,
     isFeatured,
@@ -195,7 +232,12 @@ export async function updateProduct(id: string, formData: FormData) {
   const description = formData.get("description")?.toString() || "";
   const price = formData.get("price")?.toString();
   const category = formData.get("category")?.toString() || null;
-  const image = formData.get("image")?.toString() || "";
+  const rawImage = formData.get("image")?.toString() || "";
+  const galleryImages = parseGalleryImagesFromForm(
+    formData.get("galleryImages")?.toString(),
+    rawImage
+  );
+  const image = rawImage.trim() || galleryImages[0] || "";
   const isFeatured = formData.get("isFeatured") === "true";
   const isActive = formData.get("isActive") !== "false";
   const modifiersRaw = formData.get("modifiers")?.toString();
@@ -212,6 +254,7 @@ export async function updateProduct(id: string, formData: FormData) {
     title: name,
     description,
     imageUrl: image,
+    galleryImages,
     basePrice: priceInCents,
     categoryId: category || null,
     isFeatured,
@@ -224,6 +267,7 @@ export async function updateProduct(id: string, formData: FormData) {
     title: name,
     description,
     imageUrl: image,
+    galleryImages,
     basePrice: priceInCents,
     categoryId: category || null,
     isFeatured,

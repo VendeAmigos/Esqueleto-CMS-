@@ -15,8 +15,8 @@
 }
 
 (uploads_handler) {
-    # Bloquear acceso público a archivos internos (.cms-data / .json) dentro de uploads
-    @blocked_uploads path /uploads/.* /uploads/*.json
+    # Bloquear acceso público a archivos internos (.cms-data / .json / bandeja FTP sin optimizar)
+    @blocked_uploads path /uploads/.* /uploads/*.json /uploads/ftp-inbox /uploads/ftp-inbox/* /uploads/.tmp-optimize /uploads/.tmp-optimize/*
     respond @blocked_uploads 403
 
     # Servir imágenes subidas directamente desde disco con caché inmutable

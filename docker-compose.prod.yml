@@ -39,6 +39,8 @@ services:
       - PUBLIC_MP_PUBLIC_KEY=${PUBLIC_MP_PUBLIC_KEY:-}
       - MP_WEBHOOK_SECRET=${MP_WEBHOOK_SECRET:-}
       - PUBLIC_STOREFRONT_URL=${PUBLIC_STOREFRONT_URL:-https://lunnadecoco.com}
+      - FTP_USER=${FTP_USER:-lunnacoco_ftp}
+      - FTP_PASV_ADDRESS=${FTP_PASV_ADDRESS:-}
     env_file:
       - path: .env
         required: false
@@ -76,6 +78,8 @@ services:
       - PUBLIC_MP_PUBLIC_KEY=${PUBLIC_MP_PUBLIC_KEY:-}
       - MP_WEBHOOK_SECRET=${MP_WEBHOOK_SECRET:-}
       - PUBLIC_STOREFRONT_URL=${PUBLIC_STOREFRONT_URL:-https://lunnadecoco.com}
+      - FTP_USER=${FTP_USER:-lunnacoco_ftp}
+      - FTP_PASV_ADDRESS=${FTP_PASV_ADDRESS:-}
     env_file:
       - path: .env
         required: false
@@ -90,6 +94,27 @@ services:
       - esqueleto-internal
       - shared_caddy_net
     restart: unless-stopped
+
+  ftp:
+    build:
+      context: .
+      dockerfile: Dockerfile.ftp
+    container_name: ${APP_SLUG:-esqueleto}-ftp
+    profiles: ["ftp"]
+    restart: unless-stopped
+    environment:
+      - FTP_USER=${FTP_USER:-lunnacoco_ftp}
+      - FTP_PASS=${FTP_PASS:-}
+      - FTP_PASV_ADDRESS=${FTP_PASV_ADDRESS:-}
+      - FTP_PASV_MIN=30000
+      - FTP_PASV_MAX=30009
+    ports:
+      - "21:21"
+      - "30000-30009:30000-30009"
+    volumes:
+      - ./uploads/ftp-inbox:/home/${FTP_USER:-lunnacoco_ftp}/inbox
+    networks:
+      - esqueleto-internal
 
 volumes:
   esqueleto_pgdata:

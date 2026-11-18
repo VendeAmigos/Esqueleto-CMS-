@@ -41,6 +41,14 @@ const relatedProducts = Array.from(
 const safeLocale = getCurrencyLocale(settings.currencyCode, settings.currencyLocale);
 const formattedBasePrice = formatMoney(product.basePrice, settings.currencyCode, safeLocale);
 const safeVtId = String(product.id || '').replace(/[^a-zA-Z0-9_-]/g, '-');
+const productGallery = Array.from(
+  new Set(
+    [
+      product.imageUrl || '/seed/prod-print-jardin.jpg',
+      ...(Array.isArray(product.galleryImages) ? product.galleryImages : []),
+    ].filter(Boolean)
+  )
+);
 
 const hasModifiers = modifiersWithOpts.length > 0;
 ---
@@ -103,6 +111,35 @@ const hasModifiers = modifiersWithOpts.length > 0;
             )}
           </div>
         </div>
+
+        {/* Miniaturas interactivas cuando el producto tiene múltiples fotos seleccionadas de la galería */}
+        {productGallery.length > 1 && (
+          <div class="grid grid-cols-4 sm:grid-cols-5 gap-2.5" id="product-gallery-thumbs" role="group" aria-label="Galería de imágenes del producto">
+            {productGallery.map((imgUrl, idx) => (
+              <button
+                type="button"
+                data-thumb-src={imgUrl}
+                aria-label={`Ver imagen ${idx + 1} de ${product.title}`}
+                aria-pressed={idx === 0 ? 'true' : 'false'}
+                class={`thumb-btn relative aspect-square overflow-hidden rounded-xl border-2 bg-gray-100 transition-all ${
+                  idx === 0
+                    ? 'border-black ring-2 ring-black/20'
+                    : 'border-gray-200 hover:border-gray-400 opacity-80 hover:opacity-100'
+                }`}
+              >
+                <img
+                  src={imgUrl}
+                  alt={`${product.title} — vista ${idx + 1}`}
+                  width="180"
+                  height="180"
+                  loading="lazy"
+                  decoding="async"
+                  class="h-full w-full object-cover"
+                />
+              </button>
+            ))}
+          </div>
+        )}
 
         <!-- Badges de Confianza / Garantía -->
         <div class="grid grid-cols-3 gap-3 pt-2">
@@ -573,6 +610,26 @@ const hasModifiers = modifiersWithOpts.length > 0;
 
     // Inicializar estilos
     updateDynamicPrice();
+
+    // Switch de miniaturas cuando el producto tiene múltiples fotos
+    const mainImg = document.getElementById('main-product-image') as HTMLImageElement | null;
+    const thumbButtons = document.querySelectorAll<HTMLButtonElement>('#product-gallery-thumbs .thumb-btn');
+    thumbButtons.forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const nextSrc = btn.dataset.thumbSrc;
+        if (!nextSrc || !mainImg) return;
+        mainImg.src = nextSrc;
+        thumbButtons.forEach((b) => {
+          const active = b === btn;
+          b.setAttribute('aria-pressed', active ? 'true' : 'false');
+          b.classList.toggle('border-black', active);
+          b.classList.toggle('ring-2', active);
+          b.classList.toggle('ring-black/20', active);
+          b.classList.toggle('border-gray-200', !active);
+          b.classList.toggle('opacity-80', !active);
+        });
+      });
+    });
   }
 
   // Ejecución en carga inicial y transiciones Astro

@@ -37,6 +37,7 @@ export interface StoredProduct {
   title: string;
   description: string | null;
   imageUrl: string | null;
+  galleryImages?: string[];
   basePrice: number;
   isActive: boolean;
   isFeatured: boolean;
@@ -44,6 +45,33 @@ export interface StoredProduct {
   categoryName?: string | null;
   categorySlug?: string | null;
   modifiers: StoredModifierGroup[];
+}
+
+function normalizeProductGallery(
+  gallery: string[] | null | undefined,
+  primaryImageUrl: string | null | undefined
+): string[] {
+  const cleaned = Array.isArray(gallery)
+    ? gallery.map((u) => String(u || '').trim()).filter(Boolean)
+    : [];
+  const primary = String(primaryImageUrl || '').trim();
+  const combined = primary ? [primary, ...cleaned] : cleaned;
+  return Array.from(new Set(combined));
+}
+
+function parseProductGalleryJson(
+  rawJson: string | null | undefined,
+  primaryImageUrl: string | null | undefined
+): string[] {
+  if (!rawJson) {
+    return normalizeProductGallery([], primaryImageUrl);
+  }
+  try {
+    const parsed = JSON.parse(rawJson);
+    return normalizeProductGallery(Array.isArray(parsed) ? parsed : [], primaryImageUrl);
+  } catch {
+    return normalizeProductGallery([], primaryImageUrl);
+  }
 }
 
 export const DEFAULT_INITIAL_CATEGORIES: Category[] = [
@@ -457,6 +485,7 @@ export async function getStoredProducts(includeInactive = false): Promise<Stored
             title: p.title,
             description: p.description,
             imageUrl: p.imageUrl,
+            galleryImages: parseProductGalleryJson((p as any).galleryImagesJson, p.imageUrl),
             basePrice: p.basePrice,
             isActive: p.isActive,
             isFeatured: Boolean(p.isFeatured),
@@ -477,6 +506,7 @@ export async function getStoredProducts(includeInactive = false): Promise<Stored
             const cat = locP.categoryId ? catMap.get(locP.categoryId) : undefined;
             mergedMap.set(locP.id, {
               ...locP,
+              galleryImages: normalizeProductGallery(locP.galleryImages, locP.imageUrl),
               categoryName: cat?.name || locP.categoryName || 'General',
               categorySlug: cat?.slug || locP.categorySlug || null,
             });
@@ -502,6 +532,7 @@ export async function getStoredProducts(includeInactive = false): Promise<Stored
     const cat = p.categoryId ? catMap.get(p.categoryId) : undefined;
     return {
       ...p,
+      galleryImages: normalizeProductGallery(p.galleryImages, p.imageUrl),
       categoryName: cat?.name || p.categoryName || 'General',
       categorySlug: cat?.slug || p.categorySlug || null,
     };
@@ -676,6 +707,7 @@ export async function createStoredProduct(input: {
   title: string;
   description: string;
   imageUrl: string;
+  galleryImages?: string[];
   basePrice: number;
   categoryId: string | null;
   isFeatured: boolean;
@@ -683,11 +715,14 @@ export async function createStoredProduct(input: {
   modifiers: StoredModifierGroup[];
 }): Promise<StoredProduct> {
   const currentLocal = readLocalProducts();
+  const normalizedGallery = normalizeProductGallery(input.galleryImages, input.imageUrl);
+  const coverImage = input.imageUrl?.trim() || normalizedGallery[0] || '';
   const newProd: StoredProduct = {
     id: input.id,
     title: input.title.trim(),
     description: input.description,
-    imageUrl: input.imageUrl,
+    imageUrl: coverImage,
+    galleryImages: normalizedGallery,
     basePrice: input.basePrice,
     isActive: input.isActive !== undefined ? input.isActive : true,
     isFeatured: input.isFeatured,
@@ -703,6 +738,7 @@ export async function updateStoredProduct(input: {
   title: string;
   description: string;
   imageUrl: string;
+  galleryImages?: string[];
   basePrice: number;
   categoryId: string | null;
   isFeatured: boolean;
@@ -711,12 +747,15 @@ export async function updateStoredProduct(input: {
 }): Promise<StoredProduct> {
   const currentLocal = readLocalProducts();
   const existsInLocal = currentLocal.some((p) => p.id === input.id);
+  const normalizedGallery = normalizeProductGallery(input.galleryImages, input.imageUrl);
+  const coverImage = input.imageUrl?.trim() || normalizedGallery[0] || '';
 
   const updatedProd: StoredProduct = {
     id: input.id,
     title: input.title.trim(),
     description: input.description,
-    imageUrl: input.imageUrl,
+    imageUrl: coverImage,
+    galleryImages: normalizedGallery,
     basePrice: input.basePrice,
     isActive: input.isActive !== undefined ? input.isActive : true,
     isFeatured: input.isFeatured,
@@ -794,6 +833,7 @@ export async function bulkUpsertStoredProducts(
       title: item.title.trim(),
       description: item.description ?? existing?.description ?? '',
       imageUrl: item.imageUrl || existing?.imageUrl || '',
+      galleryImages: normalizeProductGallery(existing?.galleryImages, item.imageUrl || existing?.imageUrl),
       basePrice: Math.max(0, Math.round(item.basePrice)),
       isActive: item.isActive !== undefined ? item.isActive : (existing?.isActive ?? true),
       isFeatured: item.isFeatured !== undefined ? item.isFeatured : (existing?.isFeatured ?? false),

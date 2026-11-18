@@ -26,6 +26,7 @@ export default async function EditarProductoPage({
     title: product.title,
     description: product.description,
     imageUrl: product.imageUrl,
+    galleryImages: product.galleryImages || [],
     basePrice: product.basePrice,
     categoryId: product.categoryId,
     isFeatured: Boolean(product.isFeatured),

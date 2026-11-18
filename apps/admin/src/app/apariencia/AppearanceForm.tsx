@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import type { StoredSiteAppearance } from '@esqueleto/core';
 import { updateSiteSettings } from './actions';
+import MediaPickerModal from '@/components/MediaPickerModal';
 
 interface AppearanceFormProps {
   initialSettings: StoredSiteAppearance;
@@ -105,6 +106,7 @@ function sanitizeClientSvg(raw: string): string {
 
 export default function AppearanceForm({ initialSettings }: AppearanceFormProps) {
   const [activeTab, setActiveTab] = useState<TabId>('brand');
+  const [mediaPickerTarget, setMediaPickerTarget] = useState<'hero' | 'og' | null>(null);
 
   // 1. Marca, Colores & Tema
   const [siteName, setSiteName] = useState(initialSettings.siteName || 'LUNNA DE COCO');
@@ -901,7 +903,16 @@ export default function AppearanceForm({ initialSettings }: AppearanceFormProps)
           </div>
 
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">Imagen de Fondo del Banner</label>
+            <div className="flex items-center justify-between mb-2">
+              <label className="block text-sm font-semibold text-gray-700">Imagen de Fondo del Banner</label>
+              <button
+                type="button"
+                onClick={() => setMediaPickerTarget('hero')}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-50 border border-indigo-200 px-3 py-1 text-xs font-bold text-indigo-700 hover:bg-indigo-100 transition-colors"
+              >
+                Elegir de la Galería
+              </button>
+            </div>
             <div
               onDragOver={(e) => {
                 e.preventDefault();
@@ -1470,7 +1481,16 @@ export default function AppearanceForm({ initialSettings }: AppearanceFormProps)
               </p>
             </div>
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">Imagen OpenGraph (Redes)</label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-sm font-semibold text-gray-700">Imagen OpenGraph (Redes)</label>
+                <button
+                  type="button"
+                  onClick={() => setMediaPickerTarget('og')}
+                  className="text-xs font-bold text-indigo-600 hover:underline"
+                >
+                  Elegir de Galería
+                </button>
+              </div>
               <input
                 type="text"
                 value={ogImageUrl}
@@ -1513,6 +1533,33 @@ export default function AppearanceForm({ initialSettings }: AppearanceFormProps)
           {isSubmitting ? 'Guardando cambios...' : 'Guardar Configuración'}
         </button>
       </div>
+
+      <MediaPickerModal
+        open={mediaPickerTarget !== null}
+        multiple={false}
+        selectedUrls={
+          mediaPickerTarget === 'hero' && heroImageUrl
+            ? [heroImageUrl]
+            : mediaPickerTarget === 'og' && ogImageUrl
+              ? [ogImageUrl]
+              : []
+        }
+        title={
+          mediaPickerTarget === 'og'
+            ? 'Elegir Imagen OpenGraph desde la Galería'
+            : 'Elegir Imagen de Portada desde la Galería'
+        }
+        onClose={() => setMediaPickerTarget(null)}
+        onConfirm={(urls) => {
+          const picked = urls[0] || '';
+          if (!picked) return;
+          if (mediaPickerTarget === 'hero') {
+            setHeroImageUrl(picked);
+          } else if (mediaPickerTarget === 'og') {
+            setOgImageUrl(picked);
+          }
+        }}
+      />
     </form>
   );
 }

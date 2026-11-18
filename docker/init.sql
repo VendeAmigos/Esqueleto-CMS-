@@ -27,6 +27,7 @@ CREATE TABLE IF NOT EXISTS products (
   title TEXT NOT NULL,
   description TEXT,
   image_url TEXT,
+  gallery_images_json TEXT,
   base_price INTEGER NOT NULL,
   is_active BOOLEAN NOT NULL DEFAULT true,
   is_featured BOOLEAN NOT NULL DEFAULT false,
@@ -35,6 +36,7 @@ CREATE TABLE IF NOT EXISTS products (
 );
 
 ALTER TABLE products ADD COLUMN IF NOT EXISTS is_featured BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS gallery_images_json TEXT;
 
 CREATE TABLE IF NOT EXISTS site_settings (
   id TEXT PRIMARY KEY,
@@ -143,10 +145,40 @@ CREATE TABLE IF NOT EXISTS payment_settings (
   updated_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS media_items (
+  id TEXT PRIMARY KEY,
+  filename TEXT NOT NULL,
+  original_name TEXT NOT NULL,
+  url TEXT NOT NULL UNIQUE,
+  mime_type TEXT NOT NULL DEFAULT 'image/webp',
+  width INTEGER NOT NULL DEFAULT 800,
+  height INTEGER NOT NULL DEFAULT 800,
+  size_bytes INTEGER NOT NULL DEFAULT 0,
+  original_size_bytes INTEGER NOT NULL DEFAULT 0,
+  source TEXT NOT NULL DEFAULT 'web',
+  show_in_gallery BOOLEAN NOT NULL DEFAULT false,
+  grid_span TEXT NOT NULL DEFAULT '1x1',
+  display_order INTEGER NOT NULL DEFAULT 0,
+  title TEXT,
+  created_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS gallery_settings (
+  id TEXT PRIMARY KEY DEFAULT 'default',
+  columns INTEGER NOT NULL DEFAULT 4,
+  updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+INSERT INTO gallery_settings (id, columns)
+VALUES ('default', 4)
+ON CONFLICT (id) DO NOTHING;
+
 CREATE INDEX IF NOT EXISTS idx_products_category ON products(category_id);
 CREATE INDEX IF NOT EXISTS idx_products_active ON products(is_active);
 CREATE INDEX IF NOT EXISTS idx_discount_codes_code ON discount_codes(code);
 CREATE INDEX IF NOT EXISTS idx_orders_created_at ON orders(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_media_items_created_at ON media_items(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_media_items_gallery ON media_items(show_in_gallery, display_order);
 
 -- ============================================================
 -- Categorías Iniciales (Bento Grid 2D)

@@ -97,6 +97,14 @@ const pathname = Astro.url.pathname;
           Catálogo
         </a>
         <a
+          href="/galeria"
+          data-nav-href="/galeria"
+          class={`text-sm font-semibold transition-colors ${pathname === '/galeria' ? 'is-active' : 'opacity-70 hover:opacity-100'}`}
+          style="color: var(--text-main);"
+        >
+          Galería
+        </a>
+        <a
           href="/contacto"
           data-nav-href="/contacto"
           class={`text-sm font-semibold transition-colors ${pathname === '/contacto' ? 'is-active' : 'opacity-70 hover:opacity-100'}`}
@@ -177,13 +185,25 @@ const pathname = Astro.url.pathname;
   <a
     href="/catalogo"
     data-mobile-href="/catalogo"
-    class={`flex flex-col items-center justify-center py-1 px-2 rounded-xl transition-all ${pathname === '/catalogo' ? 'font-bold opacity-100' : 'opacity-65 hover:opacity-100'}`}
+    class={`flex flex-col items-center justify-center py-1 px-1.5 rounded-xl transition-all ${pathname === '/catalogo' ? 'font-bold opacity-100' : 'opacity-65 hover:opacity-100'}`}
     style="color: var(--text-main);"
   >
     <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 mb-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width={1.9}>
       <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 10.5V6a3.75 3.75 0 10-7.5 0v4.5m11.356-1.993l1.263 12c.07.665-.45 1.243-1.119 1.243H4.25a1.125 1.125 0 01-1.12-1.243l1.264-12A1.125 1.125 0 015.513 7.5h12.974c.576 0 1.059.435 1.119.993z" />
     </svg>
-    <span class="text-[10px] sm:text-[11px]">Catálogo</span>
+    <span class="text-[10px]">Catálogo</span>
+  </a>
+
+  <a
+    href="/galeria"
+    data-mobile-href="/galeria"
+    class={`flex flex-col items-center justify-center py-1 px-1.5 rounded-xl transition-all ${pathname === '/galeria' ? 'font-bold opacity-100' : 'opacity-65 hover:opacity-100'}`}
+    style="color: var(--text-main);"
+  >
+    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 mb-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width={1.9}>
+      <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5zm10.5-11.25h.008v.008h-.008V8.25zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
+    </svg>
+    <span class="text-[10px]">Galería</span>
   </a>
 
   <a

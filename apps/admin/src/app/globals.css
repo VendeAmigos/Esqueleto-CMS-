@@ -18,3 +18,41 @@ input[type='checkbox'][switch]:focus-visible {
 input.switch {
   top: 0;
 }
+
+/* Modal <dialog> scroll containment & backdrop (modern-web-guidance: dialog) */
+dialog:modal {
+  overscroll-behavior: contain;
+}
+
+dialog::backdrop {
+  overflow: hidden;
+  overscroll-behavior: contain;
+  background-color: rgb(17 24 39 / 0.62);
+  backdrop-filter: blur(4px);
+}
+
+/* Tabs accessible indicator without changing layout dimensions (modern-web-guidance: tabs) */
+[role="tab"] {
+  position: relative;
+}
+
+[role="tab"][aria-selected="true"]::after {
+  content: "";
+  position: absolute;
+  inset: auto 0.5rem 0;
+  border-block-end: 3px solid currentColor;
+  border-radius: 9999px;
+}
+
+/* View transitions for gallery auto-arrange / sort */
+.vt-gallery-item {
+  view-transition-name: match-element;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none;
+  }
+}

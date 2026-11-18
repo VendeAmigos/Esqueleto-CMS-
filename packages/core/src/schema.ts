@@ -38,6 +38,7 @@ export const products = pgTable('products', {
   title: text('title').notNull(),
   description: text('description'),
   imageUrl: text('image_url'),
+  galleryImagesJson: text('gallery_images_json'),
   basePrice: integer('base_price').notNull(), // Almacenado en centavos (ej: 29900 = $299.00 MXN)
   isActive: boolean('is_active').notNull().default(true),
   isFeatured: boolean('is_featured').notNull().default(false), // Producto destacado en portada
@@ -188,6 +189,37 @@ export const discountCodes = pgTable('discount_codes', {
 });
 
 // ==========================================
+// 9. Galería Multimedia & Layout Editorial
+// ==========================================
+export const mediaItems = pgTable('media_items', {
+  id: text('id')
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  filename: text('filename').notNull(),
+  originalName: text('original_name').notNull(),
+  url: text('url').notNull().unique(),
+  mimeType: text('mime_type').notNull().default('image/webp'),
+  width: integer('width').notNull().default(800),
+  height: integer('height').notNull().default(800),
+  sizeBytes: integer('size_bytes').notNull().default(0),
+  originalSizeBytes: integer('original_size_bytes').notNull().default(0),
+  source: text('source').notNull().default('web'), // 'web' | 'ftp' | 'existing'
+  showInGallery: boolean('show_in_gallery').notNull().default(false),
+  gridSpan: text('grid_span').notNull().default('1x1'),
+  displayOrder: integer('display_order').notNull().default(0),
+  title: text('title'),
+  createdAt: timestamp('created_at').notNull().$defaultFn(() => new Date()),
+});
+
+export const gallerySettings = pgTable('gallery_settings', {
+  id: text('id')
+    .primaryKey()
+    .$defaultFn(() => 'default'),
+  columns: integer('columns').notNull().default(4), // 3 | 4 | 5
+  updatedAt: timestamp('updated_at').notNull().$defaultFn(() => new Date()),
+});
+
+// ==========================================
 // Relaciones (Drizzle Relations)
 // ==========================================
 export const usersRelations = relations(users, ({ many }) => ({
@@ -268,3 +300,9 @@ export type NewDiscountCode = InferInsertModel<typeof discountCodes>;
 
 export type PaymentSettings = InferSelectModel<typeof paymentSettings>;
 export type NewPaymentSettings = InferInsertModel<typeof paymentSettings>;
+
+export type MediaItem = InferSelectModel<typeof mediaItems>;
+export type NewMediaItem = InferInsertModel<typeof mediaItems>;
+
+export type GallerySettings = InferSelectModel<typeof gallerySettings>;
+export type NewGallerySettings = InferInsertModel<typeof gallerySettings>;

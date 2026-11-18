@@ -11,6 +11,7 @@ import {
   parseGridSpan,
   formatGridSpan,
 } from '@esqueleto/core/grid';
+import MediaPickerModal from '@/components/MediaPickerModal';
 
 interface CategoryItem {
   id: string;
@@ -292,6 +293,7 @@ export default function CategoryGridManager({
   const [editColSpan, setEditColSpan] = useState(1);
   const [editRowSpan, setEditRowSpan] = useState(1);
   const [isSavingEdit, setIsSavingEdit] = useState(false);
+  const [mediaPickerTarget, setMediaPickerTarget] = useState<'new' | 'edit' | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [targetUploadId, setTargetUploadId] = useState<string | null>(null);
@@ -1346,7 +1348,7 @@ export default function CategoryGridManager({
                   placeholder="https://... o sube una foto"
                   className="flex-1 rounded-xl border border-gray-300 px-3 py-2 text-xs font-mono"
                 />
-                <label className="cursor-pointer px-3 py-2 rounded-xl bg-gray-100 hover:bg-gray-200 text-xs font-bold text-gray-700">
+                <label className="cursor-pointer px-3 py-2 rounded-xl bg-gray-100 hover:bg-gray-200 text-xs font-bold text-gray-700 shrink-0">
                   {isUploading === 'new' ? '...' : 'Subir'}
                   <input
                     type="file"
@@ -1357,6 +1359,13 @@ export default function CategoryGridManager({
                     className="hidden"
                   />
                 </label>
+                <button
+                  type="button"
+                  onClick={() => setMediaPickerTarget('new')}
+                  className="px-3 py-2 rounded-xl bg-indigo-50 border border-indigo-200 hover:bg-indigo-100 text-xs font-bold text-indigo-700 shrink-0"
+                >
+                  Galería
+                </button>
               </div>
             </div>
 
@@ -1463,7 +1472,7 @@ export default function CategoryGridManager({
                   onChange={(e) => setEditImageUrl(e.target.value)}
                   className="flex-1 rounded-xl border border-gray-300 px-3 py-2 text-xs font-mono"
                 />
-                <label className="cursor-pointer px-3 py-2 rounded-xl bg-gray-100 hover:bg-gray-200 text-xs font-bold text-gray-700">
+                <label className="cursor-pointer px-3 py-2 rounded-xl bg-gray-100 hover:bg-gray-200 text-xs font-bold text-gray-700 shrink-0">
                   {isUploading === 'edit-modal' ? '...' : 'Subir'}
                   <input
                     type="file"
@@ -1474,6 +1483,13 @@ export default function CategoryGridManager({
                     className="hidden"
                   />
                 </label>
+                <button
+                  type="button"
+                  onClick={() => setMediaPickerTarget('edit')}
+                  className="px-3 py-2 rounded-xl bg-indigo-50 border border-indigo-200 hover:bg-indigo-100 text-xs font-bold text-indigo-700 shrink-0"
+                >
+                  Galería
+                </button>
               </div>
             </div>
 
@@ -1510,6 +1526,26 @@ export default function CategoryGridManager({
           </form>
         </div>
       )}
+
+      <MediaPickerModal
+        open={mediaPickerTarget !== null}
+        multiple={false}
+        selectedUrls={
+          mediaPickerTarget === 'edit' && editImageUrl
+            ? [editImageUrl]
+            : mediaPickerTarget === 'new' && newImageUrl
+              ? [newImageUrl]
+              : []
+        }
+        title="Elegir foto de portada desde Galería"
+        onClose={() => setMediaPickerTarget(null)}
+        onConfirm={(urls) => {
+          const picked = urls[0] || '';
+          if (!picked) return;
+          if (mediaPickerTarget === 'edit') setEditImageUrl(picked);
+          if (mediaPickerTarget === 'new') setNewImageUrl(picked);
+        }}
+      />
     </div>
   );
 }

@@ -409,8 +409,12 @@ const rootCssVars = [
   }
 
   /* Diálogos nativos modernos: scroll isolation + transición suave de entrada */
-  dialog:modal,
+  dialog:modal {
+    overscroll-behavior: contain;
+  }
+
   dialog::backdrop {
+    overflow: hidden;
     overscroll-behavior: contain;
   }
 
