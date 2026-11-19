@@ -47,27 +47,28 @@ const vtSlug = String(category.slug || '').replace(/[^a-zA-Z0-9_-]/g, '-');
 
     <!-- Header Banner de la Categoría con Morphing View Transition suave -->
     <div class="relative overflow-hidden theme-radius-card bg-gray-900 py-10 sm:py-14 px-6 sm:px-12 text-white shadow-lg">
-      {category.imageUrl ? (
-        <img
-          src={category.imageUrl}
-          alt={category.name}
-          width="1200"
-          height="600"
-          loading="eager"
-          fetchpriority="high"
-          decoding="async"
-          transition:name={`cat-img-${vtSlug}`}
-          style="view-transition-class: vt-cat-img;"
-          class="absolute inset-0 h-full w-full object-cover object-center"
-        />
-      ) : (
-        <div
-          transition:name={`cat-img-${vtSlug}`}
-          style="view-transition-class: vt-cat-img;"
-          class="absolute inset-0 bg-gradient-to-br from-gray-800 to-gray-950"
-        />
-      )}
-      <div class="absolute inset-0 bg-gradient-to-r from-black/80 via-black/55 to-black/35" />
+      <div
+        transition:name={`cat-img-${vtSlug}`}
+        style="view-transition-class: vt-cat-img;"
+        class="absolute inset-0 overflow-hidden bg-gray-900"
+      >
+        {category.imageUrl ? (
+          <img
+            src={category.imageUrl}
+            alt={category.name}
+            width="1200"
+            height="600"
+            loading="eager"
+            fetchpriority="high"
+            decoding="async"
+            class="h-full w-full object-cover object-center"
+          />
+        ) : (
+          <div class="h-full w-full bg-gradient-to-br from-gray-800 to-gray-950" />
+        )}
+        {/* Degradado integrado en el mismo wrapper animado que la tarjeta origen */}
+        <div class="absolute inset-0 bg-gradient-to-tr from-black/85 via-black/55 to-black/25" />
+      </div>
 
       <div class="relative z-10 max-w-2xl space-y-2">
         <span class="inline-block px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-white/20 backdrop-blur-md text-white border border-white/20">
