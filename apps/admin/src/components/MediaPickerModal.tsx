@@ -185,6 +185,15 @@ export default function MediaPickerModal({
     }
   };
 
+  const setCoverInDraft = (url: string) => {
+    setDraftUrls((prev) => [url, ...prev.filter((u) => u !== url)]);
+  };
+
+  const extraSelectedUrls = useMemo(() => {
+    const libraryUrls = new Set(items.map((item) => item.url));
+    return draftUrls.filter((u) => !libraryUrls.has(u));
+  }, [draftUrls, items]);
+
   return (
     <dialog
       ref={dialogRef}
@@ -296,61 +305,152 @@ export default function MediaPickerModal({
             {filteredItems.map((item, idx) => {
               const selectedIdx = draftUrls.indexOf(item.url);
               const isSelected = selectedIdx !== -1;
+              const isCover = multiple && selectedIdx === 0;
               const tint = CARD_TINTS[idx % CARD_TINTS.length];
+              const displayName = item.title || item.originalName;
               return (
-                <button
+                <div
                   key={item.id}
-                  type="button"
-                  onClick={() => toggleSelect(item.url)}
-                  className={`group text-left rounded-2xl border p-2 transition-all ${tint} ${
+                  className={`flex flex-col rounded-2xl border p-2 transition-all ${tint} ${
                     isSelected
-                      ? 'ring-2 ring-black border-black shadow-md scale-[0.99]'
+                      ? 'ring-2 ring-black border-black shadow-md'
                       : 'hover:border-gray-400 hover:shadow-sm'
                   }`}
                 >
-                  <div className="relative aspect-square w-full overflow-hidden rounded-xl bg-white/80">
-                    <img
-                      src={item.url}
-                      alt={item.title || item.originalName}
-                      width={item.width}
-                      height={item.height}
-                      loading="lazy"
-                      {...({ fetchpriority: 'low' } as any)}
-                      decoding="async"
-                      className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-                    />
-                    {isSelected && (
-                      <span className="absolute top-2 right-2 rounded-full bg-black text-white text-[10px] font-extrabold px-2 py-0.5 shadow-md">
-                        {multiple ? `#${selectedIdx + 1}` : 'Elegida'}
+                  <button
+                    type="button"
+                    aria-pressed={isSelected}
+                    aria-label={
+                      isSelected
+                        ? `${displayName} seleccionada${multiple ? ` en posición ${selectedIdx + 1}` : ''}, clic para quitar`
+                        : `Seleccionar ${displayName}`
+                    }
+                    onClick={() => toggleSelect(item.url)}
+                    className="group text-left w-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-indigo-600 focus-visible:outline-offset-2 rounded-xl"
+                  >
+                    <div className="relative aspect-square w-full overflow-hidden rounded-xl bg-white/80">
+                      <img
+                        src={item.url}
+                        alt={displayName}
+                        width={item.width}
+                        height={item.height}
+                        loading="lazy"
+                        {...({ fetchpriority: 'low' } as any)}
+                        decoding="async"
+                        className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                      />
+                      {isSelected && (
+                        <span className="absolute top-2 right-2 rounded-full bg-black text-white text-[10px] font-extrabold px-2 py-0.5 shadow-md">
+                          {multiple ? (isCover ? '★ Portada' : `#${selectedIdx + 1}`) : 'Elegida'}
+                        </span>
+                      )}
+                      <span className="absolute bottom-1.5 left-1.5 rounded-md bg-black/70 text-white text-[10px] font-mono px-1.5 py-0.5">
+                        {item.width}x{item.height}
                       </span>
-                    )}
-                    <span className="absolute bottom-1.5 left-1.5 rounded-md bg-black/70 text-white text-[10px] font-mono px-1.5 py-0.5">
-                      {item.width}x{item.height}
-                    </span>
-                  </div>
-                  <div className="mt-2 px-0.5 space-y-0.5">
-                    <p className="text-xs font-bold text-gray-900 truncate">
-                      {item.title || item.originalName}
-                    </p>
-                    <p className="text-[10px] text-gray-600 flex items-center justify-between">
-                      <span>{formatBytes(item.sizeBytes)} WebP</span>
-                      <span>{(item.createdAt || '').slice(0, 10)}</span>
-                    </p>
-                  </div>
-                </button>
+                    </div>
+                    <div className="mt-2 px-0.5 space-y-0.5">
+                      <p className="text-xs font-bold text-gray-900 truncate">
+                        {displayName}
+                      </p>
+                      <p className="text-[10px] text-gray-600 flex items-center justify-between">
+                        <span>{formatBytes(item.sizeBytes)} WebP</span>
+                        <span>{(item.createdAt || '').slice(0, 10)}</span>
+                      </p>
+                    </div>
+                  </button>
+
+                  {multiple && isSelected && (
+                    <div className="mt-2 pt-1.5 border-t border-black/10 flex items-center justify-between gap-1">
+                      {isCover ? (
+                        <span className="text-[10px] font-extrabold text-emerald-700">
+                          ★ Portada principal
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          aria-label={`Establecer ${displayName} como portada principal`}
+                          onClick={() => setCoverInDraft(item.url)}
+                          className="min-h-[28px] w-full rounded-lg bg-white hover:bg-black hover:text-white border border-gray-300 text-[11px] font-bold text-gray-900 px-2 py-1 transition-colors"
+                        >
+                          ★ Hacer portada
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
               );
             })}
           </div>
         )}
       </div>
 
+      {multiple && extraSelectedUrls.length > 0 && (
+        <div className="border-t border-gray-200 bg-amber-50/60 px-5 py-2.5">
+          <p className="text-[11px] font-bold text-gray-700 mb-1.5">
+            Otras fotos del producto (subidas directo o URL externa):
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {extraSelectedUrls.map((extraUrl, idx) => {
+              const pos = draftUrls.indexOf(extraUrl);
+              const isExtraCover = pos === 0;
+              return (
+                <div
+                  key={extraUrl}
+                  className={`inline-flex items-center gap-2 rounded-xl border bg-white p-1.5 text-xs ${
+                    isExtraCover ? 'border-black ring-1 ring-black' : 'border-gray-300'
+                  }`}
+                >
+                  <img
+                    src={extraUrl}
+                    alt={`Foto externa ${idx + 1}`}
+                    className="h-8 w-8 rounded-lg object-cover bg-gray-100 shrink-0"
+                  />
+                  {isExtraCover ? (
+                    <span className="text-[10px] font-extrabold text-emerald-700 px-1">
+                      ★ Portada
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setCoverInDraft(extraUrl)}
+                      className="min-h-[28px] rounded-lg px-2 text-[10px] font-bold text-indigo-700 hover:bg-indigo-50"
+                    >
+                      Hacer portada
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    aria-label={`Quitar foto externa ${idx + 1}`}
+                    onClick={() => toggleSelect(extraUrl)}
+                    className="min-h-[28px] rounded-lg px-2 text-[10px] font-bold text-red-600 hover:bg-red-50"
+                  >
+                    Quitar
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Footer */}
       <div className="flex flex-wrap items-center justify-between gap-3 border-t border-gray-200 bg-gray-50 px-5 py-3.5">
-        <span className="text-xs font-semibold text-gray-600">
-          {draftUrls.length === 0
-            ? 'Ninguna seleccionada'
-            : `${draftUrls.length} ${draftUrls.length === 1 ? 'fotografía seleccionada' : 'fotografías seleccionadas'}`}
-        </span>
+        <div className="flex items-center gap-2.5 min-w-0">
+          {multiple && draftUrls[0] && (
+            <img
+              src={draftUrls[0]}
+              alt="Portada seleccionada"
+              className="h-8 w-8 rounded-lg object-cover border border-gray-300 shrink-0"
+            />
+          )}
+          <span className="text-xs font-semibold text-gray-600 truncate">
+            {draftUrls.length === 0
+              ? 'Ninguna seleccionada'
+              : multiple
+                ? `${draftUrls.length} ${draftUrls.length === 1 ? 'fotografía' : 'fotografías'} (la #1 será la portada)`
+                : '1 fotografía seleccionada'}
+          </span>
+        </div>
         <div className="flex items-center gap-2">
           <button
             type="button"

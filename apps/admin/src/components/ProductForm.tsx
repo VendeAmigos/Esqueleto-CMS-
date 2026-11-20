@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef } from 'react';
+import { flushSync } from 'react-dom';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createProduct, updateProduct } from '../actions/products';
@@ -52,6 +53,8 @@ export default function ProductForm({ categories, initialData, isEdit = false }:
     return Array.from(new Set(merged.filter(Boolean)));
   });
   const [galleryPickerOpen, setGalleryPickerOpen] = useState(false);
+  const [photoStatusMessage, setPhotoStatusMessage] = useState('');
+  const [manualUrlInput, setManualUrlInput] = useState('');
   const [isFeatured, setIsFeatured] = useState(initialData?.isFeatured || false);
   const [isActive, setIsActive] = useState(initialData?.isActive !== false);
   const [modifiers, setModifiers] = useState<ModifierGroup[]>(initialData?.modifiers || []);
@@ -121,9 +124,92 @@ export default function ProductForm({ categories, initialData, isEdit = false }:
     });
   };
 
-  const handleProcessFile = async (file: File) => {
-    if (!file.type.startsWith('image/')) {
-      alert('Por favor selecciona un archivo de imagen válido (JPG, PNG, WebP)');
+  const toSafeVtName = (url: string) => {
+    let hash = 0;
+    for (let i = 0; i < url.length; i++) {
+      hash = ((hash << 5) - hash + url.charCodeAt(i)) | 0;
+    }
+    return `prod-photo-${Math.abs(hash).toString(36)}`;
+  };
+
+  const applyPhotoReorder = (updateFn: () => void, announcement: string) => {
+    const canTransition =
+      typeof document !== 'undefined' &&
+      'startViewTransition' in document &&
+      !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    if (canTransition) {
+      (document as any).startViewTransition(() => {
+        flushSync(updateFn);
+      });
+    } else {
+      updateFn();
+    }
+    setPhotoStatusMessage(announcement);
+  };
+
+  const setCoverPhoto = (url: string, idx: number, total: number) => {
+    applyPhotoReorder(
+      () => {
+        setImageUrl(url);
+        setGalleryImages((prev) => [url, ...prev.filter((u) => u !== url)]);
+      },
+      `Foto ${idx + 1} establecida como portada principal, ${total} fotos en producto.`
+    );
+  };
+
+  const movePhoto = (idx: number, direction: -1 | 1) => {
+    const targetIdx = idx + direction;
+    if (targetIdx < 0 || targetIdx >= galleryImages.length) return;
+    const next = [...galleryImages];
+    const [moved] = next.splice(idx, 1);
+    next.splice(targetIdx, 0, moved);
+    applyPhotoReorder(
+      () => {
+        setGalleryImages(next);
+        setImageUrl(next[0] || '');
+      },
+      `Foto movida a la posición ${targetIdx + 1} de ${next.length}.${targetIdx === 0 ? ' Ahora es la portada principal.' : ''}`
+    );
+  };
+
+  const removePhoto = (url: string, idx: number) => {
+    const next = galleryImages.filter((u) => u !== url);
+    applyPhotoReorder(
+      () => {
+        setGalleryImages(next);
+        if (url === imageUrl) {
+          setImageUrl(next[0] || '');
+        }
+        if (next.length === 0) {
+          setCompressionStats(null);
+        }
+      },
+      `Foto ${idx + 1} eliminada. ${next.length} ${next.length === 1 ? 'foto restante' : 'fotos restantes'}.`
+    );
+  };
+
+  const handleAddManualUrl = () => {
+    const clean = manualUrlInput.trim();
+    if (!clean) return;
+    if (!clean.startsWith('http://') && !clean.startsWith('https://') && !clean.startsWith('/')) {
+      alert('Ingresa una URL válida que comience con https://, http:// o /');
+      return;
+    }
+    const next = Array.from(new Set([...galleryImages, clean]));
+    const assignedCover = !imageUrl.trim() ? clean : imageUrl;
+    setGalleryImages(next);
+    setImageUrl(assignedCover);
+    setManualUrlInput('');
+    setPhotoStatusMessage(
+      `URL agregada. Total ${next.length} ${next.length === 1 ? 'foto' : 'fotos'} en producto.`
+    );
+  };
+
+  const handleProcessFiles = async (fileList: FileList | File[]) => {
+    const validFiles = Array.from(fileList).filter((f) => f.type.startsWith('image/'));
+    if (validFiles.length === 0) {
+      alert('Por favor selecciona al menos un archivo de imagen válido (JPG, PNG, WebP)');
       return;
     }
 
@@ -131,45 +217,65 @@ export default function ProductForm({ categories, initialData, isEdit = false }:
       setIsCompressing(true);
       setCompressionStats(null);
 
-      // 1. Comprimir en cliente
-      const { blob, originalSize, compressedSize } = await compressImage(file);
+      let totalOriginal = 0;
+      let totalCompressed = 0;
+      const uploadedUrls: string[] = [];
 
-      // 2. Subir imagen comprimida al servidor
-      const formData = new FormData();
-      formData.append('file', blob, 'imagen-producto.webp');
+      for (const file of validFiles) {
+        // 1. Comprimir en cliente
+        const { blob, originalSize, compressedSize } = await compressImage(file);
+        totalOriginal += originalSize;
+        totalCompressed += compressedSize;
 
-      const response = await fetch('/api/upload', {
-        method: 'POST',
-        body: formData,
-      });
+        // 2. Subir imagen comprimida al servidor
+        const formData = new FormData();
+        formData.append('file', blob, 'imagen-producto.webp');
 
-      if (!response.ok) {
-        throw new Error('Error al guardar la imagen en el servidor');
+        const response = await fetch('/api/upload', {
+          method: 'POST',
+          body: formData,
+        });
+
+        if (!response.ok) {
+          throw new Error(`Error al guardar "${file.name}" en el servidor`);
+        }
+
+        const data = await response.json();
+        if (data?.url) {
+          uploadedUrls.push(data.url);
+        }
       }
 
-      const data = await response.json();
-      setImageUrl(data.url);
-      setGalleryImages((prev) => Array.from(new Set([data.url, ...prev])));
+      if (uploadedUrls.length > 0) {
+        const merged = Array.from(new Set([...galleryImages, ...uploadedUrls]));
+        setGalleryImages(merged);
+        if (!imageUrl.trim() && merged[0]) {
+          setImageUrl(merged[0]);
+        }
+        setPhotoStatusMessage(
+          `${uploadedUrls.length} ${uploadedUrls.length === 1 ? 'imagen subida' : 'imágenes subidas'}. Total ${merged.length} en el producto.`
+        );
+      }
 
-      // 3. Mostrar métricas de ahorro
+      // 3. Mostrar métricas de ahorro acumuladas
       const formatKB = (bytes: number) =>
         bytes > 1024 * 1024
           ? `${(bytes / (1024 * 1024)).toFixed(1)} MB`
           : `${Math.round(bytes / 1024)} KB`;
 
-      const savingPercent = Math.max(
-        0,
-        Math.round(((originalSize - compressedSize) / originalSize) * 100)
-      );
+      const savingPercent =
+        totalOriginal > 0
+          ? Math.max(0, Math.round(((totalOriginal - totalCompressed) / totalOriginal) * 100))
+          : 0;
 
       setCompressionStats({
-        originalSize: formatKB(originalSize),
-        compressedSize: formatKB(compressedSize),
+        originalSize: formatKB(totalOriginal),
+        compressedSize: formatKB(totalCompressed),
         savingPercent,
       });
     } catch (err: any) {
       console.error(err);
-      alert(err.message || 'Error al procesar la imagen');
+      alert(err.message || 'Error al procesar las imágenes');
     } finally {
       setIsCompressing(false);
     }
@@ -190,7 +296,7 @@ export default function ProductForm({ categories, initialData, isEdit = false }:
     setIsDragging(false);
     const files = e.dataTransfer.files;
     if (files && files.length > 0) {
-      handleProcessFile(files[0]);
+      handleProcessFiles(files);
     }
   };
 
@@ -521,21 +627,24 @@ export default function ProductForm({ categories, initialData, isEdit = false }:
                 ref={fileInputRef}
                 type="file"
                 accept="image/*"
+                multiple
                 className="hidden"
                 onChange={(e) => {
-                  if (e.target.files && e.target.files[0]) {
-                    handleProcessFile(e.target.files[0]);
+                  if (e.target.files && e.target.files.length > 0) {
+                    handleProcessFiles(e.target.files);
+                    e.target.value = '';
                   }
                 }}
               />
 
-              {/* Contenedor Drag & Drop */}
-              <div
+              {/* Contenedor Drag & Drop múltiple */}
+              <button
+                type="button"
                 onDragOver={handleDragOver}
                 onDragLeave={handleDragLeave}
                 onDrop={handleDrop}
                 onClick={() => fileInputRef.current?.click()}
-                className={`relative border-2 border-dashed rounded-2xl p-6 text-center cursor-pointer transition-all duration-200 ${
+                className={`w-full relative border-2 border-dashed rounded-2xl p-6 text-center cursor-pointer transition-all duration-200 ${
                   isDragging
                     ? 'border-indigo-600 bg-indigo-50/50 scale-[1.01]'
                     : 'border-gray-300 hover:border-black bg-gray-50/50'
@@ -543,12 +652,12 @@ export default function ProductForm({ categories, initialData, isEdit = false }:
               >
                 {isCompressing ? (
                   <div className="py-6 flex flex-col items-center justify-center space-y-2">
-                    <svg className="animate-spin h-8 w-8 text-indigo-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <svg className="animate-spin h-8 w-8 text-indigo-600" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
                     </svg>
                     <p className="text-sm font-semibold text-gray-800">
-                      Optimizando y comprimiendo imagen a WebP...
+                      Optimizando y comprimiendo imágenes a WebP...
                     </p>
                     <p className="text-xs text-gray-400">
                       Reduciendo tamaño para máxima velocidad en tienda
@@ -557,13 +666,13 @@ export default function ProductForm({ categories, initialData, isEdit = false }:
                 ) : (
                   <div className="py-4 flex flex-col items-center justify-center space-y-2">
                     <div className="h-12 w-12 rounded-full bg-white shadow-sm flex items-center justify-center text-gray-600">
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                       </svg>
                     </div>
                     <div>
                       <span className="text-sm font-bold text-gray-900">
-                        Arrastra tu imagen aquí
+                        Arrastra una o varias imágenes aquí
                       </span>{' '}
                       <span className="text-sm text-gray-500">o haz clic para explorar</span>
                     </div>
@@ -572,12 +681,12 @@ export default function ProductForm({ categories, initialData, isEdit = false }:
                     </p>
                   </div>
                 )}
-              </div>
+              </button>
 
               {/* Indicador de Ahorro y Optimización */}
               {compressionStats && (
                 <div className="flex items-center gap-2 p-3 bg-emerald-50 rounded-xl border border-emerald-200 text-xs text-emerald-800">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 shrink-0 text-emerald-600" viewBox="0 0 20 20" fill="currentColor">
+                  <svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" className="h-4 w-4 shrink-0 text-emerald-600" viewBox="0 0 20 20" fill="currentColor">
                     <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                   </svg>
                   <span>
@@ -588,15 +697,33 @@ export default function ProductForm({ categories, initialData, isEdit = false }:
               )}
             </div>
           ) : (
-            <div>
-              <input
-                type="url"
-                id="image"
-                value={imageUrl}
-                onChange={(e) => setImageUrl(e.target.value)}
-                className="block w-full rounded-xl border border-gray-300 px-4 py-2.5 text-gray-900 focus:border-black focus:ring-black sm:text-sm font-mono text-xs"
-                placeholder="https://images.unsplash.com/..."
-              />
+            <div className="space-y-2">
+              <label htmlFor="manual-image-url" className="block text-xs font-medium text-gray-600">
+                Pega una URL externa para agregarla a las fotos del producto
+              </label>
+              <div className="flex gap-2">
+                <input
+                  type="url"
+                  id="manual-image-url"
+                  value={manualUrlInput}
+                  onChange={(e) => setManualUrlInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleAddManualUrl();
+                    }
+                  }}
+                  className="block w-full rounded-xl border border-gray-300 px-4 py-2.5 text-gray-900 focus:border-black focus:ring-black sm:text-sm font-mono text-xs"
+                  placeholder="https://images.unsplash.com/..."
+                />
+                <button
+                  type="button"
+                  onClick={handleAddManualUrl}
+                  className="shrink-0 rounded-xl bg-black hover:bg-gray-800 text-white px-4 py-2.5 text-xs font-bold transition-colors"
+                >
+                  + Agregar foto
+                </button>
+              </div>
             </div>
           )}
 
@@ -609,7 +736,7 @@ export default function ProductForm({ categories, initialData, isEdit = false }:
                     <div className="h-16 w-16 overflow-hidden rounded-lg bg-gray-200 shrink-0 border border-gray-300">
                       <img
                         src={imageUrl}
-                        alt="Vista previa"
+                        alt="Portada principal del producto"
                         className="h-full w-full object-cover"
                       />
                     </div>
@@ -617,20 +744,16 @@ export default function ProductForm({ categories, initialData, isEdit = false }:
                       <p className="text-xs font-semibold text-gray-900 truncate max-w-xs">
                         {imageUrl}
                       </p>
-                      <p className="text-[11px] text-emerald-600 font-medium">
-                        Portada principal lista ({galleryImages.length || 1} {galleryImages.length === 1 ? 'foto' : 'fotos'} en producto)
+                      <p className="text-[11px] text-emerald-700 font-semibold">
+                        ★ Portada principal activa ({galleryImages.length || 1} {galleryImages.length === 1 ? 'foto' : 'fotos'} en producto)
                       </p>
                     </div>
                   </div>
                   <button
                     type="button"
-                    onClick={() => {
-                      const remaining = galleryImages.filter((u) => u !== imageUrl);
-                      setGalleryImages(remaining);
-                      setImageUrl(remaining[0] || '');
-                      setCompressionStats(null);
-                    }}
-                    className="text-xs text-red-600 hover:text-red-800 font-semibold p-2 hover:bg-red-50 rounded-lg transition-colors shrink-0"
+                    aria-label="Quitar imagen portada actual"
+                    onClick={() => removePhoto(imageUrl, 0)}
+                    className="min-h-[28px] text-xs text-red-600 hover:text-red-800 font-semibold px-2.5 py-1.5 hover:bg-red-50 rounded-lg transition-colors shrink-0"
                   >
                     Quitar
                   </button>
@@ -638,63 +761,112 @@ export default function ProductForm({ categories, initialData, isEdit = false }:
               )}
 
               {galleryImages.length > 0 && (
-                <div className="rounded-xl border border-gray-200 bg-gray-50/70 p-3 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-gray-700">
-                      Fotos seleccionadas para este producto ({galleryImages.length})
-                    </span>
+                <div className="rounded-xl border border-gray-200 bg-gray-50/70 p-3 space-y-2.5">
+                  <p role="status" className="sr-only">
+                    {photoStatusMessage}
+                  </p>
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <span className="text-xs font-bold text-gray-700 block">
+                        Fotos del producto ({galleryImages.length})
+                      </span>
+                      {galleryImages.length > 1 && (
+                        <span className="text-[11px] text-gray-500">
+                          Haz clic en cualquier foto o en &ldquo;Usar portada&rdquo; para elegir la portada del catálogo.
+                        </span>
+                      )}
+                    </div>
                     <button
                       type="button"
                       onClick={() => setGalleryPickerOpen(true)}
-                      className="text-[11px] font-bold text-indigo-600 hover:underline"
+                      className="min-h-[28px] text-[11px] font-bold text-indigo-600 hover:underline px-1"
                     >
                       + Agregar o quitar de galería
                     </button>
                   </div>
-                  <div className="grid grid-cols-3 sm:grid-cols-5 gap-2.5">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 gap-2.5">
                     {galleryImages.map((url, idx) => {
                       const isCover = url === imageUrl;
                       return (
                         <div
                           key={url}
-                          className={`relative rounded-xl border p-1 bg-white transition-all ${
-                            isCover ? 'border-black ring-2 ring-black/80' : 'border-gray-200'
+                          style={{ viewTransitionName: toSafeVtName(url) } as React.CSSProperties}
+                          className={`relative rounded-xl border p-1.5 bg-white transition-shadow ${
+                            isCover ? 'border-black ring-2 ring-black/80 shadow-sm' : 'border-gray-200 hover:border-gray-400'
                           }`}
                         >
-                          <div className="aspect-square w-full overflow-hidden rounded-lg bg-gray-100">
-                            <img src={url} alt={`Foto ${idx + 1}`} className="h-full w-full object-cover" />
-                          </div>
-                          {isCover && (
-                            <span className="absolute top-2 left-2 rounded-md bg-black/85 text-white text-[9px] font-bold px-1.5 py-0.5">
-                              Principal
-                            </span>
-                          )}
-                          <div className="mt-1 flex items-center justify-between gap-1">
-                            {!isCover ? (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setImageUrl(url);
-                                  setGalleryImages((prev) => [url, ...prev.filter((u) => u !== url)]);
-                                }}
-                                className="text-[10px] font-bold text-indigo-600 hover:underline truncate"
-                              >
-                                Portada
-                              </button>
+                          <button
+                            type="button"
+                            aria-pressed={isCover}
+                            aria-label={
+                              isCover
+                                ? `Foto ${idx + 1}, portada principal actual`
+                                : `Elegir foto ${idx + 1} como portada principal`
+                            }
+                            onClick={() => {
+                              if (!isCover) {
+                                setCoverPhoto(url, idx, galleryImages.length);
+                              }
+                            }}
+                            className="group relative block aspect-square w-full overflow-hidden rounded-lg bg-gray-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-indigo-600 focus-visible:outline-offset-2"
+                          >
+                            <img
+                              src={url}
+                              alt={`Foto ${idx + 1} del producto${isCover ? ' (portada principal)' : ''}`}
+                              className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                            />
+                            {isCover ? (
+                              <span aria-hidden="true" className="absolute top-1.5 left-1.5 rounded-md bg-black/90 text-white text-[10px] font-bold px-1.5 py-0.5 shadow-xs">
+                                ★ Portada
+                              </span>
                             ) : (
-                              <span className="text-[10px] font-bold text-gray-500">#{idx + 1}</span>
+                              <span aria-hidden="true" className="absolute inset-x-1.5 bottom-1.5 rounded-md bg-black/75 text-white text-[10px] font-semibold py-0.5 opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100 transition-opacity">
+                                Usar portada
+                              </span>
                             )}
+                          </button>
+
+                          <div className="mt-1.5 flex items-center justify-between gap-1">
+                            <div className="flex items-center gap-1">
+                              {galleryImages.length > 1 && (
+                                <>
+                                  <button
+                                    type="button"
+                                    disabled={idx === 0}
+                                    aria-label={`Mover foto ${idx + 1} hacia la izquierda`}
+                                    onClick={() => movePhoto(idx, -1)}
+                                    className="min-h-[28px] min-w-[28px] flex items-center justify-center rounded-md border border-gray-200 text-xs font-bold text-gray-700 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed"
+                                  >
+                                    ←
+                                  </button>
+                                  <button
+                                    type="button"
+                                    disabled={idx === galleryImages.length - 1}
+                                    aria-label={`Mover foto ${idx + 1} hacia la derecha`}
+                                    onClick={() => movePhoto(idx, 1)}
+                                    className="min-h-[28px] min-w-[28px] flex items-center justify-center rounded-md border border-gray-200 text-xs font-bold text-gray-700 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed"
+                                  >
+                                    →
+                                  </button>
+                                </>
+                              )}
+                              {!isCover && (
+                                <button
+                                  type="button"
+                                  aria-label={`Usar foto ${idx + 1} como portada principal`}
+                                  onClick={() => setCoverPhoto(url, idx, galleryImages.length)}
+                                  className="min-h-[28px] px-1.5 rounded-md text-[10px] font-bold text-indigo-700 hover:bg-indigo-50"
+                                >
+                                  Portada
+                                </button>
+                              )}
+                            </div>
+
                             <button
                               type="button"
-                              aria-label="Quitar imagen"
-                              onClick={() => {
-                                const next = galleryImages.filter((u) => u !== url);
-                                setGalleryImages(next);
-                                if (url === imageUrl) {
-                                  setImageUrl(next[0] || '');
-                                }
-                              }}
-                              className="text-[10px] font-bold text-red-600 hover:underline"
+                              aria-label={`Quitar foto ${idx + 1} del producto`}
+                              onClick={() => removePhoto(url, idx)}
+                              className="min-h-[28px] min-w-[28px] px-1.5 rounded-md text-[10px] font-bold text-red-600 hover:bg-red-50"
                             >
                               Quitar
                             </button>
@@ -976,6 +1148,11 @@ export default function ProductForm({ categories, initialData, isEdit = false }:
                     {categories.find((c) => c.id === categoryId)?.name || 'Categoría'}
                   </span>
                 )}
+                {galleryImages.length > 1 && (
+                  <span className="absolute bottom-3 right-3 bg-black/80 text-white px-2.5 py-0.5 rounded-full text-[10px] font-bold shadow-xs">
+                    1/{galleryImages.length} fotos
+                  </span>
+                )}
               </div>
               <div className="p-4 space-y-2">
                 <h3 className="font-bold text-gray-900 text-base line-clamp-2">
@@ -1002,17 +1179,16 @@ export default function ProductForm({ categories, initialData, isEdit = false }:
         open={galleryPickerOpen}
         multiple={true}
         selectedUrls={galleryImages}
-        title="Seleccionar fotografías para este producto"
+        title="Seleccionar fotografías y portada del producto"
         onClose={() => setGalleryPickerOpen(false)}
         onConfirm={(urls) => {
           setGalleryImages(urls);
-          if (urls.length > 0) {
-            if (!urls.includes(imageUrl)) {
-              setImageUrl(urls[0]);
-            }
-          } else {
-            setImageUrl('');
-          }
+          setImageUrl(urls[0] || '');
+          setPhotoStatusMessage(
+            urls.length > 0
+              ? `${urls.length} fotografías guardadas en selección; la foto 1 es la portada principal.`
+              : 'Se quitaron las fotografías del producto.'
+          );
         }}
       />
     </form>
