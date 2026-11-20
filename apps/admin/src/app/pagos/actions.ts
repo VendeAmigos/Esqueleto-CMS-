@@ -8,6 +8,11 @@ import { revalidatePath } from 'next/cache';
 import { cookies } from 'next/headers';
 import { verifySessionToken, SESSION_COOKIE_NAME } from '@/lib/auth';
 
+function maskSecret(secret: string): string {
+  if (!secret || secret.length < 12) return '';
+  return `${secret.slice(0, 8)}••••••••${secret.slice(-4)}`;
+}
+
 async function ensureAdminAuthenticated() {
   const cookieStore = cookies();
   const token = cookieStore.get(SESSION_COOKIE_NAME)?.value;
@@ -68,7 +73,11 @@ export async function savePaymentGatewaySettings(formData: FormData) {
 
     return {
       success: true,
-      settings: saved,
+      settings: {
+        ...saved,
+        mpAccessToken: maskSecret(saved.mpAccessToken),
+        mpWebhookSecret: maskSecret(saved.mpWebhookSecret),
+      },
     };
   } catch (error: any) {
     console.error('Error guardando configuración de pagos:', error);

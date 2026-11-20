@@ -169,45 +169,95 @@ export const POST: APIRoute = async ({ request, url }) => {
     const allStoredProducts = await getStoredProducts();
     const dbProducts = allStoredProducts.filter((p) => items.some((i) => i.id === p.id));
 
-    // 2. Mapa de todas las opciones de modificadores
-    const dbOptions = allStoredProducts.flatMap((p) =>
-      (p.modifiers || []).flatMap((m) => m.options || [])
-    );
-
     let subtotalCents = 0;
     const itemsSummaryList: string[] = [];
 
-    // 3. Validar productos y calcular subtotales
+    // 2. Validar productos, cantidades y modificadores exclusivamente contra el catálogo del servidor
     const validatedItems = items.map((item) => {
       const product = dbProducts.find((p) => p.id === item.id);
 
       if (!product) {
-        throw new Error(`Producto no encontrado en el catálogo: ${item.id}`);
+        throw new ValidationError(`Producto no encontrado en el catálogo: ${item.id}`);
       }
 
+      if (product.isActive === false) {
+        throw new ValidationError(`El producto "${product.title}" ya no está disponible.`);
+      }
+
+      const qty = Number(item.quantity);
+      if (!Number.isInteger(qty) || qty < 1 || qty > 999) {
+        throw new ValidationError(`Cantidad inválida para "${product.title}".`);
+      }
+
+      const optionMap = new Map<
+        string,
+        { modifierId: string; modifierName: string; modifierType: string; name: string; priceDelta: number }
+      >();
+      for (const m of product.modifiers || []) {
+        for (const opt of m.options || []) {
+          optionMap.set(opt.id, {
+            modifierId: m.id,
+            modifierName: m.name,
+            modifierType: m.type || 'single',
+            name: opt.name,
+            priceDelta: Number(opt.priceDelta) || 0,
+          });
+        }
+      }
+
+      const seenOptionIds = new Set<string>();
+      const seenSingleModifierIds = new Set<string>();
       let modifiersDelta = 0;
       const modifierLabels: string[] = [];
 
-      (item.selectedModifiers || []).forEach((mod) => {
-        const authenticOpt = dbOptions.find((o) => o.id === mod.optionId);
-        const delta = authenticOpt ? authenticOpt.priceDelta : (mod.priceDelta || 0);
-        modifiersDelta += delta;
-        modifierLabels.push(`${mod.modifierName}: ${mod.optionName}`);
-      });
+      if (Array.isArray(item.selectedModifiers)) {
+        for (const mod of item.selectedModifiers) {
+          const authenticOpt = mod?.optionId ? optionMap.get(String(mod.optionId)) : undefined;
+          if (!authenticOpt) {
+            throw new ValidationError(
+              `Opción de personalización inválida para "${product.title}".`
+            );
+          }
+
+          const optKey = String(mod.optionId);
+          if (seenOptionIds.has(optKey)) {
+            throw new ValidationError(
+              `Opción duplicada "${authenticOpt.name}" en "${product.title}".`
+            );
+          }
+          seenOptionIds.add(optKey);
+
+          if (authenticOpt.modifierType === 'single') {
+            if (seenSingleModifierIds.has(authenticOpt.modifierId)) {
+              throw new ValidationError(
+                `Solo puedes elegir una opción para "${authenticOpt.modifierName}" en "${product.title}".`
+              );
+            }
+            seenSingleModifierIds.add(authenticOpt.modifierId);
+          }
+
+          modifiersDelta += authenticOpt.priceDelta;
+          modifierLabels.push(`${authenticOpt.modifierName}: ${authenticOpt.name}`);
+        }
+      }
 
       const verifiedUnitPriceCents = product.basePrice + modifiersDelta;
-      subtotalCents += verifiedUnitPriceCents * item.quantity;
+      if (!Number.isFinite(verifiedUnitPriceCents) || verifiedUnitPriceCents <= 0) {
+        throw new ValidationError(`El precio calculado para "${product.title}" es inválido.`);
+      }
+
+      subtotalCents += verifiedUnitPriceCents * qty;
 
       const titleWithModifiers = modifierLabels.length > 0
         ? `${product.title} (${modifierLabels.join(', ')})`
         : product.title;
 
-      itemsSummaryList.push(`${item.quantity}x ${titleWithModifiers}`);
+      itemsSummaryList.push(`${qty}x ${titleWithModifiers}`);
 
       return {
         id: product.id,
         title: titleWithModifiers,
-        quantity: item.quantity,
+        quantity: qty,
         unit_price: verifiedUnitPriceCents / 100,
         currency_id: activeCurrency,
         unitPriceCents: verifiedUnitPriceCents,
